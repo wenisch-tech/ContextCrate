@@ -20,6 +20,7 @@ flowchart LR
   P --> Q4[Index work]
   Q4 --> I[Indexer]
   I --> S[(Lucene or OpenSearch)]
+  UI --> S
 ```
 
 `all` runs every module. Distributed roles are `control-plane`, `crawler-http`, `crawler-browser`, `parser`, `extractor`, and `indexer`.
@@ -30,4 +31,4 @@ Work delivery is at least once. IDs derive from run, canonical URL, document, an
 
 ## Storage model
 
-PostgreSQL/H2 owns configurations, immutable runs, frontier state, fetch metadata, normalized documents, chunks, extraction rules, extraction results, users, and local work. Raw bodies live behind `ArtifactStore`. Search indices and extraction results are derived and may be rebuilt from normalized records.
+PostgreSQL/H2 owns configurations, immutable runs, frontier state, fetch metadata, normalized documents, chunks, extraction rules, extraction results, users, and local work. Raw bodies live behind `ArtifactStore`. Search indices and extraction results are derived and may be rebuilt from normalized records. The search API reads the active `SearchIndex` backend, so Lucene and OpenSearch expose the same retrieval contract.

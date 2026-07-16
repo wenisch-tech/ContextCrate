@@ -48,7 +48,7 @@ public class UiController {
   }
 
   @GetMapping("/")
-  String dashboard(Model model) {
+  String dashboard(@RequestParam(defaultValue = "") String q, Model model) throws Exception {
     model.addAttribute("jobs", jobs.jobs());
     model.addAttribute("runs", jobs.runs());
     model.addAttribute("properties", properties);
@@ -58,6 +58,10 @@ public class UiController {
         Arrays.stream(WorkStage.values())
             .collect(java.util.stream.Collectors.toMap(Enum::name, queue::depth)));
     model.addAttribute("documentCount", documents.count());
+        model.addAttribute("searchQuery", q);
+        model.addAttribute(
+          "searchResults",
+          q.isBlank() ? null : index.search(new SearchIndex.SearchRequest(q, 10, null, null)));
     return "dashboard";
   }
 

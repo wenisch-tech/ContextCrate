@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import tech.wenisch.harvex.backup.PortableBackupService;
 import tech.wenisch.harvex.domain.CrawlConfiguration;
 import tech.wenisch.harvex.domain.NormalizedDocument;
+import tech.wenisch.harvex.index.SearchIndex;
 import tech.wenisch.harvex.repository.NormalizedDocumentRepository;
 import tech.wenisch.harvex.service.JobService;
 
@@ -30,6 +31,7 @@ class HarvexPipelineIntegrationTest {
   @Autowired JobService jobs;
   @Autowired NormalizedDocumentRepository documents;
   @Autowired PortableBackupService backups;
+  @Autowired SearchIndex index;
   private HttpServer server;
 
   @BeforeEach
@@ -87,6 +89,9 @@ class HarvexPipelineIntegrationTest {
     }
     assertThat(documents.count()).isEqualTo(2);
     assertThat(documents.findAll()).allMatch(d -> d.isIndexed() && d.getBody().length() > 50);
+    var hits = index.search(new SearchIndex.SearchRequest("deterministic", 10, null, "chunk"));
+    assertThat(hits.hits()).isNotEmpty();
+    assertThat(hits.hits()).allMatch(h -> h.kind().equals("chunk") && h.snippet().contains("deterministic"));
     var bundle = Files.createTempFile("harvex-it-", ".zip");
     try {
       backups.create(bundle, true);

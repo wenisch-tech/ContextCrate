@@ -1,1 +1,105 @@
-<!doctype html><html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Overview · Harvex</title><link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css"><link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css"><link rel="stylesheet" href="/css/harvex.css"></head><body><nav th:replace="~{fragments :: nav}"></nav><main class="container-fluid p-4 p-lg-5"><div class="d-flex justify-content-between align-items-start mb-4"><div><p class="eyebrow">CONTROL PLANE</p><h1 class="display-6 fw-semibold">Crawling overview</h1><p class="text-secondary">A live view of work moving through Harvex.</p></div><a class="btn btn-primary" href="/jobs/new"><i class="bi bi-plus-lg me-1"></i>New job</a></div><div class="row g-3 mb-4"><div class="col-6 col-xl-3"><div class="metric-card"><span>Jobs</span><strong th:text="${jobs.size()}">0</strong></div></div><div class="col-6 col-xl-3"><div class="metric-card"><span>Runs</span><strong th:text="${runs.size()}">0</strong></div></div><div class="col-6 col-xl-3"><div class="metric-card"><span>Documents</span><strong th:text="${documentCount}">0</strong></div></div><div class="col-6 col-xl-3"><div class="metric-card"><span>Index</span><strong class="fs-5" th:classappend="${indexHealth.healthy} ? 'text-success' : 'text-danger'" th:text="${indexHealth.backend}">Lucene</strong></div></div></div><div class="row g-4"><div class="col-xl-8"><section class="card panel"><div class="card-header d-flex justify-content-between"><span>Recent runs</span><a href="/jobs" class="small">Manage jobs</a></div><div class="table-responsive"><table class="table mb-0 align-middle"><thead><tr><th>Run</th><th>Status</th><th>Started</th></tr></thead><tbody><tr th:each="run:${runs}"><td class="font-monospace small" th:text="${run.id}"></td><td><span class="status-pill" th:text="${run.status}"></span></td><td th:text="${run.startedAt}"></td></tr><tr th:if="${runs.empty}"><td colspan="3" class="empty-state">No runs yet. Create a crawl job to begin.</td></tr></tbody></table></div></section></div><div class="col-xl-4"><section class="card panel mb-4"><div class="card-header">Runtime</div><div class="card-body"><div class="backend-row"><span>Profile</span><code th:text="${properties.profile}"></code></div><div class="backend-row"><span>Queue</span><code th:text="${properties.queue.backend}"></code></div><div class="backend-row"><span>Database</span><code th:text="${properties.database.backend}"></code></div><div class="backend-row"><span>Artifacts</span><code th:text="${properties.artifacts.backend}"></code></div><div class="backend-row"><span>Index</span><code th:text="${properties.index.backend}"></code></div></div></section><section class="card panel"><div class="card-header">Queue depth</div><div class="card-body"><div class="backend-row" th:each="q:${queueDepth}"><span th:text="${q.key}"></span><strong th:text="${q.value}"></strong></div></div></section></div></div></main><script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script></body></html>
+<!doctype html>
+<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Overview · Harvex</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/harvex.css">
+</head>
+<body>
+<nav th:replace="~{fragments :: nav}"></nav>
+<main class="container-fluid p-4 p-lg-5">
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+      <p class="eyebrow">CONTROL PLANE</p>
+      <h1 class="display-6 fw-semibold">Crawling overview</h1>
+      <p class="text-secondary">A live view of work moving through Harvex.</p>
+    </div>
+    <a class="btn btn-primary" href="/jobs/new"><i class="bi bi-plus-lg me-1"></i>New job</a>
+  </div>
+
+  <div class="card panel p-4 mb-4">
+    <form class="row g-3 align-items-end" action="/" method="get">
+      <div class="col-lg-10">
+        <label class="form-label">Search indexed content</label>
+        <input class="form-control form-control-lg" name="q" th:value="${searchQuery}" placeholder="Search documents and chunks">
+      </div>
+      <div class="col-lg-2 d-grid">
+        <button class="btn btn-primary btn-lg"><i class="bi bi-search me-1"></i>Search</button>
+      </div>
+    </form>
+    <div th:if="${searchResults != null}" class="mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Search results</h2>
+        <span class="text-secondary small" th:text="${searchResults.hits.size()} + ' hits'"></span>
+      </div>
+      <div class="list-group list-group-flush">
+        <a th:each="hit:${searchResults.hits}" th:href="${hit.canonicalUrl}" target="_blank" class="list-group-item list-group-item-action bg-transparent px-0">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <div class="fw-semibold" th:text="${hit.title ?: hit.canonicalUrl}"></div>
+              <div class="small text-secondary text-truncate" th:text="${hit.canonicalUrl}"></div>
+            </div>
+            <div class="text-end small">
+              <span class="badge text-bg-secondary" th:text="${hit.kind}"></span>
+              <div th:text="${#numbers.formatDecimal(hit.score, 1, 2)}"></div>
+            </div>
+          </div>
+          <p class="mb-0 mt-2 small" th:text="${hit.snippet}"></p>
+        </a>
+        <div th:if="${searchResults.hits.empty}" class="empty-state">No indexed chunks matched this query.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3"><div class="metric-card"><span>Jobs</span><strong th:text="${jobs.size()}">0</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric-card"><span>Runs</span><strong th:text="${runs.size()}">0</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric-card"><span>Documents</span><strong th:text="${documentCount}">0</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric-card"><span>Index</span><strong class="fs-5" th:classappend="${indexHealth.healthy} ? 'text-success' : 'text-danger'" th:text="${indexHealth.backend}">Lucene</strong></div></div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-8">
+      <section class="card panel">
+        <div class="card-header d-flex justify-content-between"><span>Recent runs</span><a href="/jobs" class="small">Manage jobs</a></div>
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle">
+            <thead><tr><th>Run</th><th>Status</th><th>Started</th></tr></thead>
+            <tbody>
+            <tr th:each="run:${runs}">
+              <td class="font-monospace small" th:text="${run.id}"></td>
+              <td><span class="status-pill" th:text="${run.status}"></span></td>
+              <td th:text="${run.startedAt}"></td>
+            </tr>
+            <tr th:if="${runs.empty}"><td colspan="3" class="empty-state">No runs yet. Create a crawl job to begin.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-4">
+      <section class="card panel mb-4">
+        <div class="card-header">Runtime</div>
+        <div class="card-body">
+          <div class="backend-row"><span>Profile</span><code th:text="${properties.profile}"></code></div>
+          <div class="backend-row"><span>Queue</span><code th:text="${properties.queue.backend}"></code></div>
+          <div class="backend-row"><span>Database</span><code th:text="${properties.database.backend}"></code></div>
+          <div class="backend-row"><span>Artifacts</span><code th:text="${properties.artifacts.backend}"></code></div>
+          <div class="backend-row"><span>Index</span><code th:text="${properties.index.backend}"></code></div>
+        </div>
+      </section>
+      <section class="card panel">
+        <div class="card-header">Queue depth</div>
+        <div class="card-body">
+          <div class="backend-row" th:each="q:${queueDepth}"><span th:text="${q.key}"></span><strong th:text="${q.value}"></strong></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+<script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

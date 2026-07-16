@@ -33,23 +33,18 @@ public class OpenSearchSearchIndex implements SearchIndex {
                 "mappings",
                 Map.of(
                     "properties",
-                    Map.of(
-                        "kind",
-                        Map.of("type", "keyword"),
-                        "parent_id",
-                        Map.of("type", "keyword"),
-                        "run_id",
-                        Map.of("type", "keyword"),
-                        "url",
-                        Map.of("type", "keyword"),
-                        "title",
-                        Map.of("type", "text"),
-                        "language",
-                        Map.of("type", "keyword"),
-                        "text",
-                        Map.of("type", "text"),
-                        "content_hash",
-                        Map.of("type", "keyword")))));
+                    Map.ofEntries(
+                      Map.entry("kind", Map.of("type", "keyword")),
+                      Map.entry("parent_id", Map.of("type", "keyword")),
+                      Map.entry("run_id", Map.of("type", "keyword")),
+                      Map.entry("url", Map.of("type", "keyword")),
+                      Map.entry("url_text", Map.of("type", "text")),
+                      Map.entry("title", Map.of("type", "text")),
+                      Map.entry("heading", Map.of("type", "text")),
+                      Map.entry("ordinal", Map.of("type", "integer")),
+                      Map.entry("language", Map.of("type", "keyword")),
+                      Map.entry("text", Map.of("type", "text")),
+                      Map.entry("content_hash", Map.of("type", "keyword"))))));
     request("PUT", "/" + index, mapping, Set.of(200, 400));
   }
 
@@ -70,6 +65,8 @@ public class OpenSearchSearchIndex implements SearchIndex {
             d.getRunId().toString(),
             "url",
             d.getCanonicalUrl(),
+            "url_text",
+            d.getCanonicalUrl(),
             "title",
             nullable(d.getTitle()),
             "language",
@@ -82,27 +79,18 @@ public class OpenSearchSearchIndex implements SearchIndex {
       append(
           bulk,
           c.getId().toString(),
-          Map.of(
-              "kind",
-              "chunk",
-              "parent_id",
-              d.getId().toString(),
-              "run_id",
-              d.getRunId().toString(),
-              "url",
-              d.getCanonicalUrl(),
-              "title",
-              nullable(d.getTitle()),
-              "language",
-              nullable(d.getLanguage()),
-              "text",
-              c.getContent(),
-              "heading",
-              nullable(c.getHeading()),
-              "ordinal",
-              c.getOrdinal(),
-              "content_hash",
-              c.getContentHash()));
+            Map.ofEntries(
+              Map.entry("kind", "chunk"),
+              Map.entry("parent_id", d.getId().toString()),
+              Map.entry("run_id", d.getRunId().toString()),
+              Map.entry("url", d.getCanonicalUrl()),
+              Map.entry("url_text", d.getCanonicalUrl()),
+              Map.entry("title", nullable(d.getTitle())),
+              Map.entry("language", nullable(d.getLanguage())),
+              Map.entry("text", c.getContent()),
+              Map.entry("heading", nullable(c.getHeading())),
+              Map.entry("ordinal", c.getOrdinal()),
+              Map.entry("content_hash", c.getContentHash())));
     request("POST", "/_bulk", bulk.toString(), Set.of(200));
   }
 
@@ -119,6 +107,32 @@ public class OpenSearchSearchIndex implements SearchIndex {
         mapper.writeValueAsString(
             Map.of("query", Map.of("term", Map.of("parent_id", id.toString()))));
     request("POST", "/" + index + "/_delete_by_query", query, Set.of(200));
+  }
+
+  @Override
+  public SearchResults search(SearchRequest request) throws IOException, InterruptedException {
+    initialize();
+    if (request.query().isBlank()) return new SearchResults(request.query(), List.of());
+    Map<String, Object> multiMatch =
+        Map.of(
+            "query", request.query(),
+            "fields", List.of("title^3", "heading^2", "text", "url_text"));
+    List<Map<String, Object>> filters = new ArrayList<>();
+    if (request.kind() != null) filters.add(Map.of("term", Map.of("kind", request.kind())));
+    if (request.runId() != null)
+      filters.add(Map.of("term", Map.of("run_id", request.runId().toString())));
+    Map<String, Object> query = new LinkedHashMap<>();
+    query.put("must", List.of(Map.of("multi_match", multiMatch)));
+    if (!filters.isEmpty()) query.put("filter", filters);
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("size", request.limit());
+    body.put("query", Map.of("bool", query));
+    body.put("highlight", Map.of("fields", Map.of("text", Map.of(), "heading", Map.of())));
+    var response = request("POST", "/" + index + "/_search", mapper.writeValueAsString(body), Set.of(200));
+    var root = mapper.readTree(response).path("hits").path("hits");
+    List<SearchHit> hits = new ArrayList<>();
+    for (var hit : root) hits.add(hit(hit, request.query()));
+    return new SearchResults(request.query(), hits);
   }
 
   @Override
@@ -160,5 +174,39 @@ public class OpenSearchSearchIndex implements SearchIndex {
 
   private static String nullable(String value) {
     return value == null ? "" : value;
+  }
+
+  private static SearchHit hit(com.fasterxml.jackson.databind.JsonNode hit, String query) {
+    var source = hit.path("_source");
+    String kind = source.path("kind").asText();
+    UUID documentId = UUID.fromString(source.path("parent_id").asText());
+    UUID id = UUID.fromString("chunk".equals(kind) ? hit.path("_id").asText() : source.path("parent_id").asText());
+    Integer ordinal = "chunk".equals(kind) ? source.path("ordinal").asInt() : null;
+    return new SearchHit(
+        id,
+        documentId,
+        UUID.fromString(source.path("run_id").asText()),
+        kind,
+        source.path("title").asText(null),
+        source.path("url").asText(null),
+        ordinal,
+        snippet(hit, source.path("text").asText(""), query),
+        (float) hit.path("_score").asDouble());
+  }
+
+  private static String snippet(com.fasterxml.jackson.databind.JsonNode hit, String text, String query) {
+    var highlighted = hit.path("highlight").path("text");
+    if (highlighted.isArray() && highlighted.size() > 0) return highlighted.get(0).asText();
+    if (text.length() <= 240) return text;
+    String lower = text.toLowerCase(Locale.ROOT);
+    int match = -1;
+    for (String term : query.toLowerCase(Locale.ROOT).split("\\s+")) {
+      if (term.isBlank()) continue;
+      match = lower.indexOf(term);
+      if (match >= 0) break;
+    }
+    int start = match < 0 ? 0 : Math.max(0, match - 100);
+    int end = Math.min(text.length(), start + 240);
+    return (start > 0 ? "..." : "") + text.substring(start, end) + (end < text.length() ? "..." : "");
   }
 }
