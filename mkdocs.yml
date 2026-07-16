@@ -1,0 +1,21 @@
+site_name: Harvex
+site_description: Self-hosted crawling and indexing platform
+repo_url: https://github.com/wenisch-tech/Harvex
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: cyan
+nav:
+  - Overview: index.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Pipeline: pipeline.md
+  - Security: security.md
+  - Deployment: deployment.md
+  - Backup & migration: backup-migration.md
+  - API: api.md
+  - Roadmap: roadmap.md
+  - Troubleshooting: troubleshooting.md
+markdown_extensions: [admonition, tables, toc]

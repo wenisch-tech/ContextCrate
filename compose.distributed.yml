@@ -1,0 +1,51 @@
+x-harvex: &harvex
+  image: ghcr.io/wenisch-tech/harvex:latest
+  environment: &environment
+    SPRING_PROFILES_ACTIVE: distributed
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/harvex
+    SPRING_DATASOURCE_USERNAME: harvex
+    SPRING_DATASOURCE_PASSWORD: harvex
+    SPRING_RABBITMQ_HOST: rabbitmq
+    AWS_ACCESS_KEY_ID: harvex
+    AWS_SECRET_ACCESS_KEY: harvex-secret
+    S3_ENDPOINT: http://minio:9000
+    S3_BUCKET: harvex
+    OPENSEARCH_ENDPOINT: http://opensearch:9200
+  depends_on: [postgres, rabbitmq, minio, opensearch]
+services:
+  control-plane:
+    <<: *harvex
+    ports: ["8080:8080"]
+    environment: { <<: *environment, HARVEX_ROLE: control-plane }
+  crawler-http:
+    <<: *harvex
+    environment: { <<: *environment, HARVEX_ROLE: crawler-http }
+  crawler-browser:
+    <<: *harvex
+    image: ghcr.io/wenisch-tech/harvex-browser:latest
+    environment: { <<: *environment, HARVEX_ROLE: crawler-browser }
+  parser:
+    <<: *harvex
+    environment: { <<: *environment, HARVEX_ROLE: parser }
+  indexer:
+    <<: *harvex
+    environment: { <<: *environment, HARVEX_ROLE: indexer }
+  postgres:
+    image: postgres:17-alpine
+    environment: { POSTGRES_DB: harvex, POSTGRES_USER: harvex, POSTGRES_PASSWORD: harvex }
+    volumes: ["postgres:/var/lib/postgresql/data"]
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports: ["15672:15672"]
+    volumes: ["rabbitmq:/var/lib/rabbitmq"]
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment: { MINIO_ROOT_USER: harvex, MINIO_ROOT_PASSWORD: harvex-secret }
+    ports: ["9001:9001"]
+    volumes: ["minio:/data"]
+  opensearch:
+    image: opensearchproject/opensearch:3.2.0
+    environment: { discovery.type: single-node, DISABLE_SECURITY_PLUGIN: "true", OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m" }
+    volumes: ["opensearch:/usr/share/opensearch/data"]
+volumes: { postgres: {}, rabbitmq: {}, minio: {}, opensearch: {} }

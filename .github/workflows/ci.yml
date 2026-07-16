@@ -1,0 +1,28 @@
+name: CI
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+permissions: { contents: read, checks: write, pull-requests: write, packages: read }
+jobs:
+  test:
+    uses: ./.github/workflows/_test.yml
+  docker:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    needs: test
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_docker.yml
+    with:
+      version: 0.1.${{ github.run_number }}
+      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    secrets: inherit
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, docker]
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/_release.yml
+    with:
+      version: 0.1.${{ github.run_number }}
+    secrets: inherit

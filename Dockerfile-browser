@@ -1,0 +1,11 @@
+FROM mcr.microsoft.com/playwright/java:v1.54.0-noble
+WORKDIR /app
+ARG BUILD_VERSION=dev
+ARG BUILD_REVISION=unknown
+LABEL org.opencontainers.image.title="Harvex Browser Worker" org.opencontainers.image.licenses="AGPL-3.0" org.opencontainers.image.version="${BUILD_VERSION}" org.opencontainers.image.revision="${BUILD_REVISION}"
+RUN useradd --system --uid 65532 --create-home harvex
+COPY target/harvex-*.jar /app/app.jar
+RUN chown -R harvex:harvex /app
+USER 65532:65532
+ENV HARVEX_ROLE=crawler-browser
+ENTRYPOINT ["java","-jar","/app/app.jar"]

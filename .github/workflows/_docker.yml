@@ -1,0 +1,48 @@
+name: Docker
+on:
+  workflow_call:
+    inputs:
+      version: { required: true, type: string }
+      push: { required: true, type: boolean }
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: harvex, file: Dockerfile }
+          - { name: harvex-browser, file: Dockerfile-browser }
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '25', cache: maven }
+      - run: mvn -B -DskipTests package
+      - uses: docker/setup-buildx-action@v4
+      - if: inputs.push
+        uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: ${{ inputs.push }}
+          load: ${{ !inputs.push }}
+          tags: |
+            ghcr.io/wenisch-tech/${{ matrix.name }}:${{ inputs.version }}
+            ghcr.io/wenisch-tech/${{ matrix.name }}:latest
+          build-args: |
+            BUILD_VERSION=${{ inputs.version }}
+            BUILD_REVISION=${{ github.sha }}
+      - name: Scan image
+        if: matrix.name == 'harvex'
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/wenisch-tech/${{ matrix.name }}:${{ inputs.version }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+      - if: inputs.push
+        uses: actions/attest-build-provenance@v4
+        with: { subject-name: 'ghcr.io/wenisch-tech/${{ matrix.name }}', subject-digest: '${{ steps.build.outputs.digest }}', push-to-registry: true }

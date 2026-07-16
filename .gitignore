@@ -1,0 +1,12 @@
+/target/
+/site/
+/data/
+/.mvn/
+/.idea/
+/.vscode/
+*.iml
+*.log
+.DS_Store
+dependency-reduced-pom.xml
+mvnw
+mvnw.cmd

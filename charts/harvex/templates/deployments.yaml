@@ -1,0 +1,48 @@
+{{- range $role, $settings := .Values.roles }}
+{{- if $settings.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harvex.fullname" $ }}-{{ $role }}
+  labels:
+    {{- include "harvex.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $role }}
+spec:
+  replicas: {{ $settings.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: harvex, app.kubernetes.io/instance: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }} }
+      annotations: {{- toYaml $.Values.podAnnotations | nindent 8 }}
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532 }
+      containers:
+        - name: harvex
+          image: "{{ if eq $role "crawler-browser" }}{{ $.Values.image.browserRepository }}{{ else }}{{ $.Values.image.repository }}{{ end }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: {{ $.Values.profile | quote }} }
+            - { name: HARVEX_ROLE, value: {{ $role | quote }} }
+            {{- range $name, $value := $.Values.env }}
+            - { name: {{ $name }}, value: {{ $value | quote }} }
+            {{- end }}
+            {{- range $name, $_ := $.Values.secrets }}
+            - name: {{ $name }}
+              valueFrom: { secretKeyRef: { name: {{ include "harvex.fullname" $ }}, key: {{ $name }} } }
+            {{- end }}
+          ports: [{ name: http, containerPort: 8080 }]
+          startupProbe: { httpGet: { path: /actuator/health, port: http }, periodSeconds: 5, failureThreshold: 30 }
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /actuator/health/liveness, port: http }, periodSeconds: 10 }
+          resources: {{- toYaml $.Values.resources | nindent 12 }}
+          {{- if $.Values.persistence.enabled }}
+          volumeMounts: [{ name: data, mountPath: /app/data }]
+          {{- end }}
+      {{- if $.Values.persistence.enabled }}
+      volumes: [{ name: data, persistentVolumeClaim: { claimName: {{ include "harvex.fullname" $ }} } }]
+      {{- end }}
+{{- end }}
+{{- end }}

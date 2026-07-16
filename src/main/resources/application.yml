@@ -1,0 +1,91 @@
+spring:
+  application:
+    name: harvex
+  profiles:
+    default: standalone
+  datasource:
+    url: jdbc:h2:file:./data/harvex;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: manual
+  thymeleaf:
+    cache: false
+management:
+  health:
+    rabbit:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+springdoc:
+  swagger-ui:
+    path: /api
+harvex:
+  profile: standalone
+  role: all
+  queue:
+    backend: local
+  database:
+    backend: h2
+  artifacts:
+    backend: filesystem
+    path: data/artifacts
+  index:
+    backend: lucene
+    path: data/index
+    endpoint: http://localhost:9200
+    prefix: harvex
+  worker:
+    concurrency: 8
+    lease-seconds: 30
+    max-attempts: 5
+  security:
+    initial-admin-email: ${HARVEX_ADMIN_EMAIL:admin@harvex.local}
+    initial-admin-password: ${HARVEX_ADMIN_PASSWORD:admin}
+server:
+  error:
+    include-message: always
+---
+spring:
+  config:
+    activate:
+      on-profile: distributed
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/harvex}
+    username: ${SPRING_DATASOURCE_USERNAME:harvex}
+    password: ${SPRING_DATASOURCE_PASSWORD:harvex}
+harvex:
+  profile: distributed
+  role: ${HARVEX_ROLE:control-plane}
+  queue:
+    backend: rabbitmq
+  database:
+    backend: postgresql
+  artifacts:
+    backend: s3
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    region: ${S3_REGION:us-east-1}
+    bucket: ${S3_BUCKET:harvex}
+    prefix: ${S3_PREFIX:artifacts}
+  index:
+    backend: opensearch
+    endpoint: ${OPENSEARCH_ENDPOINT:http://localhost:9200}
+    prefix: ${OPENSEARCH_PREFIX:harvex}
+management:
+  health:
+    rabbit:
+      enabled: true

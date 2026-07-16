@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:harvex-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+  jpa:
+    hibernate:
+      ddl-auto: validate
+harvex:
+  artifacts:
+    path: target/test-data/artifacts
+  index:
+    path: target/test-data/index
