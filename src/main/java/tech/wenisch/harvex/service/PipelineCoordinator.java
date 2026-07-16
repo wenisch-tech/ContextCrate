@@ -17,6 +17,7 @@ public class PipelineCoordinator {
   private final ObjectMapper mapper;
   private final HttpCrawler crawler;
   private final DocumentParser parser;
+  private final ExtractionService extractor;
   private final DocumentIndexer indexer;
   private final HarvexProperties properties;
   private final MeterRegistry metrics;
@@ -27,6 +28,7 @@ public class PipelineCoordinator {
       ObjectMapper mapper,
       HttpCrawler crawler,
       DocumentParser parser,
+      ExtractionService extractor,
       DocumentIndexer indexer,
       HarvexProperties properties,
       MeterRegistry metrics) {
@@ -34,6 +36,7 @@ public class PipelineCoordinator {
     this.mapper = mapper;
     this.crawler = crawler;
     this.parser = parser;
+    this.extractor = extractor;
     this.indexer = indexer;
     this.properties = properties;
     this.metrics = metrics;
@@ -77,6 +80,7 @@ public class PipelineCoordinator {
           case FETCH -> role.equals("crawler-http");
           case BROWSER_FETCH -> role.equals("crawler-browser");
           case PARSE, DISCOVERY -> role.equals("parser");
+          case EXTRACT -> role.equals("extractor");
           case INDEX -> role.equals("indexer");
         };
   }
@@ -89,6 +93,7 @@ public class PipelineCoordinator {
         case FETCH -> crawler.fetch(payload, false);
         case BROWSER_FETCH -> crawler.fetch(payload, true);
         case PARSE -> parser.parse(payload);
+        case EXTRACT -> extractor.extract(payload);
         case INDEX -> indexer.index(payload);
         case DISCOVERY -> {}
       }

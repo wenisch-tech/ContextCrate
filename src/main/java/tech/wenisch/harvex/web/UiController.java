@@ -3,11 +3,13 @@ package tech.wenisch.harvex.web;
 import static tech.wenisch.harvex.domain.PipelineTypes.WorkStage;
 
 import java.util.*;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import tech.wenisch.harvex.config.HarvexProperties;
 import tech.wenisch.harvex.domain.CrawlConfiguration;
+import tech.wenisch.harvex.domain.PipelineTypes.ExtractionType;
 import tech.wenisch.harvex.index.SearchIndex;
 import tech.wenisch.harvex.queue.PipelineQueue;
 import tech.wenisch.harvex.repository.*;
@@ -21,6 +23,7 @@ public class UiController {
   private final PipelineQueue queue;
   private final SearchIndex index;
   private final NormalizedDocumentRepository documents;
+  private final ExtractionService extraction;
 
   public UiController(
       JobService jobs,
@@ -28,13 +31,15 @@ public class UiController {
       HarvexProperties properties,
       PipelineQueue queue,
       SearchIndex index,
-      NormalizedDocumentRepository documents) {
+      NormalizedDocumentRepository documents,
+      ExtractionService extraction) {
     this.jobs = jobs;
     this.codec = codec;
     this.properties = properties;
     this.queue = queue;
     this.index = index;
     this.documents = documents;
+    this.extraction = extraction;
   }
 
   @GetMapping("/login")
@@ -125,6 +130,39 @@ public class UiController {
   String docs(Model model) {
     model.addAttribute("documents", documents.findTop100ByOrderByCreatedAtDesc());
     return "documents";
+  }
+
+  @GetMapping("/extractions")
+  String extractions(Model model) {
+    model.addAttribute("rules", extraction.rules());
+    model.addAttribute("types", ExtractionType.values());
+    model.addAttribute("runs", jobs.runs());
+    model.addAttribute(
+        "results", extraction.search(null, null, null, null, null, PageRequest.of(0, 50)));
+    model.addAttribute("extraction", extraction);
+    return "extractions";
+  }
+
+  @PostMapping("/extractions/rules")
+  String createExtractionRule(
+      @RequestParam String name,
+      @RequestParam ExtractionType type,
+      @RequestParam(defaultValue = "") String pattern,
+      @RequestParam(defaultValue = "false") boolean enabled) {
+    extraction.createRule(name, type, pattern, enabled);
+    return "redirect:/extractions";
+  }
+
+  @PostMapping("/extractions/rules/{id}/disable")
+  String disableExtractionRule(@PathVariable UUID id) {
+    extraction.deleteRule(id);
+    return "redirect:/extractions";
+  }
+
+  @PostMapping("/extractions/runs/{id}/rebuild")
+  String rebuildRunExtractions(@PathVariable UUID id) {
+    extraction.rebuildRun(id);
+    return "redirect:/extractions";
   }
 
   @GetMapping("/operations")

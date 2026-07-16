@@ -24,7 +24,13 @@ public final class PipelineTypes {
     BROWSER_FETCH,
     PARSE,
     DISCOVERY,
+    EXTRACT,
     INDEX
+  }
+
+  public enum ExtractionType {
+    IP_ADDRESS,
+    REGEX
   }
 
   public enum WorkStatus {

@@ -9,5 +9,7 @@ import tech.wenisch.harvex.domain.NormalizedDocument;
 public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDocument, UUID> {
   Optional<NormalizedDocument> findByRunIdAndCanonicalUrl(UUID runId, String canonicalUrl);
 
+  List<NormalizedDocument> findByRunId(UUID runId);
+
   List<NormalizedDocument> findTop100ByOrderByCreatedAtDesc();
 }

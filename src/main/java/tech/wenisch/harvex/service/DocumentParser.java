@@ -27,6 +27,7 @@ public class DocumentParser {
   private final ConfigurationCodec codec;
   private final UrlPolicy urls;
   private final PipelineQueue queue;
+  private final ExtractionService extraction;
   private final ObjectMapper mapper;
 
   public DocumentParser(
@@ -39,6 +40,7 @@ public class DocumentParser {
       ConfigurationCodec codec,
       UrlPolicy urls,
       PipelineQueue queue,
+      ExtractionService extraction,
       ObjectMapper mapper) {
     this.fetches = fetches;
     this.runs = runs;
@@ -49,6 +51,7 @@ public class DocumentParser {
     this.codec = codec;
     this.urls = urls;
     this.queue = queue;
+    this.extraction = extraction;
     this.mapper = mapper;
   }
 
@@ -123,6 +126,7 @@ public class DocumentParser {
     List<DocumentChunk> created =
         chunk(document, text, config.output().chunkSize(), config.output().chunkOverlap());
     chunks.saveAll(created);
+    extraction.publish(document, false);
     discover(run, fetch, page, config);
     queue.publish(
         PipelineMessage.create(

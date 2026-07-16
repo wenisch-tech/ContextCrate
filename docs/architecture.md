@@ -14,12 +14,15 @@ flowchart LR
   Q2 --> P[JSoup parser]
   P --> F
   P --> D[(Relational store)]
-  P --> Q3[Index work]
-  Q3 --> I[Indexer]
+  P --> Q3[Extract work]
+  Q3 --> E[Extractor]
+  E --> D
+  P --> Q4[Index work]
+  Q4 --> I[Indexer]
   I --> S[(Lucene or OpenSearch)]
 ```
 
-`all` runs every module. Distributed roles are `control-plane`, `crawler-http`, `crawler-browser`, `parser`, and `indexer`.
+`all` runs every module. Distributed roles are `control-plane`, `crawler-http`, `crawler-browser`, `parser`, `extractor`, and `indexer`.
 
 ## Consistency
 
@@ -27,4 +30,4 @@ Work delivery is at least once. IDs derive from run, canonical URL, document, an
 
 ## Storage model
 
-PostgreSQL/H2 owns configurations, immutable runs, frontier state, fetch metadata, normalized documents, chunks, users, and local work. Raw bodies live behind `ArtifactStore`. Search indices are derived and may always be rebuilt from normalized records.
+PostgreSQL/H2 owns configurations, immutable runs, frontier state, fetch metadata, normalized documents, chunks, extraction rules, extraction results, users, and local work. Raw bodies live behind `ArtifactStore`. Search indices and extraction results are derived and may be rebuilt from normalized records.

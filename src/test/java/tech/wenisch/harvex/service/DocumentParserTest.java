@@ -30,6 +30,7 @@ class DocumentParserTest {
   @Mock FrontierEntryRepository frontier;
   @Mock ArtifactStore artifacts;
   @Mock PipelineQueue queue;
+    @Mock ExtractionService extraction;
 
   @Test
   void persistsAlreadyRenderedAutoFetchInsteadOfRequestingBrowserAgain() throws Exception {
@@ -46,6 +47,7 @@ class DocumentParserTest {
             codec,
             new UrlPolicy(true),
             queue,
+            extraction,
             mapper);
     UUID runId = UUID.randomUUID();
     UUID jobId = UUID.randomUUID();
@@ -88,6 +90,7 @@ class DocumentParserTest {
     ArgumentCaptor<NormalizedDocument> document = ArgumentCaptor.forClass(NormalizedDocument.class);
     verify(documents).save(document.capture());
     assertThat(document.getValue().getBody()).isEqualTo("Rendered");
+        verify(extraction).publish(document.getValue(), false);
     verify(queue, never()).publish(argThat(message -> message.stage() == WorkStage.BROWSER_FETCH));
     verify(queue).publish(argThat(message -> message.stage() == WorkStage.INDEX));
   }
