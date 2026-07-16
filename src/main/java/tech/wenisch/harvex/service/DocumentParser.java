@@ -76,7 +76,8 @@ public class DocumentParser {
     String text = normalize(root == null ? "" : root.text());
     if (text.length() < 100
         && scriptCount > 3
-        && config.reliability().renderMode() == CrawlConfiguration.RenderMode.AUTO) {
+        && config.reliability().renderMode() == CrawlConfiguration.RenderMode.AUTO
+        && !browserRendered(fetch)) {
       UUID frontierId = fetch.getFrontierEntryId();
       queue.publish(
           PipelineMessage.create(
@@ -201,6 +202,11 @@ public class DocumentParser {
     Element link = page.selectFirst("link[rel=canonical][href]");
     String raw = link == null ? fetch.getFinalUrl() : link.absUrl("href");
     return raw == null || raw.isBlank() ? fetch.getRequestedUrl() : raw;
+  }
+
+  private static boolean browserRendered(FetchRecord fetch) {
+    String key = fetch.getArtifactKey();
+    return key != null && key.endsWith(".rendered.html");
   }
 
   private static String normalize(String text) {
