@@ -22,3 +22,7 @@ roles:
 ```
 
 Provide connection settings through `env` and `secrets`. Queue-aware KEDA scaling can target RabbitMQ queue length without changing the application.
+
+## Embedding model storage
+
+Persist `/app/data/models` so the default local model is downloaded only once. To run air-gapped, mount a compatible ONNX bundle at `/models` and set `HARVEX_EMBEDDINGS_LOCAL_MODEL_PATH=/models`. Helm exposes the same choice through `embeddings.local.modelPathMount`. See [Embeddings](embeddings.md) for endpoint and rebuild configuration.

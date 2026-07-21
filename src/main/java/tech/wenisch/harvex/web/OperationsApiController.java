@@ -7,6 +7,7 @@ import tech.wenisch.harvex.domain.PipelineTypes.*;
 import tech.wenisch.harvex.index.SearchIndex;
 import tech.wenisch.harvex.queue.*;
 import tech.wenisch.harvex.repository.*;
+import tech.wenisch.harvex.service.IndexRebuildService;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -17,6 +18,7 @@ public class OperationsApiController {
   private final NormalizedDocumentRepository documents;
   private final DocumentChunkRepository chunks;
   private final AuditLogRepository audits;
+  private final IndexRebuildService rebuild;
 
   public OperationsApiController(
       PipelineQueue queue,
@@ -24,13 +26,15 @@ public class OperationsApiController {
       HarvexProperties properties,
       NormalizedDocumentRepository documents,
       DocumentChunkRepository chunks,
-      AuditLogRepository audits) {
+      AuditLogRepository audits,
+      IndexRebuildService rebuild) {
     this.queue = queue;
     this.index = index;
     this.properties = properties;
     this.documents = documents;
     this.chunks = chunks;
     this.audits = audits;
+    this.rebuild = rebuild;
   }
 
   @GetMapping("/system")
@@ -81,6 +85,11 @@ public class OperationsApiController {
   @PostMapping("/index/commit")
   public void commit() throws Exception {
     index.commit();
+  }
+
+  @PostMapping("/index/rebuild")
+  public Map<String, Long> rebuild() throws Exception {
+    return Map.of("documents", rebuild.rebuild());
   }
 
   @GetMapping("/audit")

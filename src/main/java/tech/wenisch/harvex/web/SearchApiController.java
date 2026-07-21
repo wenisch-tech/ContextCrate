@@ -18,8 +18,9 @@ public class SearchApiController {
       @RequestParam("q") String query,
       @RequestParam(defaultValue = "10") int limit,
       @RequestParam(required = false) UUID runId,
-      @RequestParam(required = false) String kind)
+      @RequestParam(required = false) String kind,
+      @RequestParam(required = false) String mode)
       throws Exception {
-    return index.search(new SearchIndex.SearchRequest(query, limit, runId, kind));
+    return index.search(new SearchIndex.SearchRequest(query, limit, runId, kind, mode));
   }
 }

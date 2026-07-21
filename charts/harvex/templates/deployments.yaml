@@ -26,6 +26,17 @@ spec:
           env:
             - { name: SPRING_PROFILES_ACTIVE, value: {{ $.Values.profile | quote }} }
             - { name: HARVEX_ROLE, value: {{ $role | quote }} }
+            - { name: HARVEX_EMBEDDINGS_ENABLED, value: {{ $.Values.embeddings.enabled | quote }} }
+            - { name: HARVEX_EMBEDDINGS_PROVIDER, value: {{ $.Values.embeddings.provider | quote }} }
+            - { name: HARVEX_EMBEDDINGS_LOCAL_CACHE_PATH, value: {{ $.Values.embeddings.local.cachePath | quote }} }
+            - { name: HARVEX_EMBEDDINGS_LOCAL_MODEL_PATH, value: {{ $.Values.embeddings.local.modelPath | quote }} }
+            - { name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL, value: {{ $.Values.embeddings.openaiCompatible.baseUrl | quote }} }
+            - { name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL, value: {{ $.Values.embeddings.openaiCompatible.model | quote }} }
+            - { name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS, value: {{ $.Values.embeddings.openaiCompatible.dimensions | quote }} }
+            {{- if $.Values.embeddings.openaiCompatible.apiKeySecret }}
+            - name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ $.Values.embeddings.openaiCompatible.apiKeySecret }}, key: api-key } }
+            {{- end }}
             {{- range $name, $value := $.Values.env }}
             - { name: {{ $name }}, value: {{ $value | quote }} }
             {{- end }}
@@ -39,10 +50,18 @@ spec:
           livenessProbe: { httpGet: { path: /actuator/health/liveness, port: http }, periodSeconds: 10 }
           resources: {{- toYaml $.Values.resources | nindent 12 }}
           {{- if $.Values.persistence.enabled }}
-          volumeMounts: [{ name: data, mountPath: /app/data }]
+          volumeMounts:
+            - { name: data, mountPath: /app/data }
+          {{- if $.Values.embeddings.local.modelPathMount }}
+            - { name: embedding-model, mountPath: {{ $.Values.embeddings.local.modelPath | quote }}, readOnly: true }
+          {{- end }}
           {{- end }}
       {{- if $.Values.persistence.enabled }}
-      volumes: [{ name: data, persistentVolumeClaim: { claimName: {{ include "harvex.fullname" $ }} } }]
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: {{ include "harvex.fullname" $ }} } }
+      {{- if $.Values.embeddings.local.modelPathMount }}
+        - { name: embedding-model, persistentVolumeClaim: { claimName: {{ $.Values.embeddings.local.modelPathMount }} } }
+      {{- end }}
       {{- end }}
 {{- end }}
 {{- end }}

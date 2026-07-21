@@ -24,7 +24,8 @@ import tech.wenisch.harvex.service.JobService;
       "harvex.crawler.allow-private-networks=true",
       "harvex.worker.poll-delay-ms=50",
       "harvex.artifacts.path=target/it-data/artifacts",
-      "harvex.index.path=target/it-data/index"
+      "harvex.index.path=target/it-data/index",
+      "harvex.embeddings.enabled=false"
     })
 @ActiveProfiles("test")
 class HarvexPipelineIntegrationTest {

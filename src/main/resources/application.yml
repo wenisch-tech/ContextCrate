@@ -49,6 +49,28 @@ harvex:
     path: data/index
     endpoint: http://localhost:9200
     prefix: harvex
+  embeddings:
+    enabled: ${HARVEX_EMBEDDINGS_ENABLED:true}
+    provider: ${HARVEX_EMBEDDINGS_PROVIDER:local}
+    local:
+      model-id: ${HARVEX_EMBEDDINGS_LOCAL_MODEL_ID:Xenova/multilingual-e5-small}
+      revision: ${HARVEX_EMBEDDINGS_LOCAL_REVISION:97cb8f96eaed1a1f0dac821239943e854fce9c36}
+      download-url: ${HARVEX_EMBEDDINGS_LOCAL_DOWNLOAD_URL:https://huggingface.co/Xenova/multilingual-e5-small/resolve/97cb8f96eaed1a1f0dac821239943e854fce9c36}
+      cache-path: ${HARVEX_EMBEDDINGS_LOCAL_CACHE_PATH:data/models}
+      model-path: ${HARVEX_EMBEDDINGS_LOCAL_MODEL_PATH:}
+      download-timeout-seconds: ${HARVEX_EMBEDDINGS_LOCAL_DOWNLOAD_TIMEOUT_SECONDS:120}
+    openai-compatible:
+      base-url: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL:}
+      model: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL:}
+      api-key: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY:}
+      headers: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_HEADERS:}
+      dimensions: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS:1536}
+      timeout-seconds: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_TIMEOUT_SECONDS:30}
+  retrieval:
+    default-mode: ${HARVEX_RETRIEVAL_DEFAULT_MODE:hybrid}
+    hybrid-fusion: rrf
+    rrf-constant: ${HARVEX_RETRIEVAL_RRF_CONSTANT:60}
+    candidate-limit: ${HARVEX_RETRIEVAL_CANDIDATE_LIMIT:100}
   worker:
     concurrency: 8
     lease-seconds: 30

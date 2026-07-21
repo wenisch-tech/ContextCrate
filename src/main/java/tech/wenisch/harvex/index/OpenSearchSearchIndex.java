@@ -1,212 +1,25 @@
 package tech.wenisch.harvex.index;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.*;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
-import tech.wenisch.harvex.config.HarvexProperties;
-import tech.wenisch.harvex.domain.DocumentChunk;
-import tech.wenisch.harvex.domain.NormalizedDocument;
+import com.fasterxml.jackson.databind.*;
+import java.io.IOException; import java.net.*; import java.net.http.*; import java.nio.charset.StandardCharsets; import java.util.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty; import org.springframework.stereotype.Component;
+import tech.wenisch.harvex.config.HarvexProperties; import tech.wenisch.harvex.domain.*; import tech.wenisch.harvex.embedding.EmbeddingProvider;
 
-@Component
-@ConditionalOnProperty(name = "harvex.index.backend", havingValue = "opensearch")
+@Component @ConditionalOnProperty(name="harvex.index.backend",havingValue="opensearch")
 public class OpenSearchSearchIndex implements SearchIndex {
-  private final HttpClient client = HttpClient.newHttpClient();
-  private final ObjectMapper mapper;
-  private final String endpoint, index;
-
-  public OpenSearchSearchIndex(HarvexProperties p, ObjectMapper mapper) {
-    this.mapper = mapper;
-    endpoint = p.index().endpoint().replaceAll("/+$", "");
-    index = p.index().prefix() + "-content-v1";
-  }
-
-  @Override
-  public void initialize() throws IOException, InterruptedException {
-    var mapping =
-        mapper.writeValueAsString(
-            Map.of(
-                "mappings",
-                Map.of(
-                    "properties",
-                    Map.ofEntries(
-                      Map.entry("kind", Map.of("type", "keyword")),
-                      Map.entry("parent_id", Map.of("type", "keyword")),
-                      Map.entry("run_id", Map.of("type", "keyword")),
-                      Map.entry("url", Map.of("type", "keyword")),
-                      Map.entry("url_text", Map.of("type", "text")),
-                      Map.entry("title", Map.of("type", "text")),
-                      Map.entry("heading", Map.of("type", "text")),
-                      Map.entry("ordinal", Map.of("type", "integer")),
-                      Map.entry("language", Map.of("type", "keyword")),
-                      Map.entry("text", Map.of("type", "text")),
-                      Map.entry("content_hash", Map.of("type", "keyword"))))));
-    request("PUT", "/" + index, mapping, Set.of(200, 400));
-  }
-
-  @Override
-  public void upsert(NormalizedDocument d, List<DocumentChunk> chunks)
-      throws IOException, InterruptedException {
-    initialize();
-    StringBuilder bulk = new StringBuilder();
-    append(
-        bulk,
-        d.getId().toString(),
-        Map.of(
-            "kind",
-            "document",
-            "parent_id",
-            d.getId().toString(),
-            "run_id",
-            d.getRunId().toString(),
-            "url",
-            d.getCanonicalUrl(),
-            "url_text",
-            d.getCanonicalUrl(),
-            "title",
-            nullable(d.getTitle()),
-            "language",
-            nullable(d.getLanguage()),
-            "text",
-            d.getBody(),
-            "content_hash",
-            d.getContentHash()));
-    for (var c : chunks)
-      append(
-          bulk,
-          c.getId().toString(),
-            Map.ofEntries(
-              Map.entry("kind", "chunk"),
-              Map.entry("parent_id", d.getId().toString()),
-              Map.entry("run_id", d.getRunId().toString()),
-              Map.entry("url", d.getCanonicalUrl()),
-              Map.entry("url_text", d.getCanonicalUrl()),
-              Map.entry("title", nullable(d.getTitle())),
-              Map.entry("language", nullable(d.getLanguage())),
-              Map.entry("text", c.getContent()),
-              Map.entry("heading", nullable(c.getHeading())),
-              Map.entry("ordinal", c.getOrdinal()),
-              Map.entry("content_hash", c.getContentHash())));
-    request("POST", "/_bulk", bulk.toString(), Set.of(200));
-  }
-
-  private void append(StringBuilder b, String id, Map<String, Object> source) throws IOException {
-    b.append(mapper.writeValueAsString(Map.of("index", Map.of("_index", index, "_id", id))))
-        .append('\n')
-        .append(mapper.writeValueAsString(source))
-        .append('\n');
-  }
-
-  @Override
-  public void delete(UUID id) throws IOException, InterruptedException {
-    String query =
-        mapper.writeValueAsString(
-            Map.of("query", Map.of("term", Map.of("parent_id", id.toString()))));
-    request("POST", "/" + index + "/_delete_by_query", query, Set.of(200));
-  }
-
-  @Override
-  public SearchResults search(SearchRequest request) throws IOException, InterruptedException {
-    initialize();
-    if (request.query().isBlank()) return new SearchResults(request.query(), List.of());
-    Map<String, Object> multiMatch =
-        Map.of(
-            "query", request.query(),
-            "fields", List.of("title^3", "heading^2", "text", "url_text"));
-    List<Map<String, Object>> filters = new ArrayList<>();
-    if (request.kind() != null) filters.add(Map.of("term", Map.of("kind", request.kind())));
-    if (request.runId() != null)
-      filters.add(Map.of("term", Map.of("run_id", request.runId().toString())));
-    Map<String, Object> query = new LinkedHashMap<>();
-    query.put("must", List.of(Map.of("multi_match", multiMatch)));
-    if (!filters.isEmpty()) query.put("filter", filters);
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("size", request.limit());
-    body.put("query", Map.of("bool", query));
-    body.put("highlight", Map.of("fields", Map.of("text", Map.of(), "heading", Map.of())));
-    var response = request("POST", "/" + index + "/_search", mapper.writeValueAsString(body), Set.of(200));
-    var root = mapper.readTree(response).path("hits").path("hits");
-    List<SearchHit> hits = new ArrayList<>();
-    for (var hit : root) hits.add(hit(hit, request.query()));
-    return new SearchResults(request.query(), hits);
-  }
-
-  @Override
-  public void commit() throws IOException, InterruptedException {
-    request("POST", "/" + index + "/_refresh", "", Set.of(200));
-  }
-
-  @Override
-  public IndexHealth health() {
-    try {
-      var response = request("GET", "/" + index + "/_count", null, Set.of(200));
-      long count = mapper.readTree(response).path("count").asLong();
-      return new IndexHealth("opensearch", true, count, endpoint);
-    } catch (Exception e) {
-      return new IndexHealth("opensearch", false, 0, e.getMessage());
-    }
-  }
-
-  private String request(String method, String path, String body, Set<Integer> expected)
-      throws IOException, InterruptedException {
-    var builder =
-        HttpRequest.newBuilder(URI.create(endpoint + path))
-            .header("Content-Type", "application/json");
-    if (body == null) builder.method(method, HttpRequest.BodyPublishers.noBody());
-    else builder.method(method, HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
-    var response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
-    if (!expected.contains(response.statusCode()))
-      throw new IOException(
-          "OpenSearch "
-              + method
-              + " "
-              + path
-              + " returned "
-              + response.statusCode()
-              + ": "
-              + response.body());
-    return response.body();
-  }
-
-  private static String nullable(String value) {
-    return value == null ? "" : value;
-  }
-
-  private static SearchHit hit(com.fasterxml.jackson.databind.JsonNode hit, String query) {
-    var source = hit.path("_source");
-    String kind = source.path("kind").asText();
-    UUID documentId = UUID.fromString(source.path("parent_id").asText());
-    UUID id = UUID.fromString("chunk".equals(kind) ? hit.path("_id").asText() : source.path("parent_id").asText());
-    Integer ordinal = "chunk".equals(kind) ? source.path("ordinal").asInt() : null;
-    return new SearchHit(
-        id,
-        documentId,
-        UUID.fromString(source.path("run_id").asText()),
-        kind,
-        source.path("title").asText(null),
-        source.path("url").asText(null),
-        ordinal,
-        snippet(hit, source.path("text").asText(""), query),
-        (float) hit.path("_score").asDouble());
-  }
-
-  private static String snippet(com.fasterxml.jackson.databind.JsonNode hit, String text, String query) {
-    var highlighted = hit.path("highlight").path("text");
-    if (highlighted.isArray() && highlighted.size() > 0) return highlighted.get(0).asText();
-    if (text.length() <= 240) return text;
-    String lower = text.toLowerCase(Locale.ROOT);
-    int match = -1;
-    for (String term : query.toLowerCase(Locale.ROOT).split("\\s+")) {
-      if (term.isBlank()) continue;
-      match = lower.indexOf(term);
-      if (match >= 0) break;
-    }
-    int start = match < 0 ? 0 : Math.max(0, match - 100);
-    int end = Math.min(text.length(), start + 240);
-    return (start > 0 ? "..." : "") + text.substring(start, end) + (end < text.length() ? "..." : "");
-  }
+  private final HttpClient client=HttpClient.newHttpClient(); private final ObjectMapper mapper; private final String endpoint,index; private final EmbeddingProvider embeddings; private final HarvexProperties.Retrieval retrieval;
+  public OpenSearchSearchIndex(HarvexProperties p,ObjectMapper mapper,EmbeddingProvider embeddings){this.mapper=mapper;endpoint=p.index().endpoint().replaceAll("/+$","");index=p.index().prefix()+"-content-v2";this.embeddings=embeddings;retrieval=p.retrieval();}
+  @Override public void initialize()throws IOException,InterruptedException { var props=new LinkedHashMap<String,Object>(); for(String key:List.of("kind","parent_id","run_id","url","language","content_hash"))props.put(key,Map.of("type","keyword"));for(String key:List.of("url_text","title","heading","text"))props.put(key,Map.of("type","text"));props.put("ordinal",Map.of("type","integer")); if (embeddings.descriptor().dimensions() > 0) { props.put("embedding_model",Map.of("type","keyword"));props.put("embedding",Map.of("type","knn_vector","dimension",embeddings.descriptor().dimensions(),"method",Map.of("name","hnsw","engine","lucene","space_type","cosinesimil"))); } request("PUT","/"+index,mapper.writeValueAsString(Map.of("settings",Map.of("index.knn",true),"mappings",Map.of("properties",props))),Set.of(200,400)); }
+  @Override public void upsert(NormalizedDocument d,List<DocumentChunk> chunks)throws IOException,InterruptedException {initialize();try{StringBuilder bulk=new StringBuilder();append(bulk,d.getId().toString(),source(d,"document",null,d.getBody(),embeddings.available()?embeddings.embedDocuments(List.of(d.getBody())).getFirst():null));for(var c:chunks)append(bulk,c.getId().toString(),source(d,"chunk",c,c.getContent(),embeddings.available()?embeddings.embedDocuments(List.of(c.getContent())).getFirst():null));request("POST","/_bulk",bulk.toString(),Set.of(200));}catch(Exception e){throw new IOException("Could not create document embeddings",e);}}
+  private Map<String,Object> source(NormalizedDocument d,String kind,DocumentChunk c,String text,float[] vector){var s=new LinkedHashMap<String,Object>();s.put("kind",kind);s.put("parent_id",d.getId().toString());s.put("run_id",d.getRunId().toString());s.put("url",d.getCanonicalUrl());s.put("url_text",d.getCanonicalUrl());s.put("title",nullable(d.getTitle()));s.put("language",nullable(d.getLanguage()));s.put("text",text);s.put("content_hash",c==null?d.getContentHash():c.getContentHash());if(c!=null){s.put("heading",nullable(c.getHeading()));s.put("ordinal",c.getOrdinal());}if(vector!=null){s.put("embedding",vector);s.put("embedding_model",embeddings.descriptor().modelId()+":"+embeddings.descriptor().version());}return s;}
+  private void append(StringBuilder b,String id,Map<String,Object>s)throws IOException{b.append(mapper.writeValueAsString(Map.of("index",Map.of("_index",index,"_id",id)))).append('\n').append(mapper.writeValueAsString(s)).append('\n');}
+  @Override public void delete(UUID id)throws IOException,InterruptedException{request("POST","/"+index+"/_delete_by_query",mapper.writeValueAsString(Map.of("query",Map.of("term",Map.of("parent_id",id.toString())))),Set.of(200));}
+  @Override public SearchResults search(SearchRequest r)throws IOException,InterruptedException{initialize();if(r.query().isBlank())return new SearchResults(r.query(),mode(r),List.of());String mode=mode(r);try{List<SearchHit>lex=mode.equals("semantic")?List.of():searchBody(r,false);List<SearchHit>sem=mode.equals("lexical")?List.of():searchBody(r,true);return new SearchResults(r.query(),mode,mode.equals("hybrid")?fuse(lex,sem,r.limit()):limit(mode.equals("lexical")?lex:sem,r.limit()));}catch(Exception e){if(e instanceof IOException io)throw io;throw new IOException("Search failed",e);}}
+  private String mode(SearchRequest r){return r.mode()!=null?r.mode():(embeddings.available()?retrieval.defaultMode():"lexical");}
+  private List<SearchHit> searchBody(SearchRequest r,boolean semantic)throws Exception{if(semantic&&!embeddings.available())throw new IllegalStateException("Semantic search requested but embeddings are unavailable");List<Map<String,Object>> filters=filters(r);Map<String,Object> query;if(semantic){query=Map.of("knn",Map.of("embedding",Map.of("vector",embeddings.embedQuery(r.query()),"k",retrieval.candidateLimit(),"filter",filters.isEmpty()?Map.of("match_all",Map.of()):Map.of("bool",Map.of("filter",filters)))));}else {var bool=new LinkedHashMap<String,Object>();bool.put("must",List.of(Map.of("multi_match",Map.of("query",r.query(),"fields",List.of("title^3","heading^2","text","url_text")))));if(!filters.isEmpty())bool.put("filter",filters);query=Map.of("bool",bool);}var body=Map.of("size",retrieval.candidateLimit(),"query",query,"highlight",Map.of("fields",Map.of("text",Map.of(),"heading",Map.of())));JsonNode hits=mapper.readTree(request("POST","/"+index+"/_search",mapper.writeValueAsString(body),Set.of(200))).path("hits").path("hits");List<SearchHit>out=new ArrayList<>();for(JsonNode h:hits)out.add(hit(h,r.query(),!semantic));return out;}
+  private static List<Map<String,Object>> filters(SearchRequest r){var x=new ArrayList<Map<String,Object>>();if(r.kind()!=null)x.add(Map.of("term",Map.of("kind",r.kind())));if(r.runId()!=null)x.add(Map.of("term",Map.of("run_id",r.runId().toString())));return x;}
+  @Override public void commit()throws IOException,InterruptedException{request("POST","/"+index+"/_refresh","",Set.of(200));} @Override public IndexHealth health(){try{long count=mapper.readTree(request("GET","/"+index+"/_count",null,Set.of(200))).path("count").asLong();return new IndexHealth("opensearch",true,count,endpoint+"; embeddings="+embeddings.available());}catch(Exception e){return new IndexHealth("opensearch",false,0,e.getMessage());}}
+  private String request(String method,String path,String body,Set<Integer>expected)throws IOException,InterruptedException{var b=HttpRequest.newBuilder(URI.create(endpoint+path)).header("Content-Type","application/json");var response=client.send(body==null?b.method(method,HttpRequest.BodyPublishers.noBody()).build():b.method(method,HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8)).build(),HttpResponse.BodyHandlers.ofString());if(!expected.contains(response.statusCode()))throw new IOException("OpenSearch "+method+" "+path+" returned "+response.statusCode()+": "+response.body());return response.body();}
+  private static SearchHit hit(JsonNode h,String q,boolean lexical){var s=h.path("_source");String kind=s.path("kind").asText();UUID doc=UUID.fromString(s.path("parent_id").asText());UUID id=UUID.fromString(kind.equals("chunk")?h.path("_id").asText():s.path("parent_id").asText());String text=s.path("text").asText("");String snippet=h.path("highlight").path("text").isArray()&&h.path("highlight").path("text").size()>0?h.path("highlight").path("text").get(0).asText():snippet(text,q);float score=(float)h.path("_score").asDouble();return new SearchHit(id,doc,UUID.fromString(s.path("run_id").asText()),kind,s.path("title").asText(null),s.path("url").asText(null),kind.equals("chunk")?s.path("ordinal").asInt():null,snippet,score,lexical?score:null,lexical?null:score);}
+  private List<SearchHit> fuse(List<SearchHit>a,List<SearchHit>b,int n){var all=new LinkedHashMap<UUID,SearchHit>();var score=new HashMap<UUID,Float>();for(int i=0;i<a.size();i++){var h=a.get(i);all.put(h.id(),h);score.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}for(int i=0;i<b.size();i++){var h=b.get(i);all.putIfAbsent(h.id(),h);score.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}return all.values().stream().map(h->new SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.canonicalUrl(),h.chunkOrdinal(),h.snippet(),score.get(h.id()),find(a,h.id(),true),find(b,h.id(),false))).sorted(Comparator.comparing(SearchHit::score).reversed().thenComparing(h->h.id().toString())).limit(n).toList();}private static Float find(List<SearchHit>x,UUID id,boolean l){return x.stream().filter(h->h.id().equals(id)).map(h->l?h.lexicalScore():h.semanticScore()).findFirst().orElse(null);}private static List<SearchHit>limit(List<SearchHit>x,int n){return x.stream().limit(n).toList();}private static String nullable(String x){return x==null?"":x;}private static String snippet(String t,String q){if(t.length()<=240)return t;int p=t.toLowerCase(Locale.ROOT).indexOf(q.toLowerCase(Locale.ROOT));int a=p<0?0:Math.max(0,p-100),b=Math.min(t.length(),a+240);return(a>0?"...":"")+t.substring(a,b)+(b<t.length()?"...":"");}
 }

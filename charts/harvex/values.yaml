@@ -19,5 +19,18 @@ resources:
   limits: { cpu: "2", memory: 2Gi }
 env: {}
 secrets: {}
+embeddings:
+  enabled: true
+  provider: local
+  local:
+    cachePath: /app/data/models
+    modelPath: /models
+    # Set modelPathMount when supplying a pre-downloaded compatible model bundle.
+    modelPathMount: ""
+  openaiCompatible:
+    baseUrl: ""
+    model: ""
+    apiKeySecret: ""
+    dimensions: 1536
 podAnnotations: {}
 serviceMonitor: { enabled: false, interval: 30s }

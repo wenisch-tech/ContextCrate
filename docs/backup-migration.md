@@ -8,6 +8,6 @@ API operations:
 - `POST /api/v1/backups/validate` with multipart field `file`
 - `POST /api/v1/backups/restore` with multipart field `file`
 
-Restore requires an empty target database, verifies checksums before importing, writes artifacts through the selected adapter, recreates unfinished work, and queues every normalized document for target-index rebuild. Retain the source installation and bundle until counts and target health are verified.
+Restore requires an empty target database, verifies checksums before importing, writes artifacts through the selected adapter, recreates unfinished work, and queues every normalized document for target-index rebuild. Search-index internals and vectors are not copied: configure the desired embedding provider/model, then run `POST /api/v1/index/rebuild` to recreate the derived vector generation. Retain the source installation and bundle until counts and target health are verified.
 
 Administrative users and external service credentials are deliberately not exported. Create the destination administrator and inject destination secrets separately.

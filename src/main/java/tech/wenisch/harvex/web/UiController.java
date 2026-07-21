@@ -61,7 +61,7 @@ public class UiController {
         model.addAttribute("searchQuery", q);
         model.addAttribute(
           "searchResults",
-          q.isBlank() ? null : index.search(new SearchIndex.SearchRequest(q, 10, null, null)));
+          q.isBlank() ? null : index.search(new SearchIndex.SearchRequest(q, 10, null, null, null)));
     return "dashboard";
   }
 

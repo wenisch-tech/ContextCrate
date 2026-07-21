@@ -1,6 +1,6 @@
 # Harvex
 
-Harvex is a self-hosted crawling, extraction, and retrieval platform. It fetches raw pages, stores immutable artifacts, normalizes text and metadata with JSoup, creates deterministic chunks, extracts structured matches, and indexes documents/chunks in Lucene or OpenSearch for BM25-style search.
+Harvex is a self-hosted crawling, extraction, and retrieval platform. It fetches raw pages, stores immutable artifacts, normalizes text and metadata with JSoup, creates deterministic chunks, extracts structured matches, and indexes documents/chunks in Lucene or OpenSearch for lexical, semantic, and hybrid search.
 
 ## What it can do today
 
@@ -14,11 +14,12 @@ Harvex is a self-hosted crawling, extraction, and retrieval platform. It fetches
 - Store extraction results with rule, run, document, chunk, offsets, matched value, and context.
 - Rebuild extraction results for a run or document after rule changes.
 - Index document and chunk records in Lucene or OpenSearch.
-- Search indexed content with BM25-style ranking through the API and the landing page.
+- Search indexed content with BM25, vector similarity, or RRF-hybrid ranking through the API and landing page.
+- Generate embeddings locally with the default multilingual ONNX model or through an OpenAI-compatible endpoint.
 - Browse jobs, runs, documents, extraction rules/results, queue state, index health, and operations in the administration UI.
 - Use REST/OpenAPI endpoints, metrics, audit logging, API keys, and portable backup/restore.
 
-Harvex is not a complete RAG system yet. It has the crawling, chunking, extraction, indexing, and retrieval substrate. LLM generation, embeddings, hybrid retrieval, feedback, and reranking are roadmap items.
+Harvex is not a complete RAG system yet. It has crawling, chunking, extraction, BM25/vector hybrid retrieval, and the substrate for future LLM answer generation. LLM generation, feedback, and reranking remain roadmap items. See [embedding configuration](docs/embeddings.md).
 
 ## Pipeline
 
@@ -37,10 +38,10 @@ flowchart LR
   E --> R[(Extraction results)]
   D --> W4[Index work]
   W4 --> I[Lucene or OpenSearch]
-  I --> S[BM25 search]
+  I --> S[Lexical + vector search]
 ```
 
-The crawler writes raw artifacts before database records point at them. The parser creates canonical normalized documents and deterministic chunks. Extraction is derived work over `DocumentChunk.content`; it does not mutate crawled artifacts, normalized document bodies, chunk IDs, or search-index contracts. Indexing writes equivalent document/chunk fields to Lucene or OpenSearch, and search reads the active backend with the same API contract.
+The crawler writes raw artifacts before database records point at them. The parser creates canonical normalized documents and deterministic chunks. Extraction is derived work over `DocumentChunk.content`; it does not mutate crawled artifacts, normalized document bodies, chunk IDs, or search-index contracts. Indexing writes equivalent document/chunk fields and, when enabled, model-versioned vectors to Lucene or OpenSearch. Search reads the active backend through one lexical/semantic/hybrid API contract.
 
 ## Standalone quick start
 
@@ -76,15 +77,15 @@ Swagger UI is available at `/api`; OpenAPI JSON is available at `/v3/api-docs`.
 
 - Jobs and runs: `GET/POST /api/v1/jobs`, `POST /api/v1/jobs/{id}/runs`, `GET /api/v1/runs`
 - Documents and chunks: `GET /api/v1/documents`, `GET /api/v1/documents/{id}/chunks`
-- Search: `GET /api/v1/search?q=...&kind=chunk&limit=20`
+- Search: `GET /api/v1/search?q=...&kind=chunk&mode=hybrid&limit=20`
 - Extraction rules: `GET/POST /api/v1/extraction-rules`, `PUT/DELETE /api/v1/extraction-rules/{id}`
 - Extraction results: `GET /api/v1/extraction-results`, `GET /api/v1/extraction-rules/{id}/results`
 - Rebuild extraction: `POST /api/v1/runs/{id}/extractions/rebuild`, `POST /api/v1/documents/{id}/extractions/rebuild`
-- Operations: `GET /api/v1/system`, `GET /api/v1/queue/dead-letters`, `POST /api/v1/index/commit`
+- Operations: `GET /api/v1/system`, `GET /api/v1/queue/dead-letters`, `POST /api/v1/index/commit`, `POST /api/v1/index/rebuild`
 - Backups: `POST /api/v1/backups`
 
 ## Current scope
 
-Version 1 focuses on durable crawling, normalization, chunking, structured extraction, BM25 retrieval, operations, and portability. Vector embeddings, hybrid retrieval, answer generation, feedback collection, reranking, and learning-to-rank controls are intentionally deferred.
+Harvex now includes durable crawling, normalization, chunking, structured extraction, BM25/vector hybrid retrieval, operations, and portability. LLM answer generation, feedback collection, reranking, and learning-to-rank controls remain deferred.
 
 Documentation lives in [`docs`](docs/index.md). Harvex is licensed under AGPL-3.0.

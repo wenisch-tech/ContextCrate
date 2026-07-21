@@ -24,3 +24,7 @@ Robots enforcement is on by default. Private, loopback, link-local, metadata, an
 ## Environment examples
 
 Spring properties map to uppercase underscore environment variables. Distributed connection variables are shown in `compose.distributed.yml`. AWS credentials use the standard AWS SDK provider chain.
+
+## Embeddings
+
+Embeddings default to the local ONNX provider. See [Embeddings](embeddings.md) for local cache/offline model configuration, OpenAI-compatible endpoints, and retrieval-mode settings.

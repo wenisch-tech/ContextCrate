@@ -19,3 +19,7 @@ Use the browser image, which contains Chromium and its OS dependencies. The norm
 ## Index differs after migration
 
 Restore queues a complete rebuild. Wait for index queue depth to reach zero and compare normalized-document and index counts.
+
+## Semantic search is unavailable
+
+Lexical search still works when embeddings are disabled or unhealthy. Check that the local bundle contains `tokenizer.json` and an ONNX model, that its cache is writable, or that the OpenAI-compatible endpoint/model/dimension are configured. After a model change, call `POST /api/v1/index/rebuild`.

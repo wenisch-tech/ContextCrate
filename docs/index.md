@@ -13,4 +13,4 @@ The default standalone profile runs in one JVM with file-backed H2, a database q
 5. Parse, normalize, extract links and metadata, and create stable chunks.
 6. Index document and chunk records.
 
-Retrieval and ranking are described in the roadmap but are not exposed in version 1.
+Retrieval supports lexical BM25, semantic-vector, and RRF-hybrid modes. The default embedding provider runs a local multilingual ONNX model; an OpenAI-compatible embeddings endpoint can be selected instead. The remaining roadmap covers feedback, evaluation, reranking, and LLM answer generation.
