@@ -19,7 +19,7 @@ Harvex is a self-hosted crawling, extraction, and retrieval platform. It fetches
 - Browse jobs, runs, documents, extraction rules/results, queue state, index health, and operations in the administration UI.
 - Use REST/OpenAPI endpoints, metrics, audit logging, API keys, and portable backup/restore.
 
-Harvex is not a complete RAG system yet. It has crawling, chunking, extraction, BM25/vector hybrid retrieval, and the substrate for future LLM answer generation. LLM generation, feedback, and reranking remain roadmap items. See [embedding configuration](docs/embeddings.md).
+Harvex is a RAG retrieval and answer-generation platform: it crawls, chunks, retrieves with BM25/vector hybrid search, and can stream cited answers from a configured OpenAI-compatible LLM. Feedback, evaluation, and reranking remain roadmap items. See [embedding configuration](docs/embeddings.md) and [answer generation](docs/answers.md).
 
 ## Pipeline
 
@@ -78,6 +78,7 @@ Swagger UI is available at `/api`; OpenAPI JSON is available at `/v3/api-docs`.
 - Jobs and runs: `GET/POST /api/v1/jobs`, `POST /api/v1/jobs/{id}/runs`, `GET /api/v1/runs`
 - Documents and chunks: `GET /api/v1/documents`, `GET /api/v1/documents/{id}/chunks`
 - Search: `GET /api/v1/search?q=...&kind=chunk&mode=hybrid&limit=20`
+- Stream an answer: `POST /api/v1/answers` (configure an OpenAI-compatible chat endpoint first)
 - Extraction rules: `GET/POST /api/v1/extraction-rules`, `PUT/DELETE /api/v1/extraction-rules/{id}`
 - Extraction results: `GET /api/v1/extraction-results`, `GET /api/v1/extraction-rules/{id}/results`
 - Rebuild extraction: `POST /api/v1/runs/{id}/extractions/rebuild`, `POST /api/v1/documents/{id}/extractions/rebuild`
@@ -86,6 +87,6 @@ Swagger UI is available at `/api`; OpenAPI JSON is available at `/v3/api-docs`.
 
 ## Current scope
 
-Harvex now includes durable crawling, normalization, chunking, structured extraction, BM25/vector hybrid retrieval, operations, and portability. LLM answer generation, feedback collection, reranking, and learning-to-rank controls remain deferred.
+Harvex now includes durable crawling, normalization, chunking, structured extraction, BM25/vector hybrid retrieval, cited LLM answer generation, operations, and portability. Feedback collection, reranking, and learning-to-rank controls remain deferred.
 
 Documentation lives in [`docs`](docs/index.md). Harvex is licensed under AGPL-3.0.

@@ -6,4 +6,6 @@
 4. Introduce offline judgments, reproducible evaluation sets, and NDCG/MRR/recall dashboards.
 5. Add pluggable rerankers, feature logging, model/version registries, shadow evaluation, and learning-to-rank rollout controls.
 
+Answer generation is now available through a configured OpenAI-compatible streaming endpoint. Feedback and evaluation remain prerequisites for ranking optimization.
+
 No crawler or normalized-document contract needs to change for these phases; new index versions are rebuilt from the canonical relational data.

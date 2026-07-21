@@ -32,5 +32,11 @@ embeddings:
     model: ""
     apiKeySecret: ""
     dimensions: 1536
+answering:
+  enabled: false
+  openaiCompatible:
+    baseUrl: ""
+    model: ""
+    apiKeySecret: ""
 podAnnotations: {}
 serviceMonitor: { enabled: false, interval: 30s }

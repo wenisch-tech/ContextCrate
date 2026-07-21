@@ -28,3 +28,7 @@ Spring properties map to uppercase underscore environment variables. Distributed
 ## Embeddings
 
 Embeddings default to the local ONNX provider. See [Embeddings](embeddings.md) for local cache/offline model configuration, OpenAI-compatible endpoints, and retrieval-mode settings.
+
+## Answer generation
+
+Answer generation is disabled by default. Set `HARVEX_ANSWERING_ENABLED=true` and configure `HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL`, `HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL`, and a secret-backed `HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY`. See [RAG answer generation](answers.md) for limits, SSE behavior, and safety controls.

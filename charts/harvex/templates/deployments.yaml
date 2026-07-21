@@ -33,9 +33,16 @@ spec:
             - { name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL, value: {{ $.Values.embeddings.openaiCompatible.baseUrl | quote }} }
             - { name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL, value: {{ $.Values.embeddings.openaiCompatible.model | quote }} }
             - { name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS, value: {{ $.Values.embeddings.openaiCompatible.dimensions | quote }} }
+            - { name: HARVEX_ANSWERING_ENABLED, value: {{ $.Values.answering.enabled | quote }} }
+            - { name: HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL, value: {{ $.Values.answering.openaiCompatible.baseUrl | quote }} }
+            - { name: HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL, value: {{ $.Values.answering.openaiCompatible.model | quote }} }
             {{- if $.Values.embeddings.openaiCompatible.apiKeySecret }}
             - name: HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY
               valueFrom: { secretKeyRef: { name: {{ $.Values.embeddings.openaiCompatible.apiKeySecret }}, key: api-key } }
+            {{- end }}
+            {{- if $.Values.answering.openaiCompatible.apiKeySecret }}
+            - name: HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ $.Values.answering.openaiCompatible.apiKeySecret }}, key: api-key } }
             {{- end }}
             {{- range $name, $value := $.Values.env }}
             - { name: {{ $name }}, value: {{ $value | quote }} }

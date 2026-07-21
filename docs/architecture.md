@@ -32,3 +32,5 @@ Work delivery is at least once. IDs derive from run, canonical URL, document, an
 ## Storage model
 
 PostgreSQL/H2 owns configurations, immutable runs, frontier state, fetch metadata, normalized documents, chunks, extraction rules, extraction results, users, and local work. Raw bodies live behind `ArtifactStore`. Search indices, including model-versioned embeddings, and extraction results are derived and may be rebuilt from normalized records. The search API reads the active `SearchIndex` backend, so Lucene and OpenSearch expose the same lexical/semantic/hybrid retrieval contract.
+
+Answer generation is stateless derived work: it retrieves chunk context, calls a configured OpenAI-compatible chat provider, and streams cited text without persisting prompts, histories, or answers. Only privacy-safe operational metadata is audited.

@@ -12,6 +12,7 @@ nav:
   - Architecture: architecture.md
   - Configuration: configuration.md
   - Embeddings: embeddings.md
+  - Answers: answers.md
   - Pipeline: pipeline.md
   - Security: security.md
   - Deployment: deployment.md

@@ -8,6 +8,7 @@ import tech.wenisch.harvex.index.SearchIndex;
 import tech.wenisch.harvex.queue.*;
 import tech.wenisch.harvex.repository.*;
 import tech.wenisch.harvex.service.IndexRebuildService;
+import tech.wenisch.harvex.answer.AnswerService;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -19,6 +20,7 @@ public class OperationsApiController {
   private final DocumentChunkRepository chunks;
   private final AuditLogRepository audits;
   private final IndexRebuildService rebuild;
+  private final AnswerService answers;
 
   public OperationsApiController(
       PipelineQueue queue,
@@ -27,7 +29,8 @@ public class OperationsApiController {
       NormalizedDocumentRepository documents,
       DocumentChunkRepository chunks,
       AuditLogRepository audits,
-      IndexRebuildService rebuild) {
+      IndexRebuildService rebuild,
+      AnswerService answers) {
     this.queue = queue;
     this.index = index;
     this.properties = properties;
@@ -35,6 +38,7 @@ public class OperationsApiController {
     this.chunks = chunks;
     this.audits = audits;
     this.rebuild = rebuild;
+    this.answers = answers;
   }
 
   @GetMapping("/system")
@@ -58,8 +62,8 @@ public class OperationsApiController {
             properties.index().backend()),
         "queues",
         depths,
-        "indexHealth",
-        index.health());
+        "indexHealth", index.health(),
+        "answeringAvailable", answers.available());
   }
 
   @GetMapping("/queue/dead-letters")

@@ -71,6 +71,21 @@ harvex:
     hybrid-fusion: rrf
     rrf-constant: ${HARVEX_RETRIEVAL_RRF_CONSTANT:60}
     candidate-limit: ${HARVEX_RETRIEVAL_CANDIDATE_LIMIT:100}
+  answering:
+    enabled: ${HARVEX_ANSWERING_ENABLED:false}
+    provider: openai-compatible
+    retrieval-mode: ${HARVEX_ANSWERING_RETRIEVAL_MODE:hybrid}
+    source-limit: ${HARVEX_ANSWERING_SOURCE_LIMIT:8}
+    context-token-budget: ${HARVEX_ANSWERING_CONTEXT_TOKEN_BUDGET:6000}
+    max-history-messages: ${HARVEX_ANSWERING_MAX_HISTORY_MESSAGES:10}
+    temperature: ${HARVEX_ANSWERING_TEMPERATURE:0.2}
+    max-output-tokens: ${HARVEX_ANSWERING_MAX_OUTPUT_TOKENS:800}
+    openai-compatible:
+      base-url: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL:}
+      model: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL:}
+      api-key: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY:}
+      headers: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_HEADERS:}
+      timeout-seconds: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_TIMEOUT_SECONDS:60}
   worker:
     concurrency: 8
     lease-seconds: 30

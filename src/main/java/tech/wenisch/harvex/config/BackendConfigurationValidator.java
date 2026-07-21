@@ -21,6 +21,8 @@ public class BackendConfigurationValidator implements ApplicationRunner {
     require("index", properties.index().backend(), Set.of("lucene", "opensearch"));
     require("embeddings provider", properties.embeddings().provider(), Set.of("local", "openai-compatible"));
     require("retrieval mode", properties.retrieval().defaultMode(), Set.of("lexical", "semantic", "hybrid"));
+    require("answering provider", properties.answering().provider(), Set.of("openai-compatible"));
+    require("answering retrieval mode", properties.answering().retrievalMode(), Set.of("lexical", "semantic", "hybrid"));
     require(
         "role",
         properties.role(),

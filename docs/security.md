@@ -8,5 +8,6 @@
 - Queue messages contain references and identifiers, never raw content or credentials.
 - Do not store secrets in job JSON. S3, database, RabbitMQ, and OpenSearch credentials come from environment/secret stores.
 - Embedding API keys must be injected from a secret store. Remote embedding providers receive the indexed/query text, so use TLS and approve the endpoint as a data processor.
+- Answer-generation API keys must also come from a secret store. Answer providers receive the question, caller-supplied history, and retrieved chunk context; Harvex treats that context as untrusted and does not persist it in audit logs.
 
 Local users are BCrypt-backed through Spring Security. The initial user is created only when the user table is empty. OIDC dependencies are present for deployment integration; provider registration is configured through standard Spring Security properties.

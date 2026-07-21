@@ -14,6 +14,7 @@ public record HarvexProperties(
     Index index,
     Embeddings embeddings,
     Retrieval retrieval,
+    Answering answering,
     Worker worker,
     Security security) {
 
@@ -21,7 +22,7 @@ public record HarvexProperties(
   public HarvexProperties(
       String profile, String role, Queue queue, Database database, Artifacts artifacts, Index index,
       Worker worker, Security security) {
-    this(profile, role, queue, database, artifacts, index, null, null, worker, security);
+    this(profile, role, queue, database, artifacts, index, null, null, null, worker, security);
   }
 
   @ConstructorBinding
@@ -40,6 +41,7 @@ public record HarvexProperties(
             : index;
     embeddings = embeddings == null ? Embeddings.defaults() : embeddings;
     retrieval = retrieval == null ? new Retrieval("hybrid", "rrf", 60, 100) : retrieval;
+    answering = answering == null ? Answering.defaults() : answering;
     worker = worker == null ? new Worker(8, 30, 5) : worker;
     security = security == null ? new Security("admin@harvex.local", "admin") : security;
   }
@@ -110,6 +112,27 @@ public record HarvexProperties(
       hybridFusion = defaulted(hybridFusion, "rrf");
       rrfConstant = Math.max(1, rrfConstant);
       candidateLimit = Math.max(10, Math.min(candidateLimit, 1000));
+    }
+  }
+
+  public record Answering(boolean enabled, String provider, OpenAiCompatible openaiCompatible,
+                          String retrievalMode, int sourceLimit, int contextTokenBudget,
+                          int maxHistoryMessages, double temperature, int maxOutputTokens) {
+    static Answering defaults() {
+      return new Answering(false, "openai-compatible", new OpenAiCompatible(null, null, null, null, 60), "hybrid", 8, 6000, 10, 0.2, 800);
+    }
+    public Answering {
+      provider = defaulted(provider, "openai-compatible");
+      openaiCompatible = openaiCompatible == null ? new OpenAiCompatible(null, null, null, null, 60) : openaiCompatible;
+      retrievalMode = defaulted(retrievalMode, "hybrid");
+      sourceLimit = Math.max(1, Math.min(sourceLimit, 20));
+      contextTokenBudget = Math.max(256, Math.min(contextTokenBudget, 100_000));
+      maxHistoryMessages = Math.max(0, Math.min(maxHistoryMessages, 50));
+      temperature = Math.max(0, Math.min(temperature, 2));
+      maxOutputTokens = Math.max(32, Math.min(maxOutputTokens, 16_000));
+    }
+    public record OpenAiCompatible(String baseUrl, String model, String apiKey, String headers, int timeoutSeconds) {
+      public OpenAiCompatible { timeoutSeconds = Math.max(5, timeoutSeconds); }
     }
   }
 
