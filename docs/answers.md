@@ -42,6 +42,19 @@ No generated answer is guaranteed correct. Treat citations as a route to inspect
 
 The dashboard includes **Ask Harvex**, which shows retrieved sources before answer text arrives, links inline citation markers to those sources, and allows the request to be cancelled. If the provider is not configured, the UI explains that answer generation is unavailable while ordinary search remains usable.
 
+## Runtime RAG settings
+
+The authenticated **Settings** page controls answer policy without editing deployment files:
+
+- **Knowledge-base-only answers** prevents general-knowledge answers. If retrieval finds no chunks, Harvex returns a clear no-answer result without calling the LLM.
+- **Client-supplied conversation history** can be disabled for strictly single-turn answers.
+- **Inline citations** controls whether the model is instructed to write `[n]` markers; **structured sources** controls whether the `sources` SSE event is returned to clients.
+- **Default retrieval mode** and **maximum sources** set the RAG policy used when callers omit request-level retrieval options. The deployment configuration remains the upper source-count limit.
+
+These settings are stored in Harvex’s database and take effect on the next answer request. Endpoint URL, model, API key, context budget, and token limits remain deployment-level settings because they affect secrets and infrastructure.
+
+The same page also configures the active embedding provider: select local ONNX or an OpenAI-compatible endpoint, choose local model/download/cache paths, set remote model dimensions, configure answer endpoint/model, and store provider API-key overrides. Persisted settings take precedence over environment values immediately. API keys are stored in Harvex’s database when entered here, so protect database backups and access and enable storage-level encryption for production deployments.
+
 Each attempt creates an `ANSWER_GENERATED` audit event containing only actor, model identifier, retrieval mode, source count, completion status, and latency. Configuration, prompts, credentials, question text, history, answer text, and source content are never written to the audit log.
 
 For Kubernetes, configure `answering.enabled`, `answering.openaiCompatible.baseUrl`, and `answering.openaiCompatible.model`; reference a Secret containing `api-key` with `answering.openaiCompatible.apiKeySecret`.

@@ -21,6 +21,8 @@ Harvex is a self-hosted crawling, extraction, and retrieval platform. It fetches
 
 Harvex is a RAG retrieval and answer-generation platform: it crawls, chunks, retrieves with BM25/vector hybrid search, and can stream cited answers from a configured OpenAI-compatible LLM. Feedback, evaluation, and reranking remain roadmap items. See [embedding configuration](docs/embeddings.md) and [answer generation](docs/answers.md).
 
+The built-in **Settings** page lets administrators choose whether answers must be grounded in the knowledge base, permit request-only conversation history, include citations, select retrieval/source defaults, and configure embedding/answer providers, models, URLs, local model paths, and API keys. Saved settings take precedence over environment configuration; protect the database and backups when storing API keys there.
+
 ## Pipeline
 
 ```mermaid

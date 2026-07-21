@@ -10,27 +10,29 @@ import java.nio.LongBuffer;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
-import tech.wenisch.harvex.config.HarvexProperties;
+import tech.wenisch.harvex.config.RuntimeProviderSettings;
 
 @Component
-@ConditionalOnExpression("'${harvex.embeddings.enabled:true}' == 'true' and '${harvex.embeddings.provider:local}' == 'local'")
 public class LocalOnnxEmbeddingProvider implements EmbeddingProvider {
-  private final HarvexProperties.Embeddings.Local config;
+  private final RuntimeProviderSettings settings;
   private volatile HuggingFaceTokenizer tokenizer;
   private volatile OrtEnvironment environment;
   private volatile OrtSession session;
+  private volatile Path loadedRoot;
 
-  public LocalOnnxEmbeddingProvider(HarvexProperties properties) { config = properties.embeddings().local(); }
-  @Override public ModelDescriptor descriptor() { return new ModelDescriptor("local", config.modelId(), config.revision(), 384, true, "query: ", "passage: "); }
+  public LocalOnnxEmbeddingProvider(RuntimeProviderSettings settings) { this.settings = settings; }
+  @Override public ModelDescriptor descriptor() { var config=settings.effectiveEmbedding();return new ModelDescriptor("local", config.localModelId(), config.localRevision(), 384, true, "query: ", "passage: "); }
   @Override public boolean available() { try { initialize(); return true; } catch (Exception e) { return false; } }
   @Override public List<float[]> embedDocuments(List<String> texts) throws Exception { return embed(texts, descriptor().documentPrefix()); }
   @Override public List<float[]> embedQueries(List<String> texts) throws Exception { return embed(texts, descriptor().queryPrefix()); }
+  /** Downloads/validates the selected local bundle without embedding content. */
+  public void downloadModel() throws Exception { initialize(); }
 
   private synchronized void initialize() throws Exception {
-    if (session != null) return;
-    Path root = modelRoot();
+    var config=settings.effectiveEmbedding(); Path root = modelRoot(config);
+    if (session != null && root.equals(loadedRoot)) return;
+    if (session != null) { session.close(); session = null; }
     ensureBundle(root);
     Path model = root.resolve("onnx/model_quantized.onnx");
     if (!Files.isRegularFile(model)) model = root.resolve("onnx/model.onnx");
@@ -39,21 +41,24 @@ public class LocalOnnxEmbeddingProvider implements EmbeddingProvider {
     tokenizer = HuggingFaceTokenizer.newInstance(root.resolve("tokenizer.json"));
     environment = OrtEnvironment.getEnvironment();
     session = environment.createSession(model.toString(), new OrtSession.SessionOptions());
+    loadedRoot = root;
   }
 
-  private Path modelRoot() { return config.modelPath() != null ? config.modelPath().toAbsolutePath().normalize() : config.cachePath().resolve(config.modelId().replace('/', '_')).resolve(config.revision()).toAbsolutePath().normalize(); }
+  private Path modelRoot(RuntimeProviderSettings.Embedding config) { return config.localModelPath() != null ? config.localModelPath().toAbsolutePath().normalize() : config.localCachePath().resolve(config.localModelId().replace('/', '_')).resolve(config.localRevision()).toAbsolutePath().normalize(); }
   private void ensureBundle(Path root) throws Exception {
+    var config=settings.effectiveEmbedding();
     if (Files.isRegularFile(root.resolve("tokenizer.json")) && (Files.isRegularFile(root.resolve("onnx/model_quantized.onnx")) || Files.isRegularFile(root.resolve("onnx/model.onnx")))) return;
-    if (config.modelPath() != null) return;
+    if (config.localModelPath() != null) return;
     Files.createDirectories(root.resolve("onnx"));
-    HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(config.downloadTimeoutSeconds())).build();
+    HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(120)).build();
     download(client, "tokenizer.json", root.resolve("tokenizer.json"));
     download(client, "config.json", root.resolve("config.json"));
     download(client, "onnx/model_quantized.onnx", root.resolve("onnx/model_quantized.onnx"));
   }
   private void download(HttpClient client, String source, Path target) throws Exception {
+    var config=settings.effectiveEmbedding();
     Path temporary = target.resolveSibling(target.getFileName() + ".part");
-    var response = client.send(HttpRequest.newBuilder(URI.create(config.downloadUrl().replaceAll("/+$", "") + "/" + source)).timeout(Duration.ofSeconds(config.downloadTimeoutSeconds())).GET().build(), HttpResponse.BodyHandlers.ofFile(temporary));
+    var response = client.send(HttpRequest.newBuilder(URI.create(config.localDownloadUrl().replaceAll("/+$", "") + "/" + source)).timeout(Duration.ofSeconds(120)).GET().build(), HttpResponse.BodyHandlers.ofFile(temporary));
     if (response.statusCode() / 100 != 2) { Files.deleteIfExists(temporary); throw new IOException("Could not download local embedding model asset " + source + " (HTTP " + response.statusCode() + ")"); }
     Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
   }
@@ -77,5 +82,5 @@ public class LocalOnnxEmbeddingProvider implements EmbeddingProvider {
       return OpenAiCompatibleEmbeddingProvider.normalize(vector);
     }
   }
-  @Override public synchronized void close() throws Exception { if(session != null) session.close(); if(environment != null) environment.close(); }
+  @Override public synchronized void close() throws Exception { if(session != null) session.close(); if(environment != null) environment.close(); session=null;loadedRoot=null; }
 }

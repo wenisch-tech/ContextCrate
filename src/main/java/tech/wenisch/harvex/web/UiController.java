@@ -14,6 +14,9 @@ import tech.wenisch.harvex.index.SearchIndex;
 import tech.wenisch.harvex.queue.PipelineQueue;
 import tech.wenisch.harvex.repository.*;
 import tech.wenisch.harvex.service.*;
+import tech.wenisch.harvex.answer.RagSettingsService;
+import tech.wenisch.harvex.config.RuntimeProviderSettings;
+import tech.wenisch.harvex.embedding.LocalOnnxEmbeddingProvider;
 
 @Controller
 public class UiController {
@@ -24,6 +27,9 @@ public class UiController {
   private final SearchIndex index;
   private final NormalizedDocumentRepository documents;
   private final ExtractionService extraction;
+  private final RagSettingsService ragSettings;
+  private final RuntimeProviderSettings providerSettings;
+  private final LocalOnnxEmbeddingProvider localEmbeddings;
 
   public UiController(
       JobService jobs,
@@ -32,7 +38,10 @@ public class UiController {
       PipelineQueue queue,
       SearchIndex index,
       NormalizedDocumentRepository documents,
-      ExtractionService extraction) {
+      ExtractionService extraction,
+      RagSettingsService ragSettings,
+      RuntimeProviderSettings providerSettings,
+      LocalOnnxEmbeddingProvider localEmbeddings) {
     this.jobs = jobs;
     this.codec = codec;
     this.properties = properties;
@@ -40,6 +49,9 @@ public class UiController {
     this.index = index;
     this.documents = documents;
     this.extraction = extraction;
+    this.ragSettings = ragSettings;
+    this.providerSettings = providerSettings;
+    this.localEmbeddings = localEmbeddings;
   }
 
   @GetMapping("/login")
@@ -179,5 +191,48 @@ public class UiController {
         Arrays.stream(WorkStage.values())
             .collect(java.util.stream.Collectors.toMap(Enum::name, queue::depth)));
     return "operations";
+  }
+
+  @GetMapping("/settings")
+  String settings(Model model) {
+    model.addAttribute("rag", ragSettings.current());
+    model.addAttribute("answering", properties.answering());
+    model.addAttribute("embeddingProvider", providerSettings.effectiveEmbedding());
+    model.addAttribute("answerProvider", providerSettings.effectiveAnswer());
+    return "settings";
+  }
+
+  @PostMapping("/settings/rag")
+  String saveRagSettings(
+      @RequestParam(defaultValue = "false") boolean strictGrounding,
+      @RequestParam(defaultValue = "false") boolean allowClientHistory,
+      @RequestParam(defaultValue = "false") boolean inlineCitations,
+      @RequestParam(defaultValue = "false") boolean structuredSources,
+      @RequestParam String retrievalMode,
+      @RequestParam int sourceLimit) {
+    ragSettings.update(strictGrounding, allowClientHistory, inlineCitations, structuredSources, retrievalMode, sourceLimit);
+    return "redirect:/settings?saved";
+  }
+
+  @PostMapping("/settings/providers")
+  String saveProviderSettings(
+      @RequestParam(defaultValue="false") boolean embeddingsEnabled, @RequestParam String embeddingProvider,
+      @RequestParam String embeddingModelId, @RequestParam String embeddingRevision, @RequestParam String embeddingDownloadUrl,
+      @RequestParam String embeddingCachePath, @RequestParam(required=false) String embeddingModelPath,
+      @RequestParam(required=false) String embeddingBaseUrl, @RequestParam(required=false) String embeddingRemoteModel,
+      @RequestParam(required=false) String embeddingApiKey, @RequestParam int embeddingDimensions,
+      @RequestParam(defaultValue="false") boolean answeringEnabled, @RequestParam(required=false) String answeringBaseUrl,
+      @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey) {
+    providerSettings.update(new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
+    return "redirect:/settings?providersSaved";
+  }
+
+  @PostMapping("/settings/providers/local/download")
+  @ResponseBody
+  java.util.Map<String, String> downloadLocalModel() throws Exception {
+    if (!"local".equals(providerSettings.effectiveEmbedding().provider()))
+      throw new IllegalStateException("Select and save the local embedding provider before downloading a model");
+    localEmbeddings.downloadModel();
+    return java.util.Map.of("status", "Local embedding model is ready");
   }
 }

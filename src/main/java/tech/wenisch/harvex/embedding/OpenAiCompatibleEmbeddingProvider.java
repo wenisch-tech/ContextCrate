@@ -6,38 +6,34 @@ import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
 import java.util.*;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
-import tech.wenisch.harvex.config.HarvexProperties;
+import tech.wenisch.harvex.config.RuntimeProviderSettings;
 
 @Component
-@ConditionalOnExpression("'${harvex.embeddings.enabled:true}' == 'true' and '${harvex.embeddings.provider:local}' == 'openai-compatible'")
 public class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
-  private final HarvexProperties.Embeddings.OpenAiCompatible config;
+  private final RuntimeProviderSettings settings;
   private final ObjectMapper mapper;
   private final HttpClient client;
   private volatile int dimensions;
 
-  public OpenAiCompatibleEmbeddingProvider(HarvexProperties properties, ObjectMapper mapper) {
-    config = properties.embeddings().openaiCompatible();
+  public OpenAiCompatibleEmbeddingProvider(RuntimeProviderSettings settings, ObjectMapper mapper) {
+    this.settings = settings;
     this.mapper = mapper;
-    client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(config.timeoutSeconds())).build();
+    client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
   }
-  @Override public ModelDescriptor descriptor() { return new ModelDescriptor("openai-compatible", config.model(), config.model(), dimensions == 0 ? config.dimensions() : dimensions, true, "", ""); }
-  @Override public boolean available() { return config.baseUrl() != null && !config.baseUrl().isBlank() && config.model() != null && !config.model().isBlank(); }
+  @Override public ModelDescriptor descriptor() { var config=settings.effectiveEmbedding();return new ModelDescriptor("openai-compatible", config.openaiModel(), config.openaiModel(), dimensions == 0 ? config.openaiDimensions() : dimensions, true, "", ""); }
+  @Override public boolean available() { var config=settings.effectiveEmbedding();return config.enabled() && config.openaiBaseUrl() != null && !config.openaiBaseUrl().isBlank() && config.openaiModel() != null && !config.openaiModel().isBlank(); }
   @Override public List<float[]> embedDocuments(List<String> texts) throws Exception { return embed(texts); }
   @Override public List<float[]> embedQueries(List<String> texts) throws Exception { return embed(texts); }
 
   private List<float[]> embed(List<String> texts) throws Exception {
+    var config=settings.effectiveEmbedding();
     if (!available()) throw new IllegalStateException("OpenAI-compatible embedding endpoint and model must be configured");
-    String url = config.baseUrl().replaceAll("/+$", "") + "/embeddings";
-    var request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(config.timeoutSeconds()))
+    String url = config.openaiBaseUrl().replaceAll("/+$", "") + "/embeddings";
+    var request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
         .header("Content-Type", "application/json");
-    if (config.apiKey() != null && !config.apiKey().isBlank()) request.header("Authorization", "Bearer " + config.apiKey());
-    if (config.headers() != null) for (String header : config.headers().split("\\n")) {
-      int colon = header.indexOf(':'); if (colon > 0) request.header(header.substring(0, colon).trim(), header.substring(colon + 1).trim());
-    }
-    String payload = mapper.writeValueAsString(Map.of("model", config.model(), "input", texts, "encoding_format", "float"));
+    if (config.openaiApiKey() != null && !config.openaiApiKey().isBlank()) request.header("Authorization", "Bearer " + config.openaiApiKey());
+    String payload = mapper.writeValueAsString(Map.of("model", config.openaiModel(), "input", texts, "encoding_format", "float"));
     var response = client.send(request.POST(HttpRequest.BodyPublishers.ofString(payload)).build(), HttpResponse.BodyHandlers.ofString());
     if (response.statusCode() / 100 != 2) throw new IllegalStateException("Embedding endpoint returned HTTP " + response.statusCode());
     JsonNode data = mapper.readTree(response.body()).path("data");

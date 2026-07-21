@@ -32,3 +32,7 @@ Embeddings default to the local ONNX provider. See [Embeddings](embeddings.md) f
 ## Answer generation
 
 Answer generation is disabled by default. Set `HARVEX_ANSWERING_ENABLED=true` and configure `HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL`, `HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL`, and a secret-backed `HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY`. See [RAG answer generation](answers.md) for limits, SSE behavior, and safety controls.
+
+After the provider is configured, use the authenticated **Settings** page to choose strict knowledge-base-only answers, history permission, citation behavior, default retrieval mode, and source count. Those runtime policies are stored in the database; provider connection details remain environment/secret configuration.
+
+The Settings page can also override embedding and answer-provider values such as provider kind, enabled state, model, endpoint URL, dimensions, local model paths, and API keys. Database overrides take precedence over environment values. API keys entered in Settings are stored in the Harvex database; protect database access and backups with encryption.

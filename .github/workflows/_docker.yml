@@ -37,7 +37,7 @@ jobs:
             BUILD_REVISION=${{ github.sha }}
       - name: Scan image
         if: matrix.name == 'harvex'
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/wenisch-tech/${{ matrix.name }}:${{ inputs.version }}
           format: table
