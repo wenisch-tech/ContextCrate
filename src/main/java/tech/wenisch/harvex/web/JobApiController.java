@@ -64,7 +64,7 @@ public class JobApiController {
     public JobRequest {
       if (name == null || name.isBlank()) throw new IllegalArgumentException("name is required");
       configuration =
-          configuration == null ? new CrawlConfiguration(null, null, null, null) : configuration;
+          configuration == null ? new CrawlConfiguration(null, null, null, null, null) : configuration;
     }
   }
 

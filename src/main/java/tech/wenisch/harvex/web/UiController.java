@@ -89,6 +89,15 @@ public class UiController {
     return "job-form";
   }
 
+  @GetMapping("/jobs/{id}/edit")
+  String editJob(@PathVariable UUID id, Model model) {
+    var job = jobs.requireJob(id);
+    var config = codec.read(job.getConfigurationJson());
+    model.addAttribute("job", job);
+    model.addAttribute("config", config);
+    return "job-edit";
+  }
+
   @PostMapping("/jobs")
   String create(
       @RequestParam String name,
@@ -109,7 +118,10 @@ public class UiController {
       @RequestParam(defaultValue = "30") int retentionDays,
       @RequestParam(defaultValue = "") String contentSelector,
       @RequestParam(defaultValue = "2000") int chunkSize,
-      @RequestParam(defaultValue = "200") int chunkOverlap) {
+      @RequestParam(defaultValue = "200") int chunkOverlap,
+      @RequestParam(defaultValue = "") String authUsername,
+      @RequestParam(defaultValue = "") String authPassword,
+      @RequestParam(defaultValue = "") String authLoginUrlPattern) {
     var c =
         new CrawlConfiguration(
             new CrawlConfiguration.Scope(
@@ -131,8 +143,67 @@ public class UiController {
                 List.of("script", "style", "nav", "footer", "aside"),
                 chunkSize,
                 chunkOverlap,
-                "default"));
+                "default"),
+            new CrawlConfiguration.Authentication(
+                authUsername.isBlank() ? null : authUsername,
+                authPassword.isBlank() ? null : authPassword,
+                authLoginUrlPattern));
     jobs.create(name, c);
+    return "redirect:/jobs";
+  }
+
+  @PostMapping("/jobs/{id}/update")
+  String updateJob(
+      @PathVariable UUID id,
+      @RequestParam String name,
+      @RequestParam String seedUrl,
+      @RequestParam String allowedHost,
+      @RequestParam int maxDepth,
+      @RequestParam int maxPages,
+      @RequestParam(defaultValue = "false") boolean allowSubdomains,
+      @RequestParam(defaultValue = "HarvexBot/0.1") String userAgent,
+      @RequestParam(defaultValue = "") String contact,
+      @RequestParam(defaultValue = "false") boolean honorRobots,
+      @RequestParam(defaultValue = "1000") long delayMillis,
+      @RequestParam(defaultValue = "15000") int timeoutMillis,
+      @RequestParam(defaultValue = "3") int maxAttempts,
+      @RequestParam(defaultValue = "1000") long backoffMillis,
+      @RequestParam(defaultValue = "10") long maxBodyMegabytes,
+      @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+      @RequestParam(defaultValue = "30") int retentionDays,
+      @RequestParam(defaultValue = "") String contentSelector,
+      @RequestParam(defaultValue = "2000") int chunkSize,
+      @RequestParam(defaultValue = "200") int chunkOverlap,
+      @RequestParam(defaultValue = "") String authUsername,
+      @RequestParam(defaultValue = "") String authPassword,
+      @RequestParam(defaultValue = "") String authLoginUrlPattern) {
+    var c =
+        new CrawlConfiguration(
+            new CrawlConfiguration.Scope(
+                seedUrl,
+                Set.of(allowedHost),
+                List.of(),
+                List.of(),
+                maxDepth,
+                maxPages,
+                allowSubdomains,
+                true),
+            new CrawlConfiguration.Politeness(
+                userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
+            new CrawlConfiguration.Reliability(
+                maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
+            new CrawlConfiguration.Output(
+                retentionDays,
+                contentSelector,
+                List.of("script", "style", "nav", "footer", "aside"),
+                chunkSize,
+                chunkOverlap,
+                "default"),
+            new CrawlConfiguration.Authentication(
+                authUsername.isBlank() ? null : authUsername,
+                authPassword.isBlank() ? null : authPassword,
+                authLoginUrlPattern));
+    jobs.update(id, name, c, true);
     return "redirect:/jobs";
   }
 

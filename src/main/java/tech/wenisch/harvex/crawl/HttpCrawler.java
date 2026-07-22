@@ -5,8 +5,12 @@ import static tech.wenisch.harvex.domain.PipelineTypes.*;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,7 +81,7 @@ public class HttpCrawler {
     FetchRecord record = new FetchRecord(fetchId, run.getId(), entry.getId(), entry.getUrl());
     long started = System.nanoTime();
     try {
-      Response response = request(entry.getUrl(), config, 0);
+      Response response = request(run.getId(), entry.getUrl(), config, 0);
       String type = response.headers.firstValue("Content-Type").orElse("application/octet-stream");
       String key = run.getId() + "/" + fetchId + extension(type);
       try (InputStream body = response.body) {
@@ -121,10 +125,10 @@ public class HttpCrawler {
     }
   }
 
-  private Response request(String url, CrawlConfiguration config, int redirects) throws Exception {
+  private Response request(UUID runId, String url, CrawlConfiguration config, int redirects) throws Exception {
     if (redirects > 5) throw new java.io.IOException("Too many redirects");
     urls.assertSafe(url);
-    var req =
+    var reqBuilder =
         HttpRequest.newBuilder(URI.create(url))
             .timeout(Duration.ofMillis(config.politeness().timeoutMillis()))
             .header(
@@ -133,18 +137,42 @@ public class HttpCrawler {
                     + (config.politeness().contact().isBlank()
                         ? ""
                         : " (" + config.politeness().contact() + ")"))
-            .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
-            .GET()
-            .build();
+            .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
+
+    String cookies = getCookiesForRun(runId, config);
+    if (cookies != null && !cookies.isBlank()) {
+      reqBuilder.header("Cookie", cookies);
+    }
+
+    var req = reqBuilder.GET().build();
     var res = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
     if (res.statusCode() >= 300
         && res.statusCode() < 400
         && res.headers().firstValue("Location").isPresent()) {
       res.body().close();
       String next = URI.create(url).resolve(res.headers().firstValue("Location").get()).toString();
-      return request(next, config, redirects + 1);
+      return request(runId, next, config, redirects + 1);
     }
     return new Response(res.statusCode(), res.uri().toString(), res.headers(), res.body());
+  }
+
+  private String getCookiesForRun(UUID runId, CrawlConfiguration config) {
+    try {
+      String sessionPath = "session_" + runId + ".json";
+      java.io.File sessionFile = new java.io.File(sessionPath);
+      if (!sessionFile.exists()) return null;
+
+      String jsonContent = Files.readString(sessionFile.toPath());
+      List<String> cookieStrings = new ArrayList<>();
+      Pattern pattern = Pattern.compile("\"name\":\"([^\"]+)\",\"value\":\"([^\"]+)\"");
+      Matcher matcher = pattern.matcher(jsonContent);
+      while (matcher.find()) {
+        cookieStrings.add(matcher.group(1) + "=" + matcher.group(2));
+      }
+      return String.join("; ", cookieStrings);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   private void fetchBrowser(FrontierEntry entry, CrawlRun run, CrawlConfiguration config)
@@ -157,13 +185,39 @@ public class HttpCrawler {
           playwright
               .chromium()
               .launch(new com.microsoft.playwright.BrowserType.LaunchOptions().setHeadless(true));
-      var page = browser.newPage();
+      
+      String sessionPath = "session_" + run.getId() + ".json";
+      var contextOptions = new com.microsoft.playwright.Browser.NewContextOptions();
+      java.io.File sessionFile = new java.io.File(sessionPath);
+      if (sessionFile.exists()) {
+        contextOptions.setStorageStatePath(Paths.get(sessionPath));
+      }
+      
+      var context = browser.newContext(contextOptions);
+      var page = context.newPage();
+      
       var response =
           page.navigate(
               entry.getUrl(),
               new com.microsoft.playwright.Page.NavigateOptions()
                   .setTimeout((double) config.politeness().timeoutMillis())
                   .setWaitUntil(com.microsoft.playwright.options.WaitUntilState.NETWORKIDLE));
+
+      if (config.authentication().username() != null 
+          && (config.authentication().loginUrlPattern().isBlank() 
+              || page.url().contains(config.authentication().loginUrlPattern()))) {
+        
+        handleLogin(page, config);
+        
+        response = page.navigate(
+            entry.getUrl(),
+            new com.microsoft.playwright.Page.NavigateOptions()
+                .setTimeout((double) config.politeness().timeoutMillis())
+                .setWaitUntil(com.microsoft.playwright.options.WaitUntilState.NETWORKIDLE));
+        
+        context.storageState(new com.microsoft.playwright.BrowserContext.StorageStateOptions()
+            .setPath(Paths.get(sessionPath)));
+      }
       byte[] bytes = page.content().getBytes(StandardCharsets.UTF_8);
       String key = run.getId() + "/" + fetchId + ".rendered.html";
       var saved =
@@ -190,6 +244,25 @@ public class HttpCrawler {
               "parse:" + fetchId,
               50));
       browser.close();
+    }
+  }
+
+  private void handleLogin(com.microsoft.playwright.Page page, CrawlConfiguration config) {
+    try {
+      page.fill("#username", config.authentication().username());
+      page.fill("#password", config.authentication().password());
+      page.click("button[type='submit']");
+      page.waitForURL("**");
+    } catch (Exception e) {
+      // Fallback for different Keycloak themes
+      try {
+        page.fill("input[name='username']", config.authentication().username());
+        page.fill("input[name='password']", config.authentication().password());
+        page.click("#kc-login");
+        page.waitForURL("**");
+      } catch (Exception ex) {
+        throw new RuntimeException("Failed to perform login: " + ex.getMessage());
+      }
     }
   }
 

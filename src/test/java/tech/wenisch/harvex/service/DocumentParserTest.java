@@ -59,7 +59,8 @@ class DocumentParserTest {
                 "https://wenisch.tech/", Set.of("wenisch.tech"), List.of(), List.of(), 1, 10, true, false),
             CrawlConfiguration.Politeness.defaults(),
             new CrawlConfiguration.Reliability(3, 1000, 1_000_000, true, RenderMode.AUTO),
-            new CrawlConfiguration.Output(30, "", List.of("script", "style"), 500, 50, "test"));
+            new CrawlConfiguration.Output(30, "", List.of("script", "style"), 500, 50, "test"),
+            new CrawlConfiguration.Authentication(null, null, ""));
     var run = new CrawlRun(runId, jobId, codec.write(config));
     var fetch = new FetchRecord(fetchId, runId, frontierId, "https://wenisch.tech/");
     fetch.success(

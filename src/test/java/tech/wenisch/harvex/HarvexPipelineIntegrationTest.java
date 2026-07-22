@@ -79,7 +79,8 @@ class HarvexPipelineIntegrationTest {
             new CrawlConfiguration.Politeness("HarvexTest", "", true, 1, 0, 5000),
             new CrawlConfiguration.Reliability(
                 2, 10, 1_000_000, true, CrawlConfiguration.RenderMode.HTTP_ONLY),
-            new CrawlConfiguration.Output(1, "main", List.of("script", "style"), 500, 50, "test"));
+            new CrawlConfiguration.Output(1, "main", List.of("script", "style"), 500, 50, "test"),
+            new CrawlConfiguration.Authentication(null, null, ""));
     var job = jobs.create("Fixture", config);
     jobs.start(job.getId());
     long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();

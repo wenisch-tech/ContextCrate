@@ -11,13 +11,15 @@ public record CrawlConfiguration(
     @Valid Scope scope,
     @Valid Politeness politeness,
     @Valid Reliability reliability,
-    @Valid Output output) {
+    @Valid Output output,
+    @Valid Authentication authentication) {
 
   public CrawlConfiguration {
     scope = scope == null ? Scope.defaults() : scope;
     politeness = politeness == null ? Politeness.defaults() : politeness;
     reliability = reliability == null ? Reliability.defaults() : reliability;
     output = output == null ? Output.defaults() : output;
+    authentication = authentication == null ? Authentication.defaults() : authentication;
   }
 
   public record Scope(
@@ -102,6 +104,15 @@ public record CrawlConfiguration(
     public static Output defaults() {
       return new Output(
           30, "", List.of("script", "style", "nav", "footer", "aside"), 2000, 200, "default");
+    }
+  }
+
+  public record Authentication(
+      String username,
+      String password,
+      String loginUrlPattern) {
+    public static Authentication defaults() {
+      return new Authentication(null, null, "");
     }
   }
 

@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Settings · Harvex</title><link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css"><link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css"><link rel="stylesheet" href="/css/harvex.css"></head>
 <body><nav th:replace="~{fragments :: nav}"></nav><main class="container p-4 p-lg-5">
   <div class="mb-4"><p class="eyebrow">CONTROL PLANE</p><h1 class="display-6 fw-semibold">RAG settings</h1><p class="text-secondary">Configure retrieval policies and model providers.</p></div>
-  <div class="alert alert-success" th:if="${param.saved or param.providersSaved}">Settings saved.</div>
+  <div class="alert alert-success" th:if="${param.saved != null and param.saved} or ${param.providersSaved != null and param.providersSaved}">Settings saved.</div>
   <form class="card panel p-4 mb-4" method="post" action="/settings/rag"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
     <h2 class="h5">Grounding and sources</h2>
     <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="strict" name="strictGrounding" th:checked="${rag.strictGrounding}"><label class="form-check-label" for="strict"><strong>Knowledge-base-only answers</strong><span class="d-block text-secondary small">Do not call the LLM when no knowledge-base chunks are found.</span></label></div>
