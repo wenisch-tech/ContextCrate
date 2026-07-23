@@ -7,17 +7,21 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public record CrawlConfiguration(
     @Valid Scope scope,
     @Valid Politeness politeness,
     @Valid Reliability reliability,
-    @Valid Output output) {
+    @Valid Output output,
+    @Valid LoginConfiguration loginConfiguration) {
 
   public CrawlConfiguration {
     scope = scope == null ? Scope.defaults() : scope;
     politeness = politeness == null ? Politeness.defaults() : politeness;
     reliability = reliability == null ? Reliability.defaults() : reliability;
     output = output == null ? Output.defaults() : output;
+    loginConfiguration = loginConfiguration == null ? LoginConfiguration.defaults() : loginConfiguration;
   }
 
   public record Scope(
@@ -103,6 +107,96 @@ public record CrawlConfiguration(
       return new Output(
           30, "", List.of("script", "style", "nav", "footer", "aside"), 2000, 200, "default");
     }
+  }
+
+  public enum AuthMethod {
+    NONE,
+    FORM,
+    OAUTH2
+  }
+
+  public record LoginConfiguration(
+      String loginPageUrl,
+      String username,
+      String password,
+      String usernameField,
+      String passwordField,
+      String submitSelector,
+      SuccessDetection successDetection,
+      boolean directLogin,
+      String authServerUrl,
+      String clientId,
+      String clientSecret,
+      String realm,
+      AuthMethod authMethod) {
+
+    public LoginConfiguration {
+      usernameField =
+          usernameField == null || usernameField.isBlank() ? "username" : usernameField;
+      passwordField =
+          passwordField == null || passwordField.isBlank() ? "password" : passwordField;
+      submitSelector =
+          submitSelector == null || submitSelector.isBlank()
+              ? "button[type='submit']"
+              : submitSelector;
+      successDetection =
+          successDetection == null ? new SuccessDetection(null, null) : successDetection;
+      authMethod = authMethod == null ? AuthMethod.NONE : authMethod;
+    }
+
+    public static LoginConfiguration defaults() {
+      return new LoginConfiguration(
+          null,
+          null,
+          null,
+          "username",
+          "password",
+          "button[type='submit']",
+          new SuccessDetection(null, null),
+          false,
+          null,
+          null,
+          null,
+          null,
+          AuthMethod.NONE);
+    }
+
+    @JsonIgnore
+    public boolean isConfigured() {
+      if (authMethod == null || authMethod == AuthMethod.NONE) return false;
+      if (authMethod == AuthMethod.OAUTH2) {
+        return authServerUrl != null && !authServerUrl.isBlank() &&
+               clientId != null && !clientId.isBlank() &&
+               clientSecret != null && !clientSecret.isBlank() &&
+               realm != null && !realm.isBlank();
+      } else {
+        return loginPageUrl != null && !loginPageUrl.isBlank() &&
+               username != null && !username.isBlank() &&
+               password != null && !password.isBlank();
+      }
+    }
+
+    public LoginConfiguration withoutSecrets() {
+      return new LoginConfiguration(
+          loginPageUrl,
+          username,
+          null,
+          usernameField,
+          passwordField,
+          submitSelector,
+          successDetection,
+          directLogin,
+          authServerUrl,
+          clientId,
+          null,
+          realm,
+          authMethod);
+    }
+  }
+
+  public record SuccessDetection(
+      String urlPattern,
+      String contentPattern) {
   }
 
   public enum RenderMode {

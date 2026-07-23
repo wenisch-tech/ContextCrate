@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Run details · Harvex</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/harvex.css">
+</head>
+<body>
+<nav th:replace="~{fragments :: nav}"></nav>
+<main class="container-fluid p-4 p-lg-5">
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+      <p class="eyebrow">RUN DETAILS</p>
+      <h1 class="display-6 fw-semibold" th:text="${job.name}">Job name</h1>
+      <p class="text-secondary">Detailed information about this crawl run</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" th:href="@{/}">Back to overview</a>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <div class="card panel h-100">
+        <div class="card-header">Run information</div>
+        <div class="card-body">
+          <div class="backend-row">
+            <span>Run ID</span>
+            <code class="font-monospace" th:text="${run.id}"></code>
+          </div>
+          <div class="backend-row">
+            <span>Status</span>
+            <span class="status-pill" th:text="${run.status}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Started at</span>
+            <span th:text="${run.startedAt}"></span>
+          </div>
+          <div class="backend-row" th:if="${run.finishedAt != null}">
+            <span>Finished at</span>
+            <span th:text="${run.finishedAt}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Seed URL</span>
+            <a th:href="${config.scope.seedUrl}" target="_blank" th:text="${config.scope.seedUrl}"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card panel h-100">
+        <div class="card-header">Configuration</div>
+        <div class="card-body">
+          <div class="backend-row">
+            <span>Max depth</span>
+            <span th:text="${config.scope.maxDepth}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Max pages</span>
+            <span th:text="${config.scope.maxPages}"></span>
+          </div>
+          <div class="backend-row">
+            <span>User agent</span>
+            <span th:text="${config.politeness.userAgent}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Render mode</span>
+            <span th:text="${config.reliability.renderMode}"></span>
+          </div>
+          <div class="backend-row" th:if="${config.loginConfiguration().isConfigured()}">
+            <span>Authentication</span>
+            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).FORM}">
+              Enabled (username: <span th:text="${config.loginConfiguration().username()}"></span>)
+            </span>
+            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).OAUTH2}">
+              Keycloak service account (client: <span th:text="${config.loginConfiguration().clientId()}"></span>)
+            </span>
+          </div>
+          <div class="backend-row" th:if="${!config.loginConfiguration().isConfigured()}">
+            <span>Authentication</span>
+            <span>Disabled</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="metric-card"><span>Discovered</span><strong th:text="${frontierTotal}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Fetched</span><strong th:text="${frontierFetched}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Failed</span><strong th:text="${frontierFailed}">0</strong></div></div>
+  </div>
+
+  <div class="card panel">
+    <div class="card-header">Recent fetches</div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Requested URL</th><th>Result</th><th>HTTP</th><th>Duration</th><th>Fetched</th></tr></thead>
+        <tbody>
+        <tr th:each="fetch:${fetches}">
+          <td class="text-break"><a th:href="${fetch.requestedUrl}" th:text="${fetch.requestedUrl}" target="_blank" rel="noopener"></a><div class="small text-danger" th:if="${fetch.errorMessage}" th:text="${fetch.errorMessage}"></div></td>
+          <td><span class="status-pill" th:text="${fetch.outcome}"></span></td>
+          <td th:text="${fetch.statusCode != null ? fetch.statusCode : '—'}"></td>
+          <td th:text="${fetch.durationMs != null ? fetch.durationMs + ' ms' : '—'}"></td>
+          <td th:text="${fetch.fetchedAt}"></td>
+        </tr>
+        <tr th:if="${fetches.empty}"><td colspan="5" class="empty-state">No fetch attempts have been recorded yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

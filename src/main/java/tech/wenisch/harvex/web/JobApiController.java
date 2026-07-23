@@ -64,7 +64,7 @@ public class JobApiController {
     public JobRequest {
       if (name == null || name.isBlank()) throw new IllegalArgumentException("name is required");
       configuration =
-          configuration == null ? new CrawlConfiguration(null, null, null, null) : configuration;
+          configuration == null ? new CrawlConfiguration(null, null, null, null, null) : configuration;
     }
   }
 
@@ -72,7 +72,15 @@ public class JobApiController {
       UUID id, String name, boolean enabled, CrawlConfiguration configuration) {}
 
   private static JobResponse response(CrawlJob j, ConfigurationCodec codec) {
+    CrawlConfiguration stored = codec.read(j.getConfigurationJson());
+    CrawlConfiguration sanitized =
+        new CrawlConfiguration(
+            stored.scope(),
+            stored.politeness(),
+            stored.reliability(),
+            stored.output(),
+            stored.loginConfiguration().withoutSecrets());
     return new JobResponse(
-        j.getId(), j.getName(), j.isEnabled(), codec.read(j.getConfigurationJson()));
+        j.getId(), j.getName(), j.isEnabled(), sanitized);
   }
 }

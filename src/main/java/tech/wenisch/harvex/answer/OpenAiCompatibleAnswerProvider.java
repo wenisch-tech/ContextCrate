@@ -7,7 +7,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Component;
-import tech.wenisch.harvex.config.HarvexProperties;
 import tech.wenisch.harvex.config.RuntimeProviderSettings;
 
 @Component

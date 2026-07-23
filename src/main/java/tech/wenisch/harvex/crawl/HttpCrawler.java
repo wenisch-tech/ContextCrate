@@ -1,28 +1,46 @@
 package tech.wenisch.harvex.crawl;
 
-import static tech.wenisch.harvex.domain.PipelineTypes.*;
+import static tech.wenisch.harvex.domain.PipelineTypes.FetchOutcome;
+import static tech.wenisch.harvex.domain.PipelineTypes.FrontierStatus;
+import static tech.wenisch.harvex.domain.PipelineTypes.RunStatus;
+import static tech.wenisch.harvex.domain.PipelineTypes.WorkStage;
 
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.WaitUntilState;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.*;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tech.wenisch.harvex.domain.*;
-import tech.wenisch.harvex.queue.*;
-import tech.wenisch.harvex.repository.*;
-import tech.wenisch.harvex.service.*;
+import tech.wenisch.harvex.crawl.CrawlerAuthenticationService.CrawlerResponse;
+import tech.wenisch.harvex.domain.CrawlConfiguration;
+import tech.wenisch.harvex.domain.CrawlConfiguration.AuthMethod;
+import tech.wenisch.harvex.domain.CrawlRun;
+import tech.wenisch.harvex.domain.FetchRecord;
+import tech.wenisch.harvex.domain.FrontierEntry;
+import tech.wenisch.harvex.queue.PipelineMessage;
+import tech.wenisch.harvex.queue.PipelineQueue;
+import tech.wenisch.harvex.repository.CrawlRunRepository;
+import tech.wenisch.harvex.repository.FetchRecordRepository;
+import tech.wenisch.harvex.repository.FrontierEntryRepository;
+import tech.wenisch.harvex.service.ConfigurationCodec;
+import tech.wenisch.harvex.service.JobService;
+import tech.wenisch.harvex.service.PipelinePayload;
 import tech.wenisch.harvex.storage.ArtifactStore;
 
 @Service
 public class HttpCrawler {
-  private final HttpClient client =
-      HttpClient.newBuilder()
-          .connectTimeout(Duration.ofSeconds(15))
-          .followRedirects(HttpClient.Redirect.NEVER)
-          .build();
   private final FrontierEntryRepository frontier;
   private final CrawlRunRepository runs;
   private final ConfigurationCodec codec;
@@ -32,6 +50,8 @@ public class HttpCrawler {
   private final ArtifactStore artifacts;
   private final FetchRecordRepository fetches;
   private final PipelineQueue queue;
+  private final CrawlerAuthenticationService authentication;
+  private final Map<UUID, String> browserStorage = new ConcurrentHashMap<>();
 
   public HttpCrawler(
       FrontierEntryRepository frontier,
@@ -42,7 +62,8 @@ public class HttpCrawler {
       HostPoliteness politeness,
       ArtifactStore artifacts,
       FetchRecordRepository fetches,
-      PipelineQueue queue) {
+      PipelineQueue queue,
+      CrawlerAuthenticationService authentication) {
     this.frontier = frontier;
     this.runs = runs;
     this.codec = codec;
@@ -52,19 +73,25 @@ public class HttpCrawler {
     this.artifacts = artifacts;
     this.fetches = fetches;
     this.queue = queue;
+    this.authentication = authentication;
   }
 
   @Transactional
   public void fetch(PipelinePayload payload, boolean browser) throws Exception {
     FrontierEntry entry = frontier.findById(payload.entityId()).orElseThrow();
     CrawlRun run = runs.findById(payload.runId()).orElseThrow();
-    if (run.getStatus() != RunStatus.RUNNING) return;
+    if (run.getStatus() != RunStatus.RUNNING) {
+      authentication.clear(run.getId());
+      browserStorage.remove(run.getId());
+      return;
+    }
     CrawlConfiguration config = codec.read(run.getConfigurationJson());
     if (browser
         || config.reliability().renderMode() == CrawlConfiguration.RenderMode.BROWSER_ONLY) {
       fetchBrowser(entry, run, config);
       return;
     }
+
     urls.assertSafe(entry.getUrl());
     if (config.politeness().honorRobots()
         && !robots.allowed(entry.getUrl(), config.politeness().userAgent())) {
@@ -73,34 +100,35 @@ public class HttpCrawler {
       return;
     }
     politeness.await(entry.getUrl(), config.politeness().minimumDelayMillis());
+
     UUID fetchId = UUID.randomUUID();
     FetchRecord record = new FetchRecord(fetchId, run.getId(), entry.getId(), entry.getUrl());
     long started = System.nanoTime();
     try {
-      Response response = request(entry.getUrl(), config, 0);
-      String type = response.headers.firstValue("Content-Type").orElse("application/octet-stream");
+      CrawlerResponse response = authentication.get(run.getId(), entry.getUrl(), config);
+      String type = response.headers().firstValue("Content-Type").orElse("application/octet-stream");
       String key = run.getId() + "/" + fetchId + extension(type);
-      try (InputStream body = response.body) {
+      try (InputStream body = response.body()) {
         var saved = artifacts.put(key, body, config.reliability().maxBodyBytes());
         record.success(
-            response.url,
-            response.status,
+            response.url(),
+            response.status(),
             type,
             charset(type),
             saved.key(),
             saved.sha256(),
             saved.length(),
-            Duration.ofNanos(System.nanoTime() - started).toMillis());
+            elapsedMillis(started));
       }
       fetches.save(record);
       entry.status(
-          response.status >= 200 && response.status < 400
+          response.status() >= 200 && response.status() < 400
               ? FrontierStatus.FETCHED
               : FrontierStatus.FAILED);
       frontier.save(entry);
-      if (response.status >= 200
-          && response.status < 300
-          && type.toLowerCase(Locale.ROOT).contains("html"))
+      if (response.status() >= 200
+          && response.status() < 300
+          && type.toLowerCase(Locale.ROOT).contains("html")) {
         queue.publish(
             PipelineMessage.create(
                 WorkStage.PARSE,
@@ -108,12 +136,15 @@ public class HttpCrawler {
                 run.getId(),
                 "parse:" + fetchId,
                 50));
-    } catch (java.io.IOException e) {
+      }
+    } catch (Exception e) {
       record.failure(
-          e.getMessage() != null && e.getMessage().contains("maximum")
+          e instanceof java.io.IOException
+                  && e.getMessage() != null
+                  && e.getMessage().contains("maximum")
               ? FetchOutcome.TOO_LARGE
               : FetchOutcome.FAILED,
-          e.getMessage());
+          safeMessage(e));
       fetches.save(record);
       entry.status(FrontierStatus.FAILED);
       frontier.save(entry);
@@ -121,82 +152,165 @@ public class HttpCrawler {
     }
   }
 
-  private Response request(String url, CrawlConfiguration config, int redirects) throws Exception {
-    if (redirects > 5) throw new java.io.IOException("Too many redirects");
-    urls.assertSafe(url);
-    var req =
-        HttpRequest.newBuilder(URI.create(url))
-            .timeout(Duration.ofMillis(config.politeness().timeoutMillis()))
-            .header(
-                "User-Agent",
-                config.politeness().userAgent()
-                    + (config.politeness().contact().isBlank()
-                        ? ""
-                        : " (" + config.politeness().contact() + ")"))
-            .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
-            .GET()
-            .build();
-    var res = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
-    if (res.statusCode() >= 300
-        && res.statusCode() < 400
-        && res.headers().firstValue("Location").isPresent()) {
-      res.body().close();
-      String next = URI.create(url).resolve(res.headers().firstValue("Location").get()).toString();
-      return request(next, config, redirects + 1);
-    }
-    return new Response(res.statusCode(), res.uri().toString(), res.headers(), res.body());
-  }
-
   private void fetchBrowser(FrontierEntry entry, CrawlRun run, CrawlConfiguration config)
       throws Exception {
     urls.assertSafe(entry.getUrl());
     UUID fetchId = UUID.randomUUID();
+    FetchRecord record = new FetchRecord(fetchId, run.getId(), entry.getId(), entry.getUrl());
     long started = System.nanoTime();
-    try (var playwright = com.microsoft.playwright.Playwright.create()) {
-      var browser =
+    try (Playwright playwright = Playwright.create()) {
+      Browser browser =
           playwright
               .chromium()
-              .launch(new com.microsoft.playwright.BrowserType.LaunchOptions().setHeadless(true));
-      var page = browser.newPage();
-      var response =
-          page.navigate(
-              entry.getUrl(),
-              new com.microsoft.playwright.Page.NavigateOptions()
-                  .setTimeout((double) config.politeness().timeoutMillis())
-                  .setWaitUntil(com.microsoft.playwright.options.WaitUntilState.NETWORKIDLE));
-      byte[] bytes = page.content().getBytes(StandardCharsets.UTF_8);
-      String key = run.getId() + "/" + fetchId + ".rendered.html";
-      var saved =
-          artifacts.put(
-              key, new java.io.ByteArrayInputStream(bytes), config.reliability().maxBodyBytes());
-      var record = new FetchRecord(fetchId, run.getId(), entry.getId(), entry.getUrl());
-      record.success(
-          page.url(),
-          response == null ? 200 : response.status(),
-          "text/html; charset=UTF-8",
-          "UTF-8",
-          saved.key(),
-          saved.sha256(),
-          saved.length(),
-          Duration.ofNanos(System.nanoTime() - started).toMillis());
+              .launch(new BrowserType.LaunchOptions().setHeadless(true));
+      try {
+        Browser.NewContextOptions options = new Browser.NewContextOptions();
+        String stored = browserStorage.get(run.getId());
+        if (stored != null) options.setStorageState(stored);
+        if (config.loginConfiguration().authMethod() == AuthMethod.OAUTH2) {
+          options.setExtraHTTPHeaders(
+              Map.of(
+                  "Authorization",
+                  "Bearer " + authentication.bearerToken(run.getId(), config)));
+        }
+
+        BrowserContext context = browser.newContext(options);
+        Page page = context.newPage();
+        com.microsoft.playwright.Response response = navigate(page, entry.getUrl(), config);
+        if (config.loginConfiguration().authMethod() == AuthMethod.FORM
+            && (stored == null
+                || loginUrl(page.url(), config.loginConfiguration().loginPageUrl()))) {
+          performBrowserLogin(page, config);
+          browserStorage.put(run.getId(), context.storageState());
+          response = navigate(page, entry.getUrl(), config);
+          if (loginUrl(page.url(), config.loginConfiguration().loginPageUrl())) {
+            throw new IllegalStateException("Browser authentication did not leave the login page");
+          }
+        }
+        if (config.loginConfiguration().authMethod() == AuthMethod.OAUTH2
+            && response != null
+            && response.status() == 401) {
+          context.close();
+          authentication.clear(run.getId());
+          options =
+              new Browser.NewContextOptions()
+                  .setExtraHTTPHeaders(
+                      Map.of(
+                          "Authorization",
+                          "Bearer " + authentication.bearerToken(run.getId(), config)));
+          context = browser.newContext(options);
+          page = context.newPage();
+          response = navigate(page, entry.getUrl(), config);
+        }
+
+        byte[] bytes = page.content().getBytes(StandardCharsets.UTF_8);
+        String key = run.getId() + "/" + fetchId + ".rendered.html";
+        var saved =
+            artifacts.put(
+                key, new ByteArrayInputStream(bytes), config.reliability().maxBodyBytes());
+        int status = response == null ? 200 : response.status();
+        record.success(
+            page.url(),
+            status,
+            "text/html; charset=UTF-8",
+            "UTF-8",
+            saved.key(),
+            saved.sha256(),
+            saved.length(),
+            elapsedMillis(started));
+        fetches.save(record);
+        entry.status(
+            status >= 200 && status < 400 ? FrontierStatus.FETCHED : FrontierStatus.FAILED);
+        frontier.save(entry);
+        if (status >= 200 && status < 300) {
+          queue.publish(
+              PipelineMessage.create(
+                  WorkStage.PARSE,
+                  JobService.payload(run.getId(), fetchId),
+                  run.getId(),
+                  "parse:" + fetchId,
+                  50));
+        }
+        context.close();
+      } finally {
+        browser.close();
+      }
+    } catch (Exception e) {
+      record.failure(FetchOutcome.FAILED, safeMessage(e));
       fetches.save(record);
-      entry.status(FrontierStatus.FETCHED);
+      entry.status(FrontierStatus.FAILED);
       frontier.save(entry);
-      queue.publish(
-          PipelineMessage.create(
-              WorkStage.PARSE,
-              JobService.payload(run.getId(), fetchId),
-              run.getId(),
-              "parse:" + fetchId,
-              50));
-      browser.close();
+      browserStorage.remove(run.getId());
+      throw e;
     }
   }
 
+  private static com.microsoft.playwright.Response navigate(
+      Page page, String url, CrawlConfiguration config) {
+    return page.navigate(
+        url,
+        new Page.NavigateOptions()
+            .setTimeout((double) config.politeness().timeoutMillis())
+            .setWaitUntil(WaitUntilState.NETWORKIDLE));
+  }
+
+  private void performBrowserLogin(Page page, CrawlConfiguration config) throws Exception {
+    var login = config.loginConfiguration();
+    urls.assertSafe(login.loginPageUrl());
+    if (!loginUrl(page.url(), login.loginPageUrl())) navigate(page, login.loginPageUrl(), config);
+    page.fill(nameSelector(login.usernameField()), login.username());
+    page.fill(nameSelector(login.passwordField()), login.password());
+    page.click(login.submitSelector());
+    page.waitForLoadState(
+        LoadState.NETWORKIDLE,
+        new Page.WaitForLoadStateOptions()
+            .setTimeout((double) config.politeness().timeoutMillis()));
+
+    var success = login.successDetection();
+    if (success.urlPattern() != null && !success.urlPattern().isBlank()) {
+      if (!Pattern.compile(success.urlPattern()).matcher(page.url()).find()) {
+        throw new IllegalStateException("Browser login success URL did not match");
+      }
+    } else if (success.contentPattern() != null && !success.contentPattern().isBlank()) {
+      if (!Pattern.compile(success.contentPattern(), Pattern.DOTALL)
+          .matcher(page.content())
+          .find()) {
+        throw new IllegalStateException("Browser login success content did not match");
+      }
+    } else if (loginUrl(page.url(), login.loginPageUrl())
+        || page.locator(nameSelector(login.passwordField())).count() > 0) {
+      throw new IllegalStateException("Browser login form remained visible");
+    }
+  }
+
+  private static String nameSelector(String name) {
+    return "[name=\"" + name.replace("\\", "\\\\").replace("\"", "\\\"") + "\"]";
+  }
+
+  private static boolean loginUrl(String actual, String configured) {
+    if (actual == null || configured == null) return false;
+    try {
+      java.net.URI left = java.net.URI.create(actual);
+      java.net.URI right = java.net.URI.create(configured);
+      return left.getScheme().equalsIgnoreCase(right.getScheme())
+          && left.getHost().equalsIgnoreCase(right.getHost())
+          && normalize(left.getPath()).equals(normalize(right.getPath()));
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
+  private static String normalize(String path) {
+    if (path == null || path.isBlank()) return "/";
+    return path.endsWith("/") && path.length() > 1 ? path.substring(0, path.length() - 1) : path;
+  }
+
   private static String charset(String type) {
-    for (String part : type.split(";"))
-      if (part.trim().toLowerCase(Locale.ROOT).startsWith("charset="))
+    for (String part : type.split(";")) {
+      if (part.trim().toLowerCase(Locale.ROOT).startsWith("charset=")) {
         return part.substring(part.indexOf('=') + 1).trim();
+      }
+    }
     return "UTF-8";
   }
 
@@ -204,5 +318,13 @@ public class HttpCrawler {
     return type.toLowerCase(Locale.ROOT).contains("html") ? ".html" : ".bin";
   }
 
-  private record Response(int status, String url, HttpHeaders headers, InputStream body) {}
+  private static long elapsedMillis(long started) {
+    return Duration.ofNanos(System.nanoTime() - started).toMillis();
+  }
+
+  private static String safeMessage(Exception exception) {
+    String message = exception.getMessage();
+    if (message == null || message.isBlank()) return exception.getClass().getSimpleName();
+    return message.length() > 1000 ? message.substring(0, 1000) : message;
+  }
 }
