@@ -79,7 +79,7 @@ jobs:
       - name: Add Trivy report to pull request
         if: always() && github.event_name == 'pull_request' && matrix.name == 'harvex'
         continue-on-error: true
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
