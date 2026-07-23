@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.concurrent.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tech.wenisch.harvex.config.HarvexProperties;
 import tech.wenisch.harvex.crawl.HttpCrawler;
 import tech.wenisch.harvex.domain.PipelineTypes.WorkStage;
@@ -22,6 +24,7 @@ public class PipelineCoordinator {
   private final HarvexProperties properties;
   private final MeterRegistry metrics;
   private final ThreadPoolExecutor executor;
+  private static final Logger log = LoggerFactory.getLogger(PipelineCoordinator.class);
 
   public PipelineCoordinator(
       PipelineQueue queue,
@@ -75,7 +78,7 @@ public class PipelineCoordinator {
 
   private boolean supports(WorkStage stage) {
     String role = properties.role();
-    return role.equals("all")
+    return role.equals("all") || role.equals("control-plane")
         || switch (stage) {
           case FETCH -> role.equals("crawler-http");
           case BROWSER_FETCH -> role.equals("crawler-browser");
@@ -85,32 +88,41 @@ public class PipelineCoordinator {
         };
   }
 
-  private void process(PipelineMessage message) {
-    long started = System.nanoTime();
-    try {
-      PipelinePayload payload = mapper.readValue(message.payload(), PipelinePayload.class);
-      switch (message.stage()) {
-        case FETCH -> crawler.fetch(payload, false);
-        case BROWSER_FETCH -> crawler.fetch(payload, true);
-        case PARSE -> parser.parse(payload);
-        case EXTRACT -> extractor.extract(payload);
-        case INDEX -> indexer.index(payload);
-        case DISCOVERY -> {}
-      }
-      queue.acknowledge(message.id());
-      metrics.counter("harvex.pipeline.completed", "stage", message.stage().name()).increment();
-    } catch (Exception e) {
-      queue.retry(
-          message.id(),
-          Duration.ofSeconds(Math.min(300, 1L << Math.min(message.attempts(), 8))),
-          safe(e));
-      metrics.counter("harvex.pipeline.failed", "stage", message.stage().name()).increment();
-    } finally {
-      metrics
-          .timer("harvex.pipeline.duration", "stage", message.stage().name())
-          .record(Duration.ofNanos(System.nanoTime() - started));
-    }
-  }
+   private void process(PipelineMessage message) {
+     long started = System.nanoTime();
+     try {
+       PipelinePayload payload = mapper.readValue(message.payload(), PipelinePayload.class);
+       log.info("Processing {} job (attempt {}): run={}, entity={}",
+           message.stage(), message.attempts() + 1, payload.runId(), payload.entityId());
+
+       switch (message.stage()) {
+         case FETCH -> crawler.fetch(payload, false);
+         case BROWSER_FETCH -> crawler.fetch(payload, true);
+         case PARSE -> parser.parse(payload);
+         case EXTRACT -> extractor.extract(payload);
+         case INDEX -> indexer.index(payload);
+         case DISCOVERY -> {}
+       }
+
+       queue.acknowledge(message.id());
+       metrics.counter("harvex.pipeline.completed", "stage", message.stage().name()).increment();
+       log.info("Completed {} job: run={}, entity={}, time={}ms",
+           message.stage(), payload.runId(), payload.entityId(),
+           Duration.ofNanos(System.nanoTime() - started).toMillis());
+     } catch (Exception e) {
+       queue.retry(
+           message.id(),
+           Duration.ofSeconds(Math.min(300, 1L << Math.min(message.attempts(), 8))),
+           safe(e));
+       metrics.counter("harvex.pipeline.failed", "stage", message.stage().name()).increment();
+       log.error("Failed {} job: run={}, entity={}, error={}",
+           message.stage(), message.payload(), message.id(), safe(e));
+     } finally {
+       metrics
+           .timer("harvex.pipeline.duration", "stage", message.stage().name())
+           .record(Duration.ofNanos(System.nanoTime() - started));
+     }
+   }
 
   private static String safe(Exception e) {
     String message = e.getMessage();

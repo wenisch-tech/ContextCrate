@@ -17,6 +17,9 @@ import tech.wenisch.harvex.service.*;
 import tech.wenisch.harvex.answer.RagSettingsService;
 import tech.wenisch.harvex.config.RuntimeProviderSettings;
 import tech.wenisch.harvex.embedding.LocalOnnxEmbeddingProvider;
+import java.nio.file.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Controller
 public class UiController {
@@ -98,56 +101,62 @@ public class UiController {
     return "job-edit";
   }
 
-  @PostMapping("/jobs")
-  String create(
-      @RequestParam String name,
-      @RequestParam String seedUrl,
-      @RequestParam String allowedHost,
-      @RequestParam int maxDepth,
-      @RequestParam int maxPages,
-      @RequestParam(defaultValue = "false") boolean allowSubdomains,
-      @RequestParam(defaultValue = "HarvexBot/0.1") String userAgent,
-      @RequestParam(defaultValue = "") String contact,
-      @RequestParam(defaultValue = "false") boolean honorRobots,
-      @RequestParam(defaultValue = "1000") long delayMillis,
-      @RequestParam(defaultValue = "15000") int timeoutMillis,
-      @RequestParam(defaultValue = "3") int maxAttempts,
-      @RequestParam(defaultValue = "1000") long backoffMillis,
-      @RequestParam(defaultValue = "10") long maxBodyMegabytes,
-      @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
-      @RequestParam(defaultValue = "30") int retentionDays,
-      @RequestParam(defaultValue = "") String contentSelector,
-      @RequestParam(defaultValue = "2000") int chunkSize,
-      @RequestParam(defaultValue = "200") int chunkOverlap,
-      @RequestParam(defaultValue = "") String authUsername,
-      @RequestParam(defaultValue = "") String authPassword,
-      @RequestParam(defaultValue = "") String authLoginUrlPattern) {
-    var c =
-        new CrawlConfiguration(
-            new CrawlConfiguration.Scope(
-                seedUrl,
-                Set.of(allowedHost),
-                List.of(),
-                List.of(),
-                maxDepth,
-                maxPages,
-                allowSubdomains,
-                true),
-            new CrawlConfiguration.Politeness(
-                userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
-            new CrawlConfiguration.Reliability(
-                maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
-            new CrawlConfiguration.Output(
-                retentionDays,
-                contentSelector,
-                List.of("script", "style", "nav", "footer", "aside"),
-                chunkSize,
-                chunkOverlap,
-                "default"),
-            new CrawlConfiguration.Authentication(
-                authUsername.isBlank() ? null : authUsername,
-                authPassword.isBlank() ? null : authPassword,
-                authLoginUrlPattern));
+   @PostMapping("/jobs")
+   String create(
+       @RequestParam String name,
+       @RequestParam String seedUrl,
+       @RequestParam String allowedHost,
+       @RequestParam int maxDepth,
+       @RequestParam int maxPages,
+       @RequestParam(defaultValue = "false") boolean allowSubdomains,
+       @RequestParam(defaultValue = "HarvexBot/0.1") String userAgent,
+       @RequestParam(defaultValue = "") String contact,
+       @RequestParam(defaultValue = "false") boolean honorRobots,
+       @RequestParam(defaultValue = "1000") long delayMillis,
+       @RequestParam(defaultValue = "15000") int timeoutMillis,
+       @RequestParam(defaultValue = "3") int maxAttempts,
+       @RequestParam(defaultValue = "1000") long backoffMillis,
+       @RequestParam(defaultValue = "10") long maxBodyMegabytes,
+       @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+       @RequestParam(defaultValue = "30") int retentionDays,
+       @RequestParam(defaultValue = "") String contentSelector,
+       @RequestParam(defaultValue = "2000") int chunkSize,
+       @RequestParam(defaultValue = "200") int chunkOverlap,
+       @RequestParam(defaultValue = "") String authUsername,
+       @RequestParam(defaultValue = "") String authPassword,
+       @RequestParam(defaultValue = "") String authLoginPageUrl,
+       @RequestParam(defaultValue = "false") boolean authDirectLogin) {
+     var c =
+         new CrawlConfiguration(
+             new CrawlConfiguration.Scope(
+                 seedUrl,
+                 Set.of(allowedHost),
+                 List.of(),
+                 List.of(),
+                 maxDepth,
+                 maxPages,
+                 allowSubdomains,
+                 true),
+             new CrawlConfiguration.Politeness(
+                 userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
+             new CrawlConfiguration.Reliability(
+                 maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
+             new CrawlConfiguration.Output(
+                 retentionDays,
+                 contentSelector,
+                 List.of("script", "style", "nav", "footer", "aside"),
+                 chunkSize,
+                 chunkOverlap,
+                 "default"),
+             new CrawlConfiguration.LoginConfiguration(
+                 authLoginPageUrl.isBlank() ? null : authLoginPageUrl,
+                 authUsername.isBlank() ? null : authUsername,
+                 authPassword.isBlank() ? null : authPassword,
+                 "username",
+                 "password",
+                 "button[type='submit']",
+                 new CrawlConfiguration.SuccessDetection(null, null),
+                 authDirectLogin));
     jobs.create(name, c);
     return "redirect:/jobs";
   }
@@ -176,7 +185,8 @@ public class UiController {
       @RequestParam(defaultValue = "200") int chunkOverlap,
       @RequestParam(defaultValue = "") String authUsername,
       @RequestParam(defaultValue = "") String authPassword,
-      @RequestParam(defaultValue = "") String authLoginUrlPattern) {
+      @RequestParam(defaultValue = "") String authLoginPageUrl,
+      @RequestParam(defaultValue = "false") boolean authDirectLogin) {
     var c =
         new CrawlConfiguration(
             new CrawlConfiguration.Scope(
@@ -199,10 +209,15 @@ public class UiController {
                 chunkSize,
                 chunkOverlap,
                 "default"),
-            new CrawlConfiguration.Authentication(
+            new CrawlConfiguration.LoginConfiguration(
+                authLoginPageUrl.isBlank() ? null : authLoginPageUrl,
                 authUsername.isBlank() ? null : authUsername,
                 authPassword.isBlank() ? null : authPassword,
-                authLoginUrlPattern));
+                "username",
+                "password",
+                "button[type='submit']",
+                new CrawlConfiguration.SuccessDetection(null, null),
+                authDirectLogin));
     jobs.update(id, name, c, true);
     return "redirect:/jobs";
   }
@@ -211,6 +226,30 @@ public class UiController {
   String start(@PathVariable UUID id) {
     jobs.start(id);
     return "redirect:/";
+  }
+
+  @GetMapping("/runs/{id}")
+  String runDetails(@PathVariable UUID id, Model model) throws Exception {
+    var run = jobs.requireRun(id);
+    var job = jobs.requireJob(run.getJobId());
+    var config = codec.read(job.getConfigurationJson());
+
+    model.addAttribute("run", run);
+    model.addAttribute("job", job);
+    model.addAttribute("config", config);
+
+    // Read log file if it exists
+    Path logFile = Paths.get("logs", "run_" + id + ".log");
+    if (Files.exists(logFile)) {
+      try (Stream<String> lines = Files.lines(logFile)) {
+        List<String> logLines = lines.collect(Collectors.toList());
+        model.addAttribute("logLines", logLines);
+      }
+    } else {
+      model.addAttribute("logLines", List.of());
+    }
+
+    return "run-details";
   }
 
   @GetMapping("/documents")

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Run details · Harvex</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/harvex.css">
+</head>
+<body>
+<nav th:replace="~{fragments :: nav}"></nav>
+<main class="container-fluid p-4 p-lg-5">
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+      <p class="eyebrow">RUN DETAILS</p>
+      <h1 class="display-6 fw-semibold" th:text="${job.name}">Job name</h1>
+      <p class="text-secondary">Detailed information about this crawl run</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" th:href="@{/}">Back to overview</a>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <div class="card panel h-100">
+        <div class="card-header">Run information</div>
+        <div class="card-body">
+          <div class="backend-row">
+            <span>Run ID</span>
+            <code class="font-monospace" th:text="${run.id}"></code>
+          </div>
+          <div class="backend-row">
+            <span>Status</span>
+            <span class="status-pill" th:text="${run.status}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Started at</span>
+            <span th:text="${run.startedAt}"></span>
+          </div>
+          <div class="backend-row" th:if="${run.finishedAt != null}">
+            <span>Finished at</span>
+            <span th:text="${run.finishedAt}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Seed URL</span>
+            <a th:href="${config.scope.seedUrl}" target="_blank" th:text="${config.scope.seedUrl}"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card panel h-100">
+        <div class="card-header">Configuration</div>
+        <div class="card-body">
+          <div class="backend-row">
+            <span>Max depth</span>
+            <span th:text="${config.scope.maxDepth}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Max pages</span>
+            <span th:text="${config.scope.maxPages}"></span>
+          </div>
+          <div class="backend-row">
+            <span>User agent</span>
+            <span th:text="${config.politeness.userAgent}"></span>
+          </div>
+          <div class="backend-row">
+            <span>Render mode</span>
+            <span th:text="${config.reliability.renderMode}"></span>
+          </div>
+          <div class="backend-row" th:if="${config.authentication != null && config.authentication.username != null}">
+            <span>Authentication</span>
+            <span>Enabled (username: <span th:text="${config.authentication.username}"></span>)</span>
+          </div>
+          <div class="backend-row" th:if="${config.authentication == null || config.authentication.username == null}">
+            <span>Authentication</span>
+            <span>Disabled</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card panel">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Run log</span>
+      <div class="d-flex gap-2">
+        <button id="copy-log" class="btn btn-sm btn-outline-secondary">Copy</button>
+        <button id="download-log" class="btn btn-sm btn-outline-secondary">Download</button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="log-container">
+        <pre id="log-content" class="m-0 p-3 small font-monospace"><code th:each="line:${logLines}"><span th:text="${line}"></span>
+</code></pre>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script>
+(() => {
+  const logContent = document.getElementById('log-content');
+  const logContainer = document.querySelector('.log-container');
+
+  // Copy log to clipboard
+  document.getElementById('copy-log').addEventListener('click', () => {
+    navigator.clipboard.writeText(logContent.textContent).then(() => {
+      const button = document.getElementById('copy-log');
+      const originalText = button.textContent;
+      button.textContent = 'Copied!';
+      setTimeout(() => {
+        button.textContent = originalText;
+      }, 2000);
+    });
+  });
+
+  // Download log file
+  document.getElementById('download-log').addEventListener('click', () => {
+    const blob = new Blob([logContent.textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'run_' + '[[${run.id}]]' + '.log';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // Auto-scroll to bottom if log is long
+  function scrollToBottom() {
+    if (logContainer.scrollHeight > logContainer.clientHeight) {
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+  }
+
+  scrollToBottom();
+
+  // Stream logs in real-time
+  function streamLogs() {
+    const eventSource = new EventSource('/api/v1/jobs/runs/[[${run.id}]]/log');
+
+    eventSource.onmessage = function(event) {
+      const line = document.createElement('code');
+      line.textContent = event.data;
+      logContent.appendChild(line);
+      logContent.appendChild(document.createTextNode('\n'));
+      scrollToBottom();
+    };
+
+    eventSource.onerror = function() {
+      eventSource.close();
+      // Try to reconnect after a delay
+      setTimeout(streamLogs, 5000);
+    };
+  }
+
+  // Start streaming logs for running jobs
+  if ('[[${run.status}]]' === 'RUNNING') {
+    streamLogs();
+  }
+})();
+</script>
+</body>
+</html>

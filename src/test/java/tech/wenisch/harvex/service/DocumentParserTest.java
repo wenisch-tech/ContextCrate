@@ -60,7 +60,7 @@ class DocumentParserTest {
             CrawlConfiguration.Politeness.defaults(),
             new CrawlConfiguration.Reliability(3, 1000, 1_000_000, true, RenderMode.AUTO),
             new CrawlConfiguration.Output(30, "", List.of("script", "style"), 500, 50, "test"),
-            new CrawlConfiguration.Authentication(null, null, ""));
+            CrawlConfiguration.LoginConfiguration.defaults());
     var run = new CrawlRun(runId, jobId, codec.write(config));
     var fetch = new FetchRecord(fetchId, runId, frontierId, "https://wenisch.tech/");
     fetch.success(

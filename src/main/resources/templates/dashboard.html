@@ -74,22 +74,23 @@
 
   <div class="row g-4">
     <div class="col-xl-8">
-      <section class="card panel">
-        <div class="card-header d-flex justify-content-between"><span>Recent runs</span><a href="/jobs" class="small">Manage jobs</a></div>
-        <div class="table-responsive">
-          <table class="table mb-0 align-middle">
-            <thead><tr><th>Run</th><th>Status</th><th>Started</th></tr></thead>
-            <tbody>
-            <tr th:each="run:${runs}">
-              <td class="font-monospace small" th:text="${run.id}"></td>
-              <td><span class="status-pill" th:text="${run.status}"></span></td>
-              <td th:text="${run.startedAt}"></td>
-            </tr>
-            <tr th:if="${runs.empty}"><td colspan="3" class="empty-state">No runs yet. Create a crawl job to begin.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+       <section class="card panel">
+         <div class="card-header d-flex justify-content-between"><span>Recent runs</span><a href="/jobs" class="small">Manage jobs</a></div>
+         <div class="table-responsive">
+           <table class="table mb-0 align-middle">
+             <thead><tr><th>Run</th><th>Job</th><th>Status</th><th>Started</th></tr></thead>
+             <tbody>
+             <tr th:each="run:${runs}">
+               <td class="font-monospace small"><a th:href="@{/runs/{id}(id=${run.id})}" th:text="${run.id}"></a></td>
+               <td th:text="${jobs.![name][jobs.![id].indexOf(run.jobId)]}"></td>
+               <td><span class="status-pill" th:text="${run.status}"></span></td>
+               <td th:text="${run.startedAt}"></td>
+             </tr>
+             <tr th:if="${runs.empty}"><td colspan="4" class="empty-state">No runs yet. Create a crawl job to begin.</td></tr>
+             </tbody>
+           </table>
+         </div>
+       </section>
     </div>
     <div class="col-xl-4">
       <section class="card panel mb-4">

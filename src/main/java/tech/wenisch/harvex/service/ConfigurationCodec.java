@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import tech.wenisch.harvex.domain.CrawlConfiguration;
+import tech.wenisch.harvex.domain.CrawlConfigurationCompatibility;
 
 @Component
 public class ConfigurationCodec {
@@ -23,9 +24,16 @@ public class ConfigurationCodec {
 
   public CrawlConfiguration read(String json) {
     try {
+      // First try to read as new format
       return mapper.readValue(json, CrawlConfiguration.class);
     } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Invalid stored crawl configuration", e);
+      try {
+        // If that fails, try to read as old format with backward compatibility
+        CrawlConfigurationCompatibility compatibility = mapper.readValue(json, CrawlConfigurationCompatibility.class);
+        return compatibility.getConfig();
+      } catch (JsonProcessingException ex) {
+        throw new IllegalStateException("Invalid stored crawl configuration", ex);
+      }
     }
   }
 }

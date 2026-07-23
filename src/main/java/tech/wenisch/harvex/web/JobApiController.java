@@ -6,8 +6,13 @@ import jakarta.validation.Valid;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.MediaType;
 import tech.wenisch.harvex.domain.*;
 import tech.wenisch.harvex.service.*;
+import java.nio.file.*;
+import java.io.*;
+import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/v1/jobs")
@@ -58,6 +63,40 @@ public class JobApiController {
           case "cancel" -> RunStatus.CANCELLED;
           default -> throw new IllegalArgumentException("Unknown action " + action);
         });
+  }
+
+  @GetMapping(value = "/runs/{id}/log", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  public SseEmitter streamRunLog(@PathVariable UUID id) {
+    SseEmitter emitter = new SseEmitter(30_000L); // 30 second timeout
+
+    new Thread(() -> {
+      try {
+        Path logFile = Paths.get("logs", "run_" + id + ".log");
+        if (!Files.exists(logFile)) {
+          emitter.send(SseEmitter.event().name("error").data("Log file not found"));
+          emitter.complete();
+          return;
+        }
+
+        // Send existing log lines
+        try (Stream<String> lines = Files.lines(logFile)) {
+          lines.forEach(line -> {
+            try {
+              emitter.send(SseEmitter.event().name("message").data(line));
+            } catch (IOException e) {
+              // Client disconnected
+              emitter.complete();
+            }
+          });
+        }
+
+        emitter.complete();
+      } catch (Exception e) {
+        emitter.completeWithError(e);
+      }
+    }).start();
+
+    return emitter;
   }
 
   public record JobRequest(String name, @Valid CrawlConfiguration configuration, boolean enabled) {

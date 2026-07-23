@@ -11,3 +11,5 @@ dependency-reduced-pom.xml
 mvnw
 mvnw.cmd
 .continue/
+.clinerules/
+memory-bank/

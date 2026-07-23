@@ -7,19 +7,21 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public record CrawlConfiguration(
     @Valid Scope scope,
     @Valid Politeness politeness,
     @Valid Reliability reliability,
     @Valid Output output,
-    @Valid Authentication authentication) {
+    @Valid LoginConfiguration loginConfiguration) {
 
   public CrawlConfiguration {
     scope = scope == null ? Scope.defaults() : scope;
     politeness = politeness == null ? Politeness.defaults() : politeness;
     reliability = reliability == null ? Reliability.defaults() : reliability;
     output = output == null ? Output.defaults() : output;
-    authentication = authentication == null ? Authentication.defaults() : authentication;
+    loginConfiguration = loginConfiguration == null ? LoginConfiguration.defaults() : loginConfiguration;
   }
 
   public record Scope(
@@ -107,13 +109,31 @@ public record CrawlConfiguration(
     }
   }
 
-  public record Authentication(
+  public record LoginConfiguration(
+      String loginPageUrl,
       String username,
       String password,
-      String loginUrlPattern) {
-    public static Authentication defaults() {
-      return new Authentication(null, null, "");
+      String usernameField,
+      String passwordField,
+      String submitSelector,
+      SuccessDetection successDetection,
+      boolean directLogin) {
+
+    public static LoginConfiguration defaults() {
+      return new LoginConfiguration(null, null, null, "username", "password", "button[type='submit']", new SuccessDetection(null, null), false);
     }
+
+    @JsonIgnore
+    public boolean isConfigured() {
+      return loginPageUrl != null && !loginPageUrl.isBlank() &&
+             username != null && !username.isBlank() &&
+             password != null && !password.isBlank();
+    }
+  }
+
+  public record SuccessDetection(
+      String urlPattern,
+      String contentPattern) {
   }
 
   public enum RenderMode {
