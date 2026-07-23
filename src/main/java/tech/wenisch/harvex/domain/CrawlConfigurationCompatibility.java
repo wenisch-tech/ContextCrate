@@ -34,7 +34,12 @@ public class CrawlConfigurationCompatibility {
                 authentication.passwordField(),
                 authentication.submitSelector(),
                 authentication.successDetection(),
-                false // directLogin defaults to false for backward compatibility
+                false, // directLogin defaults to false for backward compatibility
+                null,  // authServerUrl
+                null,  // clientId
+                null,  // clientSecret
+                null,  // realm
+                CrawlConfiguration.AuthMethod.FORM // authMethod defaults to FORM for backward compatibility
             );
         } else if (loginConfiguration != null) {
             convertedLoginConfig = loginConfiguration;

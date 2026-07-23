@@ -491,7 +491,12 @@ class HttpCrawlerTest {
                 "password",
                 "button[type='submit']",
                 new CrawlConfiguration.SuccessDetection(null, null),
-                true  // directLogin enabled
+                true,  // directLogin enabled
+                null,  // authServerUrl
+                null,  // clientId
+                null,  // clientSecret
+                null,  // realm
+                CrawlConfiguration.AuthMethod.FORM
             )
         );
 
@@ -531,7 +536,12 @@ class HttpCrawlerTest {
                 "password",
                 "button[type='submit']",
                 new CrawlConfiguration.SuccessDetection(null, null),
-                false  // directLogin disabled
+                false,  // directLogin disabled
+                null,   // authServerUrl
+                null,   // clientId
+                null,   // clientSecret
+                null,   // realm
+                CrawlConfiguration.AuthMethod.FORM
             )
         );
 

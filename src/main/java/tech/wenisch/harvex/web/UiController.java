@@ -101,65 +101,75 @@ public class UiController {
     return "job-edit";
   }
 
-   @PostMapping("/jobs")
-   String create(
-       @RequestParam String name,
-       @RequestParam String seedUrl,
-       @RequestParam String allowedHost,
-       @RequestParam int maxDepth,
-       @RequestParam int maxPages,
-       @RequestParam(defaultValue = "false") boolean allowSubdomains,
-       @RequestParam(defaultValue = "HarvexBot/0.1") String userAgent,
-       @RequestParam(defaultValue = "") String contact,
-       @RequestParam(defaultValue = "false") boolean honorRobots,
-       @RequestParam(defaultValue = "1000") long delayMillis,
-       @RequestParam(defaultValue = "15000") int timeoutMillis,
-       @RequestParam(defaultValue = "3") int maxAttempts,
-       @RequestParam(defaultValue = "1000") long backoffMillis,
-       @RequestParam(defaultValue = "10") long maxBodyMegabytes,
-       @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
-       @RequestParam(defaultValue = "30") int retentionDays,
-       @RequestParam(defaultValue = "") String contentSelector,
-       @RequestParam(defaultValue = "2000") int chunkSize,
-       @RequestParam(defaultValue = "200") int chunkOverlap,
-       @RequestParam(defaultValue = "") String authUsername,
-       @RequestParam(defaultValue = "") String authPassword,
-       @RequestParam(defaultValue = "") String authLoginPageUrl,
-       @RequestParam(defaultValue = "false") boolean authDirectLogin) {
-     var c =
-         new CrawlConfiguration(
-             new CrawlConfiguration.Scope(
-                 seedUrl,
-                 Set.of(allowedHost),
-                 List.of(),
-                 List.of(),
-                 maxDepth,
-                 maxPages,
-                 allowSubdomains,
-                 true),
-             new CrawlConfiguration.Politeness(
-                 userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
-             new CrawlConfiguration.Reliability(
-                 maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
-             new CrawlConfiguration.Output(
-                 retentionDays,
-                 contentSelector,
-                 List.of("script", "style", "nav", "footer", "aside"),
-                 chunkSize,
-                 chunkOverlap,
-                 "default"),
-             new CrawlConfiguration.LoginConfiguration(
-                 authLoginPageUrl.isBlank() ? null : authLoginPageUrl,
-                 authUsername.isBlank() ? null : authUsername,
-                 authPassword.isBlank() ? null : authPassword,
-                 "username",
-                 "password",
-                 "button[type='submit']",
-                 new CrawlConfiguration.SuccessDetection(null, null),
-                 authDirectLogin));
-    jobs.create(name, c);
-    return "redirect:/jobs";
-  }
+    @PostMapping("/jobs")
+    String create(
+        @RequestParam String name,
+        @RequestParam String seedUrl,
+        @RequestParam String allowedHost,
+        @RequestParam int maxDepth,
+        @RequestParam int maxPages,
+        @RequestParam(defaultValue = "false") boolean allowSubdomains,
+        @RequestParam(defaultValue = "HarvexBot/0.1") String userAgent,
+        @RequestParam(defaultValue = "") String contact,
+        @RequestParam(defaultValue = "false") boolean honorRobots,
+        @RequestParam(defaultValue = "1000") long delayMillis,
+        @RequestParam(defaultValue = "15000") int timeoutMillis,
+        @RequestParam(defaultValue = "3") int maxAttempts,
+        @RequestParam(defaultValue = "1000") long backoffMillis,
+        @RequestParam(defaultValue = "10") long maxBodyMegabytes,
+        @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+        @RequestParam(defaultValue = "30") int retentionDays,
+        @RequestParam(defaultValue = "") String contentSelector,
+        @RequestParam(defaultValue = "2000") int chunkSize,
+        @RequestParam(defaultValue = "200") int chunkOverlap,
+        @RequestParam(defaultValue = "") String authUsername,
+        @RequestParam(defaultValue = "") String authPassword,
+        @RequestParam(defaultValue = "") String authLoginPageUrl,
+        @RequestParam(defaultValue = "false") boolean authDirectLogin,
+        @RequestParam(defaultValue = "FORM") CrawlConfiguration.AuthMethod authMethod,
+        @RequestParam(defaultValue = "") String authServerUrl,
+        @RequestParam(defaultValue = "") String authRealm,
+        @RequestParam(defaultValue = "") String authClientId,
+        @RequestParam(defaultValue = "") String authClientSecret) {
+      var c =
+          new CrawlConfiguration(
+              new CrawlConfiguration.Scope(
+                  seedUrl,
+                  Set.of(allowedHost),
+                  List.of(),
+                  List.of(),
+                  maxDepth,
+                  maxPages,
+                  allowSubdomains,
+                  true),
+              new CrawlConfiguration.Politeness(
+                  userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
+              new CrawlConfiguration.Reliability(
+                  maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
+              new CrawlConfiguration.Output(
+                  retentionDays,
+                  contentSelector,
+                  List.of("script", "style", "nav", "footer", "aside"),
+                  chunkSize,
+                  chunkOverlap,
+                  "default"),
+              new CrawlConfiguration.LoginConfiguration(
+                  authLoginPageUrl.isBlank() ? null : authLoginPageUrl,
+                  authUsername.isBlank() ? null : authUsername,
+                  authPassword.isBlank() ? null : authPassword,
+                  "username",
+                  "password",
+                  "button[type='submit']",
+                  new CrawlConfiguration.SuccessDetection(null, null),
+                  authDirectLogin,
+                  authServerUrl.isBlank() ? null : authServerUrl,
+                  authClientId.isBlank() ? null : authClientId,
+                  authClientSecret.isBlank() ? null : authClientSecret,
+                  authRealm.isBlank() ? null : authRealm,
+                  authMethod));
+      jobs.create(name, c);
+      return "redirect:/jobs";
+    }
 
   @PostMapping("/jobs/{id}/update")
   String updateJob(
@@ -186,7 +196,12 @@ public class UiController {
       @RequestParam(defaultValue = "") String authUsername,
       @RequestParam(defaultValue = "") String authPassword,
       @RequestParam(defaultValue = "") String authLoginPageUrl,
-      @RequestParam(defaultValue = "false") boolean authDirectLogin) {
+      @RequestParam(defaultValue = "false") boolean authDirectLogin,
+      @RequestParam(defaultValue = "FORM") CrawlConfiguration.AuthMethod authMethod,
+      @RequestParam(defaultValue = "") String authServerUrl,
+      @RequestParam(defaultValue = "") String authRealm,
+      @RequestParam(defaultValue = "") String authClientId,
+      @RequestParam(defaultValue = "") String authClientSecret) {
     var c =
         new CrawlConfiguration(
             new CrawlConfiguration.Scope(
@@ -217,7 +232,12 @@ public class UiController {
                 "password",
                 "button[type='submit']",
                 new CrawlConfiguration.SuccessDetection(null, null),
-                authDirectLogin));
+                authDirectLogin,
+                authServerUrl.isBlank() ? null : authServerUrl,
+                authClientId.isBlank() ? null : authClientId,
+                authClientSecret.isBlank() ? null : authClientSecret,
+                authRealm.isBlank() ? null : authRealm,
+                authMethod));
     jobs.update(id, name, c, true);
     return "redirect:/jobs";
   }

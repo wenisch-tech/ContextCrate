@@ -45,30 +45,9 @@ public class HttpCrawler {
   private final FetchRecordRepository fetches;
   private final PipelineQueue queue;
   private final RunLogger runLogger;
+  private final KeycloakTokenService keycloakTokenService;
+  private final OAuth2SessionCache oauth2SessionCache;
   private static final Logger log = LoggerFactory.getLogger(HttpCrawler.class);
-
-  public HttpCrawler(
-      FrontierEntryRepository frontier,
-      CrawlRunRepository runs,
-      ConfigurationCodec codec,
-      UrlPolicy urls,
-      RobotsService robots,
-      HostPoliteness politeness,
-      ArtifactStore artifacts,
-      FetchRecordRepository fetches,
-      PipelineQueue queue,
-      RunLogger runLogger) {
-    this.frontier = frontier;
-    this.runs = runs;
-    this.codec = codec;
-    this.urls = urls;
-    this.robots = robots;
-    this.politeness = politeness;
-    this.artifacts = artifacts;
-    this.fetches = fetches;
-    this.queue = queue;
-    this.runLogger = runLogger;
-  }
 
   @Autowired
   public HttpCrawler(
@@ -80,8 +59,35 @@ public class HttpCrawler {
       HostPoliteness politeness,
       ArtifactStore artifacts,
       FetchRecordRepository fetches,
+      PipelineQueue queue,
+      RunLogger runLogger,
+      KeycloakTokenService keycloakTokenService,
+      OAuth2SessionCache oauth2SessionCache) {
+    this.frontier = frontier;
+    this.runs = runs;
+    this.codec = codec;
+    this.urls = urls;
+    this.robots = robots;
+    this.politeness = politeness;
+    this.artifacts = artifacts;
+    this.fetches = fetches;
+    this.queue = queue;
+    this.runLogger = runLogger;
+    this.keycloakTokenService = keycloakTokenService;
+    this.oauth2SessionCache = oauth2SessionCache;
+  }
+
+  public HttpCrawler(
+      FrontierEntryRepository frontier,
+      CrawlRunRepository runs,
+      ConfigurationCodec codec,
+      UrlPolicy urls,
+      RobotsService robots,
+      HostPoliteness politeness,
+      ArtifactStore artifacts,
+      FetchRecordRepository fetches,
       PipelineQueue queue) {
-    this(frontier, runs, codec, urls, robots, politeness, artifacts, fetches, queue, null);
+    this(frontier, runs, codec, urls, robots, politeness, artifacts, fetches, queue, null, null, null);
   }
 
   @Transactional
@@ -178,10 +184,38 @@ public class HttpCrawler {
 
   private boolean hasValidSession(UUID runId, CrawlConfiguration config) {
     if (config.loginConfiguration() == null || !config.loginConfiguration().isConfigured()) {
+      log.debug("No login configuration for run {}", runId);
       return true;
     }
 
+    log.debug("Checking session for run {} with auth method: {}", runId, config.loginConfiguration().authMethod());
+
+    // For OAuth2 authentication, check if we have a valid OAuth2 token
+    if (config.loginConfiguration().authMethod() == CrawlConfiguration.AuthMethod.OAUTH2) {
+      String oauthToken = getOAuth2TokenForRun(runId);
+      log.debug("OAuth2 token check for run {}: token={}", runId, oauthToken != null ? "PRESENT" : "MISSING");
+      if (runLogger != null) {
+        runLogger.log(runId, "DEBUG", "OAuth2 token check: " + (oauthToken != null ? "PRESENT" : "MISSING"));
+      }
+
+      if (oauthToken != null && !oauthToken.isBlank()) {
+        log.debug("Valid OAuth2 token found for run {}", runId);
+        if (runLogger != null) {
+          runLogger.log(runId, "DEBUG", "Valid OAuth2 token found");
+        }
+        return true;
+      } else {
+        log.debug("No OAuth2 token found for run {}", runId);
+        if (runLogger != null) {
+          runLogger.log(runId, "DEBUG", "No OAuth2 token found");
+        }
+        return false;
+      }
+    }
+
+    // For form-based authentication, check for session cookies
     String cookiesForRun = getCookiesForRun(runId, config);
+    log.debug("Cookies check for run {}: cookies={}", runId, cookiesForRun != null ? "PRESENT" : "MISSING");
 
     if (cookiesForRun == null || cookiesForRun.isBlank()) {
       log.debug("No cookies found for run {}", runId);
@@ -192,9 +226,11 @@ public class HttpCrawler {
     }
 
     // Check if any of the cookies contain session information
-    return cookiesForRun.contains("session") ||
+    boolean hasSession = cookiesForRun.contains("session") ||
            cookiesForRun.contains("Session") ||
            cookiesForRun.contains("JSESSIONID");
+    log.debug("Session cookie check for run {}: hasSession={}", runId, hasSession);
+    return hasSession;
   }
 
   private boolean shouldPerformDirectLogin(CrawlConfiguration config) {
@@ -230,6 +266,12 @@ public class HttpCrawler {
                         : " (" + config.politeness().contact() + ")"))
             .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
 
+    // Add OAuth2 authorization header if available
+    String oauthToken = getOAuth2TokenForRun(runId);
+    if (oauthToken != null && !oauthToken.isBlank()) {
+      reqBuilder.header("Authorization", "Bearer " + oauthToken);
+    }
+
     String cookies = getCookiesForRun(runId, config);
     if (cookies != null && !cookies.isBlank()) {
       reqBuilder.header("Cookie", cookies);
@@ -249,6 +291,12 @@ public class HttpCrawler {
 
     private void performHttpLogin(UUID runId, CrawlConfiguration config) throws Exception {
         if (config.loginConfiguration() == null || !config.loginConfiguration().isConfigured()) {
+            return;
+        }
+
+        // Handle OAuth2 authentication (Keycloak direct access grants)
+        if (config.loginConfiguration().authMethod() == CrawlConfiguration.AuthMethod.OAUTH2) {
+            handleOAuth2Login(runId, config);
             return;
         }
 
@@ -309,6 +357,81 @@ public class HttpCrawler {
             // Single-step authentication (traditional login form)
             log.debug("Detected single-step authentication flow");
             handleSingleStepLogin(runId, loginPageUrl, loginPageContent, username, password, config);
+        }
+    }
+
+    private void handleOAuth2Login(UUID runId, CrawlConfiguration config) throws Exception {
+        CrawlConfiguration.LoginConfiguration loginConfig = config.loginConfiguration();
+
+        log.info("Performing OAuth2 login for run {}...", runId);
+        if (runLogger != null) {
+            runLogger.log(runId, "INFO", "Performing OAuth2 login");
+        }
+
+        try {
+            // Get OAuth2 access token using client credentials flow
+            String accessToken = keycloakTokenService.getAccessToken(
+                loginConfig.authServerUrl(),
+                loginConfig.realm(),
+                loginConfig.clientId(),
+                loginConfig.clientSecret()
+            );
+
+            log.debug("Successfully obtained OAuth2 access token for run {}", runId);
+            if (runLogger != null) {
+                runLogger.log(runId, "DEBUG", "Successfully obtained OAuth2 access token");
+            }
+
+            // Store the token for use in subsequent requests
+            storeOAuth2Token(runId, accessToken);
+
+        } catch (Exception e) {
+            log.error("OAuth2 login failed for run {}: {}", runId, e.getMessage());
+            if (runLogger != null) {
+                runLogger.log(runId, "ERROR", "OAuth2 login failed: " + e.getMessage());
+            }
+            throw new Exception("OAuth2 login failed: " + e.getMessage(), e);
+        }
+    }
+
+    private void storeOAuth2Token(UUID runId, String accessToken) {
+        if (oauth2SessionCache != null) {
+            oauth2SessionCache.storeToken(runId, accessToken);
+        } else {
+            log.warn("OAuth2SessionCache is not available, falling back to file storage");
+            // Fallback to file storage for backward compatibility
+            try {
+                String tokenPath = "oauth2_token_" + runId + ".txt";
+                java.io.File tokenFile = new java.io.File(tokenPath);
+                Files.writeString(tokenFile.toPath(), accessToken);
+                log.debug("Stored OAuth2 token for run {} (file fallback)", runId);
+            } catch (Exception e) {
+                log.warn("Failed to store OAuth2 token for run {}: {}", runId, e.getMessage());
+            }
+        }
+    }
+
+    private String getOAuth2TokenForRun(UUID runId) {
+        if (oauth2SessionCache != null) {
+            return oauth2SessionCache.getToken(runId);
+        } else {
+            log.warn("OAuth2SessionCache is not available, falling back to file storage");
+            // Fallback to file storage for backward compatibility
+            try {
+                String tokenPath = "oauth2_token_" + runId + ".txt";
+                java.io.File tokenFile = new java.io.File(tokenPath);
+                if (!tokenFile.exists()) {
+                    log.debug("No OAuth2 token file found for run {}", runId);
+                    return null;
+                }
+
+                String accessToken = Files.readString(tokenFile.toPath());
+                log.debug("Found OAuth2 token for run {} (file fallback)", runId);
+                return accessToken;
+            } catch (Exception e) {
+                log.warn("Error reading OAuth2 token for run {}: {}", runId, e.getMessage());
+                return null;
+            }
         }
     }
 
@@ -623,6 +746,17 @@ private static String decodeHtmlEntities(String input) {
         // Keycloak-specific fields
         formData.put("credentialId", "");
 
+        // Add CSRF token if present (required for Keycloak security)
+        if (loginPageContent.contains("name=\"X-XSRF-TOKEN\"") || loginPageContent.contains("name='X-XSRF-TOKEN'")) {
+            // Extract CSRF token from the page
+            Pattern csrfPattern = Pattern.compile("<input[^>]+name=[\"']X-XSRF-TOKEN[\"'][^>]*value=[\"']([^\"']*)[\"'][^>]*>");
+            Matcher csrfMatcher = csrfPattern.matcher(loginPageContent);
+            if (csrfMatcher.find()) {
+                formData.put("X-XSRF-TOKEN", csrfMatcher.group(1));
+                log.debug("Extracted CSRF token for Keycloak login");
+            }
+        }
+
         // Submit form - skip authentication since we're already in the login process
         log.info("Submitting Keycloak login form to {} for run {}", formAction, runId);
         if (runLogger != null) {
@@ -637,7 +771,29 @@ private static String decodeHtmlEntities(String input) {
             if (runLogger != null) {
                 runLogger.log(runId, "INFO", "Keycloak login failed: HTTP " + response.status() + " for URL: " + formAction);
             }
+
+            // If login failed, check if we need to handle multi-step authentication
+            // Some Keycloak instances require username first, then password
+            if (response.status() == 400 && loginPageContent.contains("execution=") && loginPageContent.contains("client_id=")) {
+                log.debug("Keycloak login failed, trying multi-step authentication for run {}", runId);
+                if (runLogger != null) {
+                    runLogger.log(runId, "DEBUG", "Trying multi-step authentication after Keycloak failure");
+                }
+                handleMultiStepLogin(runId, loginPageUrl, loginPageContent, username, password, config);
+            }
             return;
+        }
+
+        // If login was successful, extract and save cookies
+        if (response.status() >= 200 && response.status() < 400) {
+            // Extract cookies from the response headers
+            String setCookieHeader = response.headers().firstValue("Set-Cookie").orElse(null);
+            if (setCookieHeader != null) {
+                log.debug("Keycloak login successful, cookies received for run {}", runId);
+                if (runLogger != null) {
+                    runLogger.log(runId, "DEBUG", "Keycloak login successful, cookies received");
+                }
+            }
         }
 
         log.debug("Keycloak login successful for run {}", runId);

@@ -109,6 +109,11 @@ public record CrawlConfiguration(
     }
   }
 
+  public enum AuthMethod {
+    FORM,
+    OAUTH2
+  }
+
   public record LoginConfiguration(
       String loginPageUrl,
       String username,
@@ -117,17 +122,29 @@ public record CrawlConfiguration(
       String passwordField,
       String submitSelector,
       SuccessDetection successDetection,
-      boolean directLogin) {
+      boolean directLogin,
+      String authServerUrl,
+      String clientId,
+      String clientSecret,
+      String realm,
+      AuthMethod authMethod) {
 
     public static LoginConfiguration defaults() {
-      return new LoginConfiguration(null, null, null, "username", "password", "button[type='submit']", new SuccessDetection(null, null), false);
+      return new LoginConfiguration(null, null, null, "username", "password", "button[type='submit']", new SuccessDetection(null, null), false, null, null, null, null, AuthMethod.FORM);
     }
 
     @JsonIgnore
     public boolean isConfigured() {
-      return loginPageUrl != null && !loginPageUrl.isBlank() &&
-             username != null && !username.isBlank() &&
-             password != null && !password.isBlank();
+      if (authMethod == AuthMethod.OAUTH2) {
+        return authServerUrl != null && !authServerUrl.isBlank() &&
+               clientId != null && !clientId.isBlank() &&
+               clientSecret != null && !clientSecret.isBlank() &&
+               realm != null && !realm.isBlank();
+      } else {
+        return loginPageUrl != null && !loginPageUrl.isBlank() &&
+               username != null && !username.isBlank() &&
+               password != null && !password.isBlank();
+      }
     }
   }
 

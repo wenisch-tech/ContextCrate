@@ -70,11 +70,16 @@
             <span>Render mode</span>
             <span th:text="${config.reliability.renderMode}"></span>
           </div>
-          <div class="backend-row" th:if="${config.authentication != null && config.authentication.username != null}">
+          <div class="backend-row" th:if="${config.loginConfiguration() != null && config.loginConfiguration().isConfigured()}">
             <span>Authentication</span>
-            <span>Enabled (username: <span th:text="${config.authentication.username}"></span>)</span>
+            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).FORM}">
+              Enabled (username: <span th:text="${config.loginConfiguration().username()}"></span>)
+            </span>
+            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).OAUTH2}">
+              OAuth2 (client: <span th:text="${config.loginConfiguration().clientId()}"></span>)
+            </span>
           </div>
-          <div class="backend-row" th:if="${config.authentication == null || config.authentication.username == null}">
+          <div class="backend-row" th:if="${config.loginConfiguration() == null || !config.loginConfiguration().isConfigured()}">
             <span>Authentication</span>
             <span>Disabled</span>
           </div>
