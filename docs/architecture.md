@@ -1,36 +1,53 @@
 # Architecture
 
-## Modules and roles
-
-The code is separated into control-plane, crawl, queue, storage, parsing, index, security, backup, repository, and web packages. All backend decisions terminate at `PipelineQueue`, `ArtifactStore`, and `SearchIndex` interfaces.
+ContextCrate is a Spring Boot application that can run all stages in one process or distribute them across control-plane, HTTP crawler, browser crawler, parser, extractor, and indexer roles.
 
 ```mermaid
 flowchart LR
-  UI[Control plane] --> F[Frontier]
-  F --> Q1[Fetch work]
-  Q1 --> C[HTTP or browser crawler]
-  C --> A[(Artifact store)]
-  C --> Q2[Parse work]
-  Q2 --> P[JSoup parser]
-  P --> F
-  P --> D[(Relational store)]
-  P --> Q3[Extract work]
-  Q3 --> E[Extractor]
-  E --> D
-  P --> Q4[Index work]
-  Q4 --> I[Indexer]
-  I --> S[(Lucene or OpenSearch)]
-  UI --> S
+  UI[Crate-qualified UI/API] --> AUTH[Membership authorization]
+  AUTH --> DB[(Relational store)]
+  DB --> Q[Crate-aware work queue]
+  Q --> C[HTTP/browser crawl]
+  C --> A[(crates/{crateId} artifacts)]
+  C --> P[Parse and discover]
+  P --> D[(Documents and chunks)]
+  D --> E[Extraction]
+  D --> I[Generation-aware indexer]
+  I --> N[(Crate index namespace)]
+  UI --> N
 ```
 
-`all` runs every module. Distributed roles are `control-plane`, `crawler-http`, `crawler-browser`, `parser`, `extractor`, and `indexer`.
+## Ownership propagation
 
-## Consistency
+`crate_id` is stored on every crate-owned row rather than inferred only through joins. Pipeline schema v2 duplicates it in the envelope and JSON payload. This deliberate redundancy lets repositories scope queries efficiently and lets workers detect inconsistent or malicious references before doing work.
 
-Work delivery is at least once. IDs derive from run, canonical URL, document, and chunk identity. Local work is leased from the database; stale processing leases become claimable after restart. RabbitMQ uses durable queues and stage-specific DLQs. Artifacts are written before their database references and are protected by SHA-256 metadata.
+Delivery is at least once. Idempotency keys include crate identity, and entity relationships are verified at each stage.
 
-## Storage model
+## Storage adapters
 
-PostgreSQL/H2 owns configurations, immutable runs, frontier state, fetch metadata, normalized documents, chunks, extraction rules, extraction results, users, and local work. Raw bodies live behind `ArtifactStore`. Search indices, including model-versioned embeddings, and extraction results are derived and may be rebuilt from normalized records. The search API reads the active `SearchIndex` backend, so Lucene and OpenSearch expose the same lexical/semantic/hybrid retrieval contract.
+The relational database owns canonical configuration and normalized content. Raw bodies use `ArtifactStore` with filesystem or S3 implementations. Search uses `SearchIndex` with Lucene or OpenSearch implementations. Index data and embeddings are derived and rebuildable.
 
-Answer generation is stateless derived work: it retrieves chunk context, calls a configured OpenAI-compatible chat provider, and streams cited text without persisting prompts, histories, or answers. Only privacy-safe operational metadata is audited.
+Backends are installation-wide services, while prefixes/directories and configuration are crate-specific.
+
+## Provider resolution
+
+Embedding and answer settings are keyed by crate. An execution context selects the correct provider configuration for crawl-index work, search queries, and asynchronous answer streaming. Local model assets may share an installation cache, but vector namespaces and credentials do not.
+
+## Generation switch
+
+```mermaid
+sequenceDiagram
+  participant O as Owner
+  participant C as ContextCrate
+  participant G1 as Active generation
+  participant G2 as Building generation
+  O->>C: Change embedding configuration
+  C->>G2: Reindex normalized documents
+  C->>G1: Continue serving search
+  C->>G1: Write new documents
+  C->>G2: Dual-write new documents
+  C->>G2: Commit and verify
+  C->>C: Atomically set active generation
+```
+
+If the build fails, its error is recorded and its namespace is removed; the previous active generation is unchanged.

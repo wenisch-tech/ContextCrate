@@ -1,6 +1,6 @@
-site_name: Harvex
+site_name: ContextCrate
 site_description: Self-hosted crawling and indexing platform
-repo_url: https://github.com/wenisch-tech/Harvex
+repo_url: https://github.com/wenisch-tech/ContextCrate
 theme:
   name: material
   palette:
@@ -9,6 +9,8 @@ theme:
     accent: cyan
 nav:
   - Overview: index.md
+  - Crates: crates.md
+  - Authorization: authorization.md
   - Architecture: architecture.md
   - Configuration: configuration.md
   - Embeddings: embeddings.md
@@ -17,7 +19,18 @@ nav:
   - Security: security.md
   - Deployment: deployment.md
   - Backup & migration: backup-migration.md
+  - Upgrade from Harvex: upgrade-from-harvex.md
   - API: api.md
+  - Operations: operations.md
+  - Tutorials: tutorials.md
   - Roadmap: roadmap.md
   - Troubleshooting: troubleshooting.md
-markdown_extensions: [admonition, tables, toc]
+markdown_extensions:
+  - admonition
+  - tables
+  - toc
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

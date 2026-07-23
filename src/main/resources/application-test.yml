@@ -1,10 +1,10 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:harvex-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:mem:contextcrate-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
   jpa:
     hibernate:
       ddl-auto: validate
-harvex:
+contextcrate:
   artifacts:
     path: target/test-data/artifacts
   index:

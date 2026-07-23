@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Run details · Harvex</title>
+  <title>Run details · ContextCrate</title>
   <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="/css/harvex.css">
+  <link rel="stylesheet" href="/css/contextcrate.css">
 </head>
 <body>
 <nav th:replace="~{fragments :: nav}"></nav>
@@ -18,7 +18,7 @@
       <p class="text-secondary">Detailed information about this crawl run</p>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" th:href="@{/}">Back to overview</a>
+      <a class="btn btn-outline-secondary" th:href="@{/crates/{id}(id=${crate.id})}">Back to overview</a>
     </div>
   </div>
 
@@ -72,10 +72,10 @@
           </div>
           <div class="backend-row" th:if="${config.loginConfiguration().isConfigured()}">
             <span>Authentication</span>
-            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).FORM}">
+            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.contextcrate.domain.CrawlConfiguration$AuthMethod).FORM}">
               Enabled (username: <span th:text="${config.loginConfiguration().username()}"></span>)
             </span>
-            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).OAUTH2}">
+            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.contextcrate.domain.CrawlConfiguration$AuthMethod).OAUTH2}">
               Keycloak service account (client: <span th:text="${config.loginConfiguration().clientId()}"></span>)
             </span>
           </div>

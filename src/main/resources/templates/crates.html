@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Crates · ContextCrate</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/contextcrate.css"></head>
+<body><main class="container py-5">
+  <div class="mb-5"><p class="eyebrow">CONTEXTCRATE</p><h1>Your crates</h1>
+    <p class="text-secondary">A crate is an isolated context workspace containing sources, jobs, documents, extraction rules, members, and AI settings.</p></div>
+  <div class="row g-4">
+    <div class="col-lg-7"><div class="card panel p-4">
+      <h2 class="h5">Available crates</h2>
+      <div th:if="${crates.empty}" class="text-secondary py-4">You do not belong to a crate yet. Create your first crate or ask an administrator to add you.</div>
+      <a th:each="crate:${crates}" th:href="@{/crates/{id}(id=${crate.id})}" class="list-group-item list-group-item-action bg-transparent py-3">
+        <div class="fw-semibold" th:text="${crate.name}"></div><small class="text-secondary" th:text="${crate.description ?: crate.status}"></small>
+      </a>
+    </div></div>
+    <div class="col-lg-5"><form th:if="${canCreateCrate}" class="card panel p-4" method="post" action="/crates">
+      <h2 class="h5">Create your first crate</h2>
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <label class="form-label mt-3">Name</label><input class="form-control" name="name" required maxlength="200">
+      <label class="form-label mt-3">Description</label><textarea class="form-control" name="description"></textarea>
+      <button class="btn btn-primary mt-4">Create crate</button>
+    </form><div th:unless="${canCreateCrate}" class="card panel p-4"><h2 class="h5">Crate creation is restricted</h2><p class="text-secondary mb-0">Contact an administrator to request a crate or a creation entitlement.</p></div></div>
+  </div>
+</main></body></html>

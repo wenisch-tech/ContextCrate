@@ -1,10 +1,10 @@
 spring:
   application:
-    name: harvex
+    name: contextcrate
   profiles:
     default: standalone
   datasource:
-    url: jdbc:h2:file:./data/harvex;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    url: jdbc:h2:file:./data/contextcrate;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     username: sa
     password:
   jpa:
@@ -34,7 +34,7 @@ management:
 springdoc:
   swagger-ui:
     path: /api
-harvex:
+contextcrate:
   profile: standalone
   role: all
   queue:
@@ -48,51 +48,51 @@ harvex:
     backend: lucene
     path: data/index
     endpoint: http://localhost:9200
-    prefix: harvex
+    prefix: contextcrate
   embeddings:
-    enabled: ${HARVEX_EMBEDDINGS_ENABLED:true}
-    provider: ${HARVEX_EMBEDDINGS_PROVIDER:local}
+    enabled: ${CONTEXTCRATE_EMBEDDINGS_ENABLED:true}
+    provider: ${CONTEXTCRATE_EMBEDDINGS_PROVIDER:local}
     local:
-      model-id: ${HARVEX_EMBEDDINGS_LOCAL_MODEL_ID:Xenova/multilingual-e5-small}
-      revision: ${HARVEX_EMBEDDINGS_LOCAL_REVISION:97cb8f96eaed1a1f0dac821239943e854fce9c36}
-      download-url: ${HARVEX_EMBEDDINGS_LOCAL_DOWNLOAD_URL:https://huggingface.co/Xenova/multilingual-e5-small/resolve/97cb8f96eaed1a1f0dac821239943e854fce9c36}
-      cache-path: ${HARVEX_EMBEDDINGS_LOCAL_CACHE_PATH:data/models}
-      model-path: ${HARVEX_EMBEDDINGS_LOCAL_MODEL_PATH:}
-      download-timeout-seconds: ${HARVEX_EMBEDDINGS_LOCAL_DOWNLOAD_TIMEOUT_SECONDS:120}
+      model-id: ${CONTEXTCRATE_EMBEDDINGS_LOCAL_MODEL_ID:Xenova/multilingual-e5-small}
+      revision: ${CONTEXTCRATE_EMBEDDINGS_LOCAL_REVISION:97cb8f96eaed1a1f0dac821239943e854fce9c36}
+      download-url: ${CONTEXTCRATE_EMBEDDINGS_LOCAL_DOWNLOAD_URL:https://huggingface.co/Xenova/multilingual-e5-small/resolve/97cb8f96eaed1a1f0dac821239943e854fce9c36}
+      cache-path: ${CONTEXTCRATE_EMBEDDINGS_LOCAL_CACHE_PATH:data/models}
+      model-path: ${CONTEXTCRATE_EMBEDDINGS_LOCAL_MODEL_PATH:}
+      download-timeout-seconds: ${CONTEXTCRATE_EMBEDDINGS_LOCAL_DOWNLOAD_TIMEOUT_SECONDS:120}
     openai-compatible:
-      base-url: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL:}
-      model: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL:}
-      api-key: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY:}
-      headers: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_HEADERS:}
-      dimensions: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS:1536}
-      timeout-seconds: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_TIMEOUT_SECONDS:30}
+      base-url: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL:}
+      model: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL:}
+      api-key: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY:}
+      headers: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_HEADERS:}
+      dimensions: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS:1536}
+      timeout-seconds: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_TIMEOUT_SECONDS:30}
   retrieval:
-    default-mode: ${HARVEX_RETRIEVAL_DEFAULT_MODE:hybrid}
+    default-mode: ${CONTEXTCRATE_RETRIEVAL_DEFAULT_MODE:hybrid}
     hybrid-fusion: rrf
-    rrf-constant: ${HARVEX_RETRIEVAL_RRF_CONSTANT:60}
-    candidate-limit: ${HARVEX_RETRIEVAL_CANDIDATE_LIMIT:100}
+    rrf-constant: ${CONTEXTCRATE_RETRIEVAL_RRF_CONSTANT:60}
+    candidate-limit: ${CONTEXTCRATE_RETRIEVAL_CANDIDATE_LIMIT:100}
   answering:
-    enabled: ${HARVEX_ANSWERING_ENABLED:false}
+    enabled: ${CONTEXTCRATE_ANSWERING_ENABLED:false}
     provider: openai-compatible
-    retrieval-mode: ${HARVEX_ANSWERING_RETRIEVAL_MODE:hybrid}
-    source-limit: ${HARVEX_ANSWERING_SOURCE_LIMIT:8}
-    context-token-budget: ${HARVEX_ANSWERING_CONTEXT_TOKEN_BUDGET:6000}
-    max-history-messages: ${HARVEX_ANSWERING_MAX_HISTORY_MESSAGES:10}
-    temperature: ${HARVEX_ANSWERING_TEMPERATURE:0.2}
-    max-output-tokens: ${HARVEX_ANSWERING_MAX_OUTPUT_TOKENS:800}
+    retrieval-mode: ${CONTEXTCRATE_ANSWERING_RETRIEVAL_MODE:hybrid}
+    source-limit: ${CONTEXTCRATE_ANSWERING_SOURCE_LIMIT:8}
+    context-token-budget: ${CONTEXTCRATE_ANSWERING_CONTEXT_TOKEN_BUDGET:6000}
+    max-history-messages: ${CONTEXTCRATE_ANSWERING_MAX_HISTORY_MESSAGES:10}
+    temperature: ${CONTEXTCRATE_ANSWERING_TEMPERATURE:0.2}
+    max-output-tokens: ${CONTEXTCRATE_ANSWERING_MAX_OUTPUT_TOKENS:800}
     openai-compatible:
-      base-url: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL:}
-      model: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL:}
-      api-key: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY:}
-      headers: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_HEADERS:}
-      timeout-seconds: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_TIMEOUT_SECONDS:60}
+      base-url: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_BASE_URL:}
+      model: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_MODEL:}
+      api-key: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_API_KEY:}
+      headers: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_HEADERS:}
+      timeout-seconds: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_TIMEOUT_SECONDS:60}
   worker:
     concurrency: 8
     lease-seconds: 30
     max-attempts: 5
   security:
-    initial-admin-email: ${HARVEX_ADMIN_EMAIL:admin@harvex.local}
-    initial-admin-password: ${HARVEX_ADMIN_PASSWORD:admin}
+    initial-admin-email: ${CONTEXTCRATE_ADMIN_EMAIL:admin@contextcrate.local}
+    initial-admin-password: ${CONTEXTCRATE_ADMIN_PASSWORD:admin}
 server:
   error:
     include-message: always
@@ -102,12 +102,12 @@ spring:
     activate:
       on-profile: distributed
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/harvex}
-    username: ${SPRING_DATASOURCE_USERNAME:harvex}
-    password: ${SPRING_DATASOURCE_PASSWORD:harvex}
-harvex:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/contextcrate}
+    username: ${SPRING_DATASOURCE_USERNAME:contextcrate}
+    password: ${SPRING_DATASOURCE_PASSWORD:contextcrate}
+contextcrate:
   profile: distributed
-  role: ${HARVEX_ROLE:control-plane}
+  role: ${CONTEXTCRATE_ROLE:control-plane}
   queue:
     backend: rabbitmq
   database:
@@ -116,12 +116,12 @@ harvex:
     backend: s3
     endpoint: ${S3_ENDPOINT:http://localhost:9000}
     region: ${S3_REGION:us-east-1}
-    bucket: ${S3_BUCKET:harvex}
+    bucket: ${S3_BUCKET:contextcrate}
     prefix: ${S3_PREFIX:artifacts}
   index:
     backend: opensearch
     endpoint: ${OPENSEARCH_ENDPOINT:http://localhost:9200}
-    prefix: ${OPENSEARCH_PREFIX:harvex}
+    prefix: ${OPENSEARCH_PREFIX:contextcrate}
 management:
   health:
     rabbit:

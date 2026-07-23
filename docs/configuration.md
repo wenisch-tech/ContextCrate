@@ -4,11 +4,11 @@
 
 | Property | Values | Standalone | Distributed |
 |---|---|---|---|
-| `harvex.queue.backend` | `local`, `rabbitmq` | local | rabbitmq |
-| `harvex.database.backend` | `h2`, `postgresql` | h2 | postgresql |
-| `harvex.artifacts.backend` | `filesystem`, `s3` | filesystem | s3 |
-| `harvex.index.backend` | `lucene`, `opensearch` | lucene | opensearch |
-| `harvex.role` | `all`, stage role | all | control-plane |
+| `contextcrate.queue.backend` | `local`, `rabbitmq` | local | rabbitmq |
+| `contextcrate.database.backend` | `h2`, `postgresql` | h2 | postgresql |
+| `contextcrate.artifacts.backend` | `filesystem`, `s3` | filesystem | s3 |
+| `contextcrate.index.backend` | `lucene`, `opensearch` | lucene | opensearch |
+| `contextcrate.role` | `all`, stage role | all | control-plane |
 
 Local queue and file-backed H2 require `role=all`. Lucene requires a singleton indexer and a local or correctly shared index path. Filesystem artifacts need a shared volume when accessed by multiple processes.
 
@@ -19,7 +19,7 @@ Local queue and file-backed H2 require `role=all`. Lucene requires a singleton i
 - **Reliability:** attempts, backoff, maximum body size, content deduplication, and `HTTP_ONLY`, `BROWSER_ONLY`, or `AUTO` rendering.
 - **Output:** raw retention, content/removal selectors, chunk size/overlap, and logical index name.
 
-Robots enforcement is on by default. Private, loopback, link-local, metadata, and multicast destinations are blocked. `harvex.crawler.allow-private-networks=true` exists for controlled intranet deployments and tests; use it only with trusted job administrators.
+Robots enforcement is on by default. Private, loopback, link-local, metadata, and multicast destinations are blocked. `contextcrate.crawler.allow-private-networks=true` exists for controlled intranet deployments and tests; use it only with trusted job administrators.
 
 ## Environment examples
 
@@ -31,8 +31,8 @@ Embeddings default to the local ONNX provider. See [Embeddings](embeddings.md) f
 
 ## Answer generation
 
-Answer generation is disabled by default. Set `HARVEX_ANSWERING_ENABLED=true` and configure `HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL`, `HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL`, and a secret-backed `HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY`. See [RAG answer generation](answers.md) for limits, SSE behavior, and safety controls.
+Answer generation is disabled by default. Set `CONTEXTCRATE_ANSWERING_ENABLED=true` and configure `CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_BASE_URL`, `CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_MODEL`, and a secret-backed `CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_API_KEY`. See [RAG answer generation](answers.md) for limits, SSE behavior, and safety controls.
 
-After the provider is configured, use the authenticated **Settings** page to choose strict knowledge-base-only answers, history permission, citation behavior, default retrieval mode, and source count. Those runtime policies are stored in the database; provider connection details remain environment/secret configuration.
+After the provider is configured, use the crate-specific authenticated **Settings** page to choose strict knowledge-base-only answers, history permission, citation behavior, default retrieval mode, and source count. Those runtime policies are stored in the database; provider connection details remain environment/secret configuration.
 
-The Settings page can also override embedding and answer-provider values such as provider kind, enabled state, model, endpoint URL, dimensions, local model paths, and API keys. Database overrides take precedence over environment values. API keys entered in Settings are stored in the Harvex database; protect database access and backups with encryption.
+Each crate Settings page can override embedding and answer-provider values such as provider kind, enabled state, model, endpoint URL, dimensions, local model paths, and API keys. Database overrides take precedence over environment values. API keys entered in Settings are stored in the ContextCrate database; protect database access and backups with encryption.

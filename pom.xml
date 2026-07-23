@@ -9,9 +9,9 @@
         <relativePath/>
     </parent>
     <groupId>tech.wenisch</groupId>
-    <artifactId>harvex</artifactId>
+    <artifactId>contextcrate</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>Harvex</name>
+    <name>ContextCrate</name>
     <description>Self-hosted crawling and indexing platform</description>
     <properties>
         <java.version>25</java.version>
@@ -66,7 +66,7 @@
         <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
     </dependencies>
     <build>
-        <finalName>harvex-${project.version}</finalName>
+        <finalName>contextcrate-${project.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -80,7 +80,7 @@
                             <rules>
                                 <requireJavaVersion>
                                     <version>[25,)</version>
-                                    <message>Harvex requires a JDK 25 or newer. Set JAVA_HOME to a JDK 25 installation before running Maven.</message>
+                                    <message>ContextCrate requires a JDK 25 or newer. Set JAVA_HOME to a JDK 25 installation before running Maven.</message>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
