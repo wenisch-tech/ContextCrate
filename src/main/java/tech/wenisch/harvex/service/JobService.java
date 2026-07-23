@@ -39,6 +39,7 @@ public class JobService {
 
   @Transactional
   public CrawlJob create(String name, CrawlConfiguration config) {
+    requireValidAuthentication(config.loginConfiguration());
     String canonical = urls.canonicalize(config.scope().seedUrl());
     if (!urls.inScope(canonical, config.scope()))
       throw new IllegalArgumentException("Seed URL is outside configured scope");
@@ -58,6 +59,8 @@ public class JobService {
   @Transactional
   public CrawlJob update(UUID id, String name, CrawlConfiguration config, boolean enabled) {
     var job = requireJob(id);
+    config = retainUnchangedSecrets(codec.read(job.getConfigurationJson()), config);
+    requireValidAuthentication(config.loginConfiguration());
     job.update(name, codec.write(config), enabled);
     return jobs.save(job);
   }
@@ -117,5 +120,61 @@ public class JobService {
         org.springframework.security.core.context.SecurityContextHolder.getContext()
             .getAuthentication();
     return auth == null ? "system" : auth.getName();
+  }
+
+  private static CrawlConfiguration retainUnchangedSecrets(
+      CrawlConfiguration existing, CrawlConfiguration submitted) {
+    var oldLogin = existing.loginConfiguration();
+    var login = submitted.loginConfiguration();
+    if (login.authMethod() == CrawlConfiguration.AuthMethod.FORM
+        && oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
+        && (login.password() == null || login.password().isBlank())) {
+      login =
+          new CrawlConfiguration.LoginConfiguration(
+              login.loginPageUrl(),
+              login.username(),
+              oldLogin.password(),
+              login.usernameField(),
+              login.passwordField(),
+              login.submitSelector(),
+              login.successDetection(),
+              login.directLogin(),
+              null,
+              null,
+              null,
+              null,
+              login.authMethod());
+    } else if (login.authMethod() == CrawlConfiguration.AuthMethod.OAUTH2
+        && oldLogin.authMethod() == CrawlConfiguration.AuthMethod.OAUTH2
+        && (login.clientSecret() == null || login.clientSecret().isBlank())) {
+      login =
+          new CrawlConfiguration.LoginConfiguration(
+              null,
+              null,
+              null,
+              login.usernameField(),
+              login.passwordField(),
+              login.submitSelector(),
+              login.successDetection(),
+              login.directLogin(),
+              login.authServerUrl(),
+              login.clientId(),
+              oldLogin.clientSecret(),
+              login.realm(),
+              login.authMethod());
+    }
+    return new CrawlConfiguration(
+        submitted.scope(),
+        submitted.politeness(),
+        submitted.reliability(),
+        submitted.output(),
+        login);
+  }
+
+  private static void requireValidAuthentication(
+      CrawlConfiguration.LoginConfiguration login) {
+    if (login.authMethod() != CrawlConfiguration.AuthMethod.NONE && !login.isConfigured()) {
+      throw new IllegalArgumentException("Selected crawler authentication is incomplete");
+    }
   }
 }

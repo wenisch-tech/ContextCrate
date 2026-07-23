@@ -7,12 +7,16 @@
   <div class="mb-3">
     <label class="form-label">Authentication Method</label>
     <div class="form-check">
-      <input type="radio" class="form-check-input" id="authMethodForm" name="authMethod" value="FORM" checked>
+      <input type="radio" class="form-check-input" id="authMethodNone" name="authMethod" value="NONE" checked>
+      <label class="form-check-label" for="authMethodNone">No authentication</label>
+    </div>
+    <div class="form-check">
+      <input type="radio" class="form-check-input" id="authMethodForm" name="authMethod" value="FORM">
       <label class="form-check-label" for="authMethodForm">Form-based Authentication</label>
     </div>
     <div class="form-check">
       <input type="radio" class="form-check-input" id="authMethodOAuth2" name="authMethod" value="OAUTH2">
-      <label class="form-check-label" for="authMethodOAuth2">OAuth2 / Keycloak Direct Access Grants</label>
+      <label class="form-check-label" for="authMethodOAuth2">Keycloak service account / client credentials</label>
     </div>
   </div>
 
@@ -25,17 +29,11 @@
       </div>
       <div class="col-md-4">
         <label class="form-label" for="authPassword">Password</label>
-        <input id="authPassword" class="form-control" name="authPassword" type="password" placeholder="Password for login">
+        <input id="authPassword" class="form-control" name="authPassword" type="password" autocomplete="new-password" placeholder="Password for login">
       </div>
       <div class="col-md-3">
         <label class="form-label" for="authLoginPageUrl">Login page URL</label>
         <input id="authLoginPageUrl" class="form-control" name="authLoginPageUrl" placeholder="https://example.com/login">
-      </div>
-      <div class="col-md-1 d-flex align-items-end">
-        <div class="form-check mb-2">
-          <input class="form-check-input" name="authDirectLogin" type="checkbox" value="true" id="directLogin">
-          <label class="form-check-label" for="directLogin">Direct login</label>
-        </div>
       </div>
     </div>
   </div>
@@ -58,20 +56,24 @@
       </div>
       <div class="col-md-6">
         <label class="form-label" for="authClientSecret">Client Secret</label>
-        <input type="password" class="form-control" id="authClientSecret" name="authClientSecret" placeholder="Client secret">
+        <input type="password" class="form-control" id="authClientSecret" name="authClientSecret" autocomplete="new-password" placeholder="Client secret">
       </div>
     </div>
   </div>
 </div><div class="card-footer d-flex justify-content-end gap-2 p-3"><a class="btn btn-outline-secondary" href="/jobs">Cancel</a><button class="btn btn-primary">Create job</button></div></form>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
+    const noneMethodRadio = document.getElementById('authMethodNone');
     const formMethodRadio = document.getElementById('authMethodForm');
     const oauth2MethodRadio = document.getElementById('authMethodOAuth2');
     const formAuthFields = document.getElementById('formAuthFields');
     const oauth2AuthFields = document.getElementById('oauth2AuthFields');
 
     function toggleAuthFields() {
-      if (formMethodRadio.checked) {
+      if (noneMethodRadio.checked) {
+        formAuthFields.style.display = 'none';
+        oauth2AuthFields.style.display = 'none';
+      } else if (formMethodRadio.checked) {
         formAuthFields.style.display = '';
         oauth2AuthFields.style.display = 'none';
       } else {
@@ -80,6 +82,7 @@
       }
     }
 
+    noneMethodRadio.addEventListener('change', toggleAuthFields);
     formMethodRadio.addEventListener('change', toggleAuthFields);
     oauth2MethodRadio.addEventListener('change', toggleAuthFields);
 
@@ -88,16 +91,3 @@
   });
 </script>
 </main></body></html>
-<task_progress>
-- [x] Read memory bank file to understand current crawler login situation
-- [x] Examine HttpCrawler code to see current authentication handling
-- [x] Research Keycloak integration options
-- [x] Design solution for direct access grants
-- [x] Present plan to user
-- [x] Extend LoginConfiguration with OAuth2 fields
-- [x] Create KeycloakTokenService
-- [x] Update HttpCrawler authentication logic
-- [x] Update UI forms
-- [ ] Add error handling and logging
-</task_progress>
-</write_to_file>

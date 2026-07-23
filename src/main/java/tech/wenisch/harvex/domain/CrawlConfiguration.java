@@ -110,6 +110,7 @@ public record CrawlConfiguration(
   }
 
   public enum AuthMethod {
+    NONE,
     FORM,
     OAUTH2
   }
@@ -129,12 +130,40 @@ public record CrawlConfiguration(
       String realm,
       AuthMethod authMethod) {
 
+    public LoginConfiguration {
+      usernameField =
+          usernameField == null || usernameField.isBlank() ? "username" : usernameField;
+      passwordField =
+          passwordField == null || passwordField.isBlank() ? "password" : passwordField;
+      submitSelector =
+          submitSelector == null || submitSelector.isBlank()
+              ? "button[type='submit']"
+              : submitSelector;
+      successDetection =
+          successDetection == null ? new SuccessDetection(null, null) : successDetection;
+      authMethod = authMethod == null ? AuthMethod.NONE : authMethod;
+    }
+
     public static LoginConfiguration defaults() {
-      return new LoginConfiguration(null, null, null, "username", "password", "button[type='submit']", new SuccessDetection(null, null), false, null, null, null, null, AuthMethod.FORM);
+      return new LoginConfiguration(
+          null,
+          null,
+          null,
+          "username",
+          "password",
+          "button[type='submit']",
+          new SuccessDetection(null, null),
+          false,
+          null,
+          null,
+          null,
+          null,
+          AuthMethod.NONE);
     }
 
     @JsonIgnore
     public boolean isConfigured() {
+      if (authMethod == null || authMethod == AuthMethod.NONE) return false;
       if (authMethod == AuthMethod.OAUTH2) {
         return authServerUrl != null && !authServerUrl.isBlank() &&
                clientId != null && !clientId.isBlank() &&
@@ -145,6 +174,23 @@ public record CrawlConfiguration(
                username != null && !username.isBlank() &&
                password != null && !password.isBlank();
       }
+    }
+
+    public LoginConfiguration withoutSecrets() {
+      return new LoginConfiguration(
+          loginPageUrl,
+          username,
+          null,
+          usernameField,
+          passwordField,
+          submitSelector,
+          successDetection,
+          directLogin,
+          authServerUrl,
+          clientId,
+          null,
+          realm,
+          authMethod);
     }
   }
 

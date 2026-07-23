@@ -70,16 +70,16 @@
             <span>Render mode</span>
             <span th:text="${config.reliability.renderMode}"></span>
           </div>
-          <div class="backend-row" th:if="${config.loginConfiguration() != null && config.loginConfiguration().isConfigured()}">
+          <div class="backend-row" th:if="${config.loginConfiguration().isConfigured()}">
             <span>Authentication</span>
             <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).FORM}">
               Enabled (username: <span th:text="${config.loginConfiguration().username()}"></span>)
             </span>
             <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.harvex.domain.CrawlConfiguration$AuthMethod).OAUTH2}">
-              OAuth2 (client: <span th:text="${config.loginConfiguration().clientId()}"></span>)
+              Keycloak service account (client: <span th:text="${config.loginConfiguration().clientId()}"></span>)
             </span>
           </div>
-          <div class="backend-row" th:if="${config.loginConfiguration() == null || !config.loginConfiguration().isConfigured()}">
+          <div class="backend-row" th:if="${!config.loginConfiguration().isConfigured()}">
             <span>Authentication</span>
             <span>Disabled</span>
           </div>
@@ -88,86 +88,31 @@
     </div>
   </div>
 
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="metric-card"><span>Discovered</span><strong th:text="${frontierTotal}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Fetched</span><strong th:text="${frontierFetched}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Failed</span><strong th:text="${frontierFailed}">0</strong></div></div>
+  </div>
+
   <div class="card panel">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span>Run log</span>
-      <div class="d-flex gap-2">
-        <button id="copy-log" class="btn btn-sm btn-outline-secondary">Copy</button>
-        <button id="download-log" class="btn btn-sm btn-outline-secondary">Download</button>
-      </div>
-    </div>
-    <div class="card-body p-0">
-      <div class="log-container">
-        <pre id="log-content" class="m-0 p-3 small font-monospace"><code th:each="line:${logLines}"><span th:text="${line}"></span>
-</code></pre>
-      </div>
+    <div class="card-header">Recent fetches</div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Requested URL</th><th>Result</th><th>HTTP</th><th>Duration</th><th>Fetched</th></tr></thead>
+        <tbody>
+        <tr th:each="fetch:${fetches}">
+          <td class="text-break"><a th:href="${fetch.requestedUrl}" th:text="${fetch.requestedUrl}" target="_blank" rel="noopener"></a><div class="small text-danger" th:if="${fetch.errorMessage}" th:text="${fetch.errorMessage}"></div></td>
+          <td><span class="status-pill" th:text="${fetch.outcome}"></span></td>
+          <td th:text="${fetch.statusCode != null ? fetch.statusCode : '—'}"></td>
+          <td th:text="${fetch.durationMs != null ? fetch.durationMs + ' ms' : '—'}"></td>
+          <td th:text="${fetch.fetchedAt}"></td>
+        </tr>
+        <tr th:if="${fetches.empty}"><td colspan="5" class="empty-state">No fetch attempts have been recorded yet.</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </main>
 <script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script>
-(() => {
-  const logContent = document.getElementById('log-content');
-  const logContainer = document.querySelector('.log-container');
-
-  // Copy log to clipboard
-  document.getElementById('copy-log').addEventListener('click', () => {
-    navigator.clipboard.writeText(logContent.textContent).then(() => {
-      const button = document.getElementById('copy-log');
-      const originalText = button.textContent;
-      button.textContent = 'Copied!';
-      setTimeout(() => {
-        button.textContent = originalText;
-      }, 2000);
-    });
-  });
-
-  // Download log file
-  document.getElementById('download-log').addEventListener('click', () => {
-    const blob = new Blob([logContent.textContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'run_' + '[[${run.id}]]' + '.log';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  // Auto-scroll to bottom if log is long
-  function scrollToBottom() {
-    if (logContainer.scrollHeight > logContainer.clientHeight) {
-      logContainer.scrollTop = logContainer.scrollHeight;
-    }
-  }
-
-  scrollToBottom();
-
-  // Stream logs in real-time
-  function streamLogs() {
-    const eventSource = new EventSource('/api/v1/jobs/runs/[[${run.id}]]/log');
-
-    eventSource.onmessage = function(event) {
-      const line = document.createElement('code');
-      line.textContent = event.data;
-      logContent.appendChild(line);
-      logContent.appendChild(document.createTextNode('\n'));
-      scrollToBottom();
-    };
-
-    eventSource.onerror = function() {
-      eventSource.close();
-      // Try to reconnect after a delay
-      setTimeout(streamLogs, 5000);
-    };
-  }
-
-  // Start streaming logs for running jobs
-  if ('[[${run.status}]]' === 'RUNNING') {
-    streamLogs();
-  }
-})();
-</script>
 </body>
 </html>

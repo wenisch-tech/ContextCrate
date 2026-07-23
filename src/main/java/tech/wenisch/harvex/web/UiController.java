@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import tech.wenisch.harvex.config.HarvexProperties;
 import tech.wenisch.harvex.domain.CrawlConfiguration;
+import tech.wenisch.harvex.domain.CrawlJob;
 import tech.wenisch.harvex.domain.PipelineTypes.ExtractionType;
 import tech.wenisch.harvex.index.SearchIndex;
 import tech.wenisch.harvex.queue.PipelineQueue;
@@ -17,9 +18,6 @@ import tech.wenisch.harvex.service.*;
 import tech.wenisch.harvex.answer.RagSettingsService;
 import tech.wenisch.harvex.config.RuntimeProviderSettings;
 import tech.wenisch.harvex.embedding.LocalOnnxEmbeddingProvider;
-import java.nio.file.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Controller
 public class UiController {
@@ -33,6 +31,8 @@ public class UiController {
   private final RagSettingsService ragSettings;
   private final RuntimeProviderSettings providerSettings;
   private final LocalOnnxEmbeddingProvider localEmbeddings;
+  private final FetchRecordRepository fetchRecords;
+  private final FrontierEntryRepository frontierEntries;
 
   public UiController(
       JobService jobs,
@@ -44,7 +44,9 @@ public class UiController {
       ExtractionService extraction,
       RagSettingsService ragSettings,
       RuntimeProviderSettings providerSettings,
-      LocalOnnxEmbeddingProvider localEmbeddings) {
+      LocalOnnxEmbeddingProvider localEmbeddings,
+      FetchRecordRepository fetchRecords,
+      FrontierEntryRepository frontierEntries) {
     this.jobs = jobs;
     this.codec = codec;
     this.properties = properties;
@@ -55,6 +57,8 @@ public class UiController {
     this.ragSettings = ragSettings;
     this.providerSettings = providerSettings;
     this.localEmbeddings = localEmbeddings;
+    this.fetchRecords = fetchRecords;
+    this.frontierEntries = frontierEntries;
   }
 
   @GetMapping("/login")
@@ -64,8 +68,13 @@ public class UiController {
 
   @GetMapping("/")
   String dashboard(@RequestParam(defaultValue = "") String q, Model model) throws Exception {
-    model.addAttribute("jobs", jobs.jobs());
+    var allJobs = jobs.jobs();
+    model.addAttribute("jobs", allJobs);
     model.addAttribute("runs", jobs.runs());
+    model.addAttribute(
+        "jobNames",
+        allJobs.stream()
+            .collect(java.util.stream.Collectors.toMap(CrawlJob::getId, CrawlJob::getName)));
     model.addAttribute("properties", properties);
     model.addAttribute("indexHealth", index.health());
     model.addAttribute(
@@ -126,47 +135,41 @@ public class UiController {
         @RequestParam(defaultValue = "") String authPassword,
         @RequestParam(defaultValue = "") String authLoginPageUrl,
         @RequestParam(defaultValue = "false") boolean authDirectLogin,
-        @RequestParam(defaultValue = "FORM") CrawlConfiguration.AuthMethod authMethod,
+        @RequestParam(defaultValue = "NONE") CrawlConfiguration.AuthMethod authMethod,
         @RequestParam(defaultValue = "") String authServerUrl,
         @RequestParam(defaultValue = "") String authRealm,
         @RequestParam(defaultValue = "") String authClientId,
         @RequestParam(defaultValue = "") String authClientSecret) {
       var c =
-          new CrawlConfiguration(
-              new CrawlConfiguration.Scope(
-                  seedUrl,
-                  Set.of(allowedHost),
-                  List.of(),
-                  List.of(),
-                  maxDepth,
-                  maxPages,
-                  allowSubdomains,
-                  true),
-              new CrawlConfiguration.Politeness(
-                  userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
-              new CrawlConfiguration.Reliability(
-                  maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
-              new CrawlConfiguration.Output(
-                  retentionDays,
-                  contentSelector,
-                  List.of("script", "style", "nav", "footer", "aside"),
-                  chunkSize,
-                  chunkOverlap,
-                  "default"),
-              new CrawlConfiguration.LoginConfiguration(
-                  authLoginPageUrl.isBlank() ? null : authLoginPageUrl,
-                  authUsername.isBlank() ? null : authUsername,
-                  authPassword.isBlank() ? null : authPassword,
-                  "username",
-                  "password",
-                  "button[type='submit']",
-                  new CrawlConfiguration.SuccessDetection(null, null),
-                  authDirectLogin,
-                  authServerUrl.isBlank() ? null : authServerUrl,
-                  authClientId.isBlank() ? null : authClientId,
-                  authClientSecret.isBlank() ? null : authClientSecret,
-                  authRealm.isBlank() ? null : authRealm,
-                  authMethod));
+          configurationFromForm(
+              null,
+              seedUrl,
+              allowedHost,
+              maxDepth,
+              maxPages,
+              allowSubdomains,
+              userAgent,
+              contact,
+              honorRobots,
+              delayMillis,
+              timeoutMillis,
+              maxAttempts,
+              backoffMillis,
+              maxBodyMegabytes,
+              renderMode,
+              retentionDays,
+              contentSelector,
+              chunkSize,
+              chunkOverlap,
+              authUsername,
+              authPassword,
+              authLoginPageUrl,
+              authDirectLogin,
+              authMethod,
+              authServerUrl,
+              authRealm,
+              authClientId,
+              authClientSecret);
       jobs.create(name, c);
       return "redirect:/jobs";
     }
@@ -197,48 +200,44 @@ public class UiController {
       @RequestParam(defaultValue = "") String authPassword,
       @RequestParam(defaultValue = "") String authLoginPageUrl,
       @RequestParam(defaultValue = "false") boolean authDirectLogin,
-      @RequestParam(defaultValue = "FORM") CrawlConfiguration.AuthMethod authMethod,
+      @RequestParam(defaultValue = "NONE") CrawlConfiguration.AuthMethod authMethod,
       @RequestParam(defaultValue = "") String authServerUrl,
       @RequestParam(defaultValue = "") String authRealm,
       @RequestParam(defaultValue = "") String authClientId,
       @RequestParam(defaultValue = "") String authClientSecret) {
+    var job = jobs.requireJob(id);
+    var existing = codec.read(job.getConfigurationJson());
     var c =
-        new CrawlConfiguration(
-            new CrawlConfiguration.Scope(
-                seedUrl,
-                Set.of(allowedHost),
-                List.of(),
-                List.of(),
-                maxDepth,
-                maxPages,
-                allowSubdomains,
-                true),
-            new CrawlConfiguration.Politeness(
-                userAgent, contact, honorRobots, 1, delayMillis, timeoutMillis),
-            new CrawlConfiguration.Reliability(
-                maxAttempts, backoffMillis, maxBodyMegabytes * 1_000_000, true, renderMode),
-            new CrawlConfiguration.Output(
-                retentionDays,
-                contentSelector,
-                List.of("script", "style", "nav", "footer", "aside"),
-                chunkSize,
-                chunkOverlap,
-                "default"),
-            new CrawlConfiguration.LoginConfiguration(
-                authLoginPageUrl.isBlank() ? null : authLoginPageUrl,
-                authUsername.isBlank() ? null : authUsername,
-                authPassword.isBlank() ? null : authPassword,
-                "username",
-                "password",
-                "button[type='submit']",
-                new CrawlConfiguration.SuccessDetection(null, null),
-                authDirectLogin,
-                authServerUrl.isBlank() ? null : authServerUrl,
-                authClientId.isBlank() ? null : authClientId,
-                authClientSecret.isBlank() ? null : authClientSecret,
-                authRealm.isBlank() ? null : authRealm,
-                authMethod));
-    jobs.update(id, name, c, true);
+        configurationFromForm(
+            existing,
+            seedUrl,
+            allowedHost,
+            maxDepth,
+            maxPages,
+            allowSubdomains,
+            userAgent,
+            contact,
+            honorRobots,
+            delayMillis,
+            timeoutMillis,
+            maxAttempts,
+            backoffMillis,
+            maxBodyMegabytes,
+            renderMode,
+            retentionDays,
+            contentSelector,
+            chunkSize,
+            chunkOverlap,
+            authUsername,
+            authPassword,
+            authLoginPageUrl,
+            authDirectLogin,
+            authMethod,
+            authServerUrl,
+            authRealm,
+            authClientId,
+            authClientSecret);
+    jobs.update(id, name, c, job.isEnabled());
     return "redirect:/jobs";
   }
 
@@ -252,24 +251,142 @@ public class UiController {
   String runDetails(@PathVariable UUID id, Model model) throws Exception {
     var run = jobs.requireRun(id);
     var job = jobs.requireJob(run.getJobId());
-    var config = codec.read(job.getConfigurationJson());
+    var config = codec.read(run.getConfigurationJson());
 
     model.addAttribute("run", run);
     model.addAttribute("job", job);
     model.addAttribute("config", config);
 
-    // Read log file if it exists
-    Path logFile = Paths.get("logs", "run_" + id + ".log");
-    if (Files.exists(logFile)) {
-      try (Stream<String> lines = Files.lines(logFile)) {
-        List<String> logLines = lines.collect(Collectors.toList());
-        model.addAttribute("logLines", logLines);
-      }
-    } else {
-      model.addAttribute("logLines", List.of());
-    }
+    model.addAttribute("fetches", fetchRecords.findTop100ByRunIdOrderByFetchedAtDesc(id));
+    model.addAttribute("frontierTotal", frontierEntries.countByRunId(id));
+    model.addAttribute(
+        "frontierFetched",
+        frontierEntries.countByRunIdAndStatus(
+            id, tech.wenisch.harvex.domain.PipelineTypes.FrontierStatus.FETCHED));
+    model.addAttribute(
+        "frontierFailed",
+        frontierEntries.countByRunIdAndStatus(
+            id, tech.wenisch.harvex.domain.PipelineTypes.FrontierStatus.FAILED));
 
     return "run-details";
+  }
+
+  private static CrawlConfiguration configurationFromForm(
+      CrawlConfiguration existing,
+      String seedUrl,
+      String allowedHost,
+      int maxDepth,
+      int maxPages,
+      boolean allowSubdomains,
+      String userAgent,
+      String contact,
+      boolean honorRobots,
+      long delayMillis,
+      int timeoutMillis,
+      int maxAttempts,
+      long backoffMillis,
+      long maxBodyMegabytes,
+      CrawlConfiguration.RenderMode renderMode,
+      int retentionDays,
+      String contentSelector,
+      int chunkSize,
+      int chunkOverlap,
+      String authUsername,
+      String authPassword,
+      String authLoginPageUrl,
+      boolean authDirectLogin,
+      CrawlConfiguration.AuthMethod authMethod,
+      String authServerUrl,
+      String authRealm,
+      String authClientId,
+      String authClientSecret) {
+    CrawlConfiguration defaults = new CrawlConfiguration(null, null, null, null, null);
+    CrawlConfiguration base = existing == null ? defaults : existing;
+
+    Set<String> allowedHosts =
+        existing == null
+            ? new LinkedHashSet<>()
+            : new LinkedHashSet<>(base.scope().allowedHosts());
+    allowedHosts.add(allowedHost);
+    var oldLogin = base.loginConfiguration();
+    var login =
+        switch (authMethod) {
+          case NONE -> CrawlConfiguration.LoginConfiguration.defaults();
+          case FORM ->
+              new CrawlConfiguration.LoginConfiguration(
+                  blankToNull(authLoginPageUrl),
+                  blankToNull(authUsername),
+                  blankToNull(authPassword),
+                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
+                      ? oldLogin.usernameField()
+                      : "username",
+                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
+                      ? oldLogin.passwordField()
+                      : "password",
+                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
+                      ? oldLogin.submitSelector()
+                      : "button[type='submit']",
+                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
+                      ? oldLogin.successDetection()
+                      : new CrawlConfiguration.SuccessDetection(null, null),
+                  authDirectLogin,
+                  null,
+                  null,
+                  null,
+                  null,
+                  authMethod);
+          case OAUTH2 ->
+              new CrawlConfiguration.LoginConfiguration(
+                  null,
+                  null,
+                  null,
+                  "username",
+                  "password",
+                  "button[type='submit']",
+                  new CrawlConfiguration.SuccessDetection(null, null),
+                  false,
+                  blankToNull(authServerUrl),
+                  blankToNull(authClientId),
+                  blankToNull(authClientSecret),
+                  blankToNull(authRealm),
+                  authMethod);
+        };
+
+    return new CrawlConfiguration(
+        new CrawlConfiguration.Scope(
+            seedUrl,
+            allowedHosts,
+            base.scope().includePatterns(),
+            base.scope().excludePatterns(),
+            maxDepth,
+            maxPages,
+            allowSubdomains,
+            base.scope().discoverSitemaps()),
+        new CrawlConfiguration.Politeness(
+            userAgent,
+            contact,
+            honorRobots,
+            base.politeness().perHostConcurrency(),
+            delayMillis,
+            timeoutMillis),
+        new CrawlConfiguration.Reliability(
+            maxAttempts,
+            backoffMillis,
+            maxBodyMegabytes * 1_000_000,
+            base.reliability().deduplicateContent(),
+            renderMode),
+        new CrawlConfiguration.Output(
+            retentionDays,
+            contentSelector,
+            base.output().removeSelectors(),
+            chunkSize,
+            chunkOverlap,
+            base.output().logicalIndex()),
+        login);
+  }
+
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 
   @GetMapping("/documents")

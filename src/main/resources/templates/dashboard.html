@@ -82,7 +82,7 @@
              <tbody>
              <tr th:each="run:${runs}">
                <td class="font-monospace small"><a th:href="@{/runs/{id}(id=${run.id})}" th:text="${run.id}"></a></td>
-               <td th:text="${jobs.![name][jobs.![id].indexOf(run.jobId)]}"></td>
+               <td th:text="${jobNames[run.jobId]}"></td>
                <td><span class="status-pill" th:text="${run.status}"></span></td>
                <td th:text="${run.startedAt}"></td>
              </tr>
