@@ -71,7 +71,7 @@ jobs:
           exit 0
       - name: Upload Trivy report
         if: always() && matrix.name == 'contextcrate'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-report-${{ github.run_id }}
           path: trivy-report.txt
