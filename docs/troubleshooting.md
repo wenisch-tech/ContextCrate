@@ -2,11 +2,11 @@
 
 ## Startup rejects the backend combination
 
-Local queue and H2 require `harvex.role=all`. Use RabbitMQ and PostgreSQL for separate roles. Lucene requires one writer.
+Local queue and H2 require `contextcrate.role=all`. Use RabbitMQ and PostgreSQL for separate roles. Lucene requires one writer.
 
 ## URLs are blocked
 
-Harvex blocks non-public network ranges by default. Verify DNS and redirects. For an authorized intranet crawl, explicitly enable private networks and constrain allowed hosts.
+ContextCrate blocks non-public network ranges by default. Verify DNS and redirects. For an authorized intranet crawl, explicitly enable private networks and constrain allowed hosts.
 
 ## Work remains processing after a crash
 

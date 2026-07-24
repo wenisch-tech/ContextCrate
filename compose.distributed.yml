@@ -1,47 +1,49 @@
-x-harvex: &harvex
-  image: ghcr.io/wenisch-tech/harvex:latest
+name: contextcrate
+
+x-contextcrate: &contextcrate
+  image: ghcr.io/wenisch-tech/contextcrate:latest
   environment: &environment
     SPRING_PROFILES_ACTIVE: distributed
-    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/harvex
-    SPRING_DATASOURCE_USERNAME: harvex
-    SPRING_DATASOURCE_PASSWORD: harvex
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/contextcrate
+    SPRING_DATASOURCE_USERNAME: contextcrate
+    SPRING_DATASOURCE_PASSWORD: contextcrate
     SPRING_RABBITMQ_HOST: rabbitmq
-    AWS_ACCESS_KEY_ID: harvex
-    AWS_SECRET_ACCESS_KEY: harvex-secret
+    AWS_ACCESS_KEY_ID: contextcrate
+    AWS_SECRET_ACCESS_KEY: contextcrate-secret
     S3_ENDPOINT: http://minio:9000
-    S3_BUCKET: harvex
+    S3_BUCKET: contextcrate
     OPENSEARCH_ENDPOINT: http://opensearch:9200
-    HARVEX_EMBEDDINGS_PROVIDER: ${HARVEX_EMBEDDINGS_PROVIDER:-local}
-    HARVEX_EMBEDDINGS_LOCAL_CACHE_PATH: /app/data/models
-    HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL:-}
-    HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL:-}
-    HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY: ${HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY:-}
-    HARVEX_ANSWERING_ENABLED: ${HARVEX_ANSWERING_ENABLED:-false}
-    HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_BASE_URL:-}
-    HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_MODEL:-}
-    HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY: ${HARVEX_ANSWERING_OPENAI_COMPATIBLE_API_KEY:-}
+    CONTEXTCRATE_EMBEDDINGS_PROVIDER: ${CONTEXTCRATE_EMBEDDINGS_PROVIDER:-local}
+    CONTEXTCRATE_EMBEDDINGS_LOCAL_CACHE_PATH: /app/data/models
+    CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL:-}
+    CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL:-}
+    CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY: ${CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY:-}
+    CONTEXTCRATE_ANSWERING_ENABLED: ${CONTEXTCRATE_ANSWERING_ENABLED:-false}
+    CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_BASE_URL: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_BASE_URL:-}
+    CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_MODEL: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_MODEL:-}
+    CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_API_KEY: ${CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_API_KEY:-}
   depends_on: [postgres, rabbitmq, minio, opensearch]
 services:
   control-plane:
-    <<: *harvex
+    <<: *contextcrate
     ports: ["8080:8080"]
-    environment: { <<: *environment, HARVEX_ROLE: control-plane }
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: control-plane }
   crawler-http:
-    <<: *harvex
-    environment: { <<: *environment, HARVEX_ROLE: crawler-http }
+    <<: *contextcrate
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: crawler-http }
   crawler-browser:
-    <<: *harvex
-    image: ghcr.io/wenisch-tech/harvex-browser:latest
-    environment: { <<: *environment, HARVEX_ROLE: crawler-browser }
+    <<: *contextcrate
+    image: ghcr.io/wenisch-tech/contextcrate-browser:latest
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: crawler-browser }
   parser:
-    <<: *harvex
-    environment: { <<: *environment, HARVEX_ROLE: parser }
+    <<: *contextcrate
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: parser }
   indexer:
-    <<: *harvex
-    environment: { <<: *environment, HARVEX_ROLE: indexer }
+    <<: *contextcrate
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: indexer }
   postgres:
     image: postgres:17-alpine
-    environment: { POSTGRES_DB: harvex, POSTGRES_USER: harvex, POSTGRES_PASSWORD: harvex }
+    environment: { POSTGRES_DB: contextcrate, POSTGRES_USER: contextcrate, POSTGRES_PASSWORD: contextcrate }
     volumes: ["postgres:/var/lib/postgresql/data"]
   rabbitmq:
     image: rabbitmq:4-management-alpine
@@ -50,7 +52,7 @@ services:
   minio:
     image: minio/minio:latest
     command: server /data --console-address :9001
-    environment: { MINIO_ROOT_USER: harvex, MINIO_ROOT_PASSWORD: harvex-secret }
+    environment: { MINIO_ROOT_USER: contextcrate, MINIO_ROOT_PASSWORD: contextcrate-secret }
     ports: ["9001:9001"]
     volumes: ["minio:/data"]
   opensearch:

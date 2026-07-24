@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Overview · Harvex</title>
+  <title>Overview · ContextCrate</title>
   <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="/css/harvex.css">
+  <link rel="stylesheet" href="/css/contextcrate.css">
 </head>
 <body>
 <nav th:replace="~{fragments :: nav}"></nav>
-<main class="container-fluid p-4 p-lg-5">
+<main id="dashboard" class="container-fluid p-4 p-lg-5" th:data-crate-id="${crate.id}">
   <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
       <p class="eyebrow">CONTROL PLANE</p>
       <h1 class="display-6 fw-semibold">Crawling overview</h1>
-      <p class="text-secondary">A live view of work moving through Harvex.</p>
+      <p class="text-secondary">A live view of work moving through ContextCrate.</p>
     </div>
-    <a class="btn btn-primary" href="/jobs/new"><i class="bi bi-plus-lg me-1"></i>New job</a>
+    <a class="btn btn-primary" th:href="@{/crates/{id}/jobs/new(id=${crate.id})}"><i class="bi bi-plus-lg me-1"></i>New job</a>
   </div>
 
   <div class="card panel p-4 mb-4">
-    <form class="row g-3 align-items-end" action="/" method="get">
+    <form class="row g-3 align-items-end" th:action="@{/crates/{id}(id=${crate.id})}" method="get">
       <div class="col-lg-10">
         <label class="form-label">Search indexed content</label>
         <input class="form-control form-control-lg" name="q" th:value="${searchQuery}" placeholder="Search documents and chunks">
@@ -54,8 +54,8 @@
     </div>
   </div>
 
-  <div class="card panel p-4 mb-4" id="ask-harvex">
-    <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Ask Harvex</h2><p class="text-secondary small mb-0">Answers stream from the configured model and include retrieved sources.</p></div><button id="cancel-answer" class="btn btn-outline-secondary btn-sm d-none" type="button">Cancel</button></div>
+  <div class="card panel p-4 mb-4" id="ask-contextcrate">
+    <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Ask ContextCrate</h2><p class="text-secondary small mb-0">Answers stream from the configured model and include retrieved sources.</p></div><button id="cancel-answer" class="btn btn-outline-secondary btn-sm d-none" type="button">Cancel</button></div>
     <form id="answer-form" class="row g-3">
       <div class="col-lg-10"><label class="visually-hidden" for="answer-question">Question</label><input id="answer-question" class="form-control form-control-lg" required maxlength="8000" placeholder="Ask a question about indexed content"></div>
       <div class="col-lg-2 d-grid"><button class="btn btn-primary btn-lg" type="submit">Ask</button></div>
@@ -75,13 +75,13 @@
   <div class="row g-4">
     <div class="col-xl-8">
        <section class="card panel">
-         <div class="card-header d-flex justify-content-between"><span>Recent runs</span><a href="/jobs" class="small">Manage jobs</a></div>
+         <div class="card-header d-flex justify-content-between"><span>Recent runs</span><a th:href="@{/crates/{id}/jobs(id=${crate.id})}" class="small">Manage jobs</a></div>
          <div class="table-responsive">
            <table class="table mb-0 align-middle">
              <thead><tr><th>Run</th><th>Job</th><th>Status</th><th>Started</th></tr></thead>
              <tbody>
              <tr th:each="run:${runs}">
-               <td class="font-monospace small"><a th:href="@{/runs/{id}(id=${run.id})}" th:text="${run.id}"></a></td>
+               <td class="font-monospace small"><a th:href="@{/crates/{crateId}/runs/{id}(crateId=${crate.id},id=${run.id})}" th:text="${run.id}"></a></td>
                <td th:text="${jobNames[run.jobId]}"></td>
                <td><span class="status-pill" th:text="${run.status}"></span></td>
                <td th:text="${run.startedAt}"></td>
@@ -113,13 +113,47 @@
   </div>
 </main>
 <script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script>
+<script th:inline="none">
 (() => {
-  const form=document.getElementById('answer-form'), status=document.getElementById('answer-status'), text=document.getElementById('answer-text'), sources=document.getElementById('answer-sources'), cancel=document.getElementById('cancel-answer'); let controller, sourceList=[];
-  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li');li.id='citation-'+s.citation;const a=document.createElement('a');a.href=s.canonicalUrl;a.target='_blank';a.rel='noopener';a.textContent=s.title||s.canonicalUrl;li.append(a,document.createTextNode(' — '+s.snippet));list.append(li)});sources.append(list)};
-  const linkCitations=()=>{const raw=text.textContent; text.replaceChildren(); let last=0; raw.replace(/\[(\d+)\]/g,(match,n,offset)=>{text.append(document.createTextNode(raw.slice(last,offset)));const known=sourceList.some(s=>s.citation===Number(n));if(known){const a=document.createElement('a');a.href='#citation-'+n;a.textContent=match;text.append(a)}else text.append(document.createTextNode(match));last=offset+match.length;return match});text.append(document.createTextNode(raw.slice(last)))};
+  const crateId=document.getElementById('dashboard').dataset.crateId;
+  const form=document.getElementById('answer-form'), status=document.getElementById('answer-status'), text=document.getElementById('answer-text'), sources=document.getElementById('answer-sources'), cancel=document.getElementById('cancel-answer'); let controller, sourceList=[], markdown='';
+  const safeUrl=value=>{try{const url=new URL(value,window.location.origin);return ['http:','https:'].includes(url.protocol)?url.href:null}catch{return null}};
+  const appendInline=(parent,value)=>{
+    const token=/(`[^`]*`|!?\[[^\]]+\]\([^\s)]+\)|\[\d+\]|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+    let last=0;
+    const appendToken=part=>{
+      if(part.startsWith('`')){const code=document.createElement('code');code.textContent=part.slice(1,-1);parent.append(code);return}
+      const link=part.match(/^(!)?\[([^\]]+)\]\(([^\s)]+)\)$/);
+      if(link){
+        if(link[1]){parent.append(document.createTextNode(link[2]));return}
+        const href=safeUrl(link[3]);
+        if(!href){parent.append(document.createTextNode(link[2]));return}
+        const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener';a.textContent=link[2];parent.append(a);return
+      }
+      const citation=part.match(/^\[(\d+)\]$/);
+      if(citation){const known=sourceList.some(s=>s.citation===Number(citation[1]));if(known){const a=document.createElement('a');a.href='#citation-'+citation[1];a.textContent=part;parent.append(a)}else parent.append(document.createTextNode(part));return}
+      const emphasized=document.createElement(part.startsWith('**')||part.startsWith('__')?'strong':'em');emphasized.textContent=part.slice(part.startsWith('**')||part.startsWith('__')?2:1,part.startsWith('**')||part.startsWith('__')?-2:-1);parent.append(emphasized);
+    };
+    for(const match of value.matchAll(token)){parent.append(document.createTextNode(value.slice(last,match.index)));appendToken(match[0]);last=match.index+match[0].length}parent.append(document.createTextNode(value.slice(last)));
+  };
+  const renderMarkdown=()=>{
+    text.replaceChildren();const lines=markdown.replace(/\r/g,'').split('\n');
+    for(let i=0;i<lines.length;){
+      const line=lines[i];
+      if(!line.trim()){i++;continue}
+      if(line.startsWith('```')){const code=[];while(++i<lines.length&&!lines[i].startsWith('```'))code.push(lines[i]);if(i<lines.length)i++;const pre=document.createElement('pre'), node=document.createElement('code');node.textContent=code.join('\n');pre.append(node);text.append(pre);continue}
+      const heading=line.match(/^(#{1,6})\s+(.+)$/);
+      if(heading){const node=document.createElement('h'+heading[1].length);appendInline(node,heading[2]);text.append(node);i++;continue}
+      const list=line.match(/^\s*([-*+]|\d+\.)\s+(.+)$/);
+      if(list){const ordered=/\d+\./.test(list[1]),node=document.createElement(ordered?'ol':'ul');do{const item=lines[i].match(/^\s*(?:[-*+]|\d+\.)\s+(.+)$/);if(!item)break;const li=document.createElement('li');appendInline(li,item[1]);node.append(li);i++}while(i<lines.length);text.append(node);continue}
+      const quote=line.match(/^>\s?(.*)$/);
+      if(quote){const node=document.createElement('blockquote');appendInline(node,quote[1]);text.append(node);i++;continue}
+      const paragraph=[];while(i<lines.length&&lines[i].trim()&&!lines[i].startsWith('```')&&!/^(#{1,6})\s+/.test(lines[i])&&!/^\s*(?:[-*+]|\d+\.)\s+/.test(lines[i])&&!/^>\s?/.test(lines[i]))paragraph.push(lines[i++]);const node=document.createElement('p');paragraph.forEach((part,index)=>{if(index)node.append(document.createElement('br'));appendInline(node,part)});text.append(node);
+    }
+  };
+  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li');li.id='citation-'+s.citation;const a=document.createElement('a'),href=safeUrl(s.canonicalUrl);if(href){a.href=href;a.target='_blank';a.rel='noopener'}a.textContent=s.title||s.canonicalUrl;li.append(a,document.createTextNode(' — '+s.snippet));list.append(li)});sources.append(list);renderMarkdown()};
   cancel.addEventListener('click',()=>controller?.abort());
-  form.addEventListener('submit',async event=>{event.preventDefault();controller?.abort();controller=new AbortController();status.textContent='Finding sources…';text.replaceChildren();sources.replaceChildren();cancel.classList.remove('d-none');try{const response=await fetch('/api/v1/answers',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:document.getElementById('answer-question').value}),signal:controller.signal});if(!response.ok)throw new Error(response.status===503?'Answer generation is not configured.':'Unable to generate an answer.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';status.textContent='Generating answer…';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop();for(const eventText of events){let name='',data='';eventText.split('\n').forEach(line=>{if(line.startsWith('event:'))name=line.slice(6).trim();if(line.startsWith('data:'))data+=line.slice(5).trim()});if(!data)continue;const payload=JSON.parse(data);if(name==='sources')renderSources(payload);if(name==='delta')text.append(document.createTextNode(payload.text));if(name==='complete'){linkCitations();status.textContent='Complete.'}if(name==='error')throw new Error(payload.error)}}}catch(error){if(error.name==='AbortError')status.textContent='Cancelled.';else status.textContent=error.message}finally{cancel.classList.add('d-none')}});
+  form.addEventListener('submit',async event=>{event.preventDefault();controller?.abort();controller=new AbortController();markdown='';sourceList=[];status.textContent='Finding sources…';text.replaceChildren();sources.replaceChildren();cancel.classList.remove('d-none');try{const response=await fetch('/api/v1/crates/'+crateId+'/answers',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:document.getElementById('answer-question').value}),signal:controller.signal});if(!response.ok)throw new Error(response.status===503?'Answer generation is not configured.':'Unable to generate an answer.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';status.textContent='Generating answer…';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop();for(const eventText of events){let name='',data='';eventText.split('\n').forEach(line=>{if(line.startsWith('event:'))name=line.slice(6).trim();if(line.startsWith('data:'))data+=line.slice(5).trim()});if(!data)continue;const payload=JSON.parse(data);if(name==='sources')renderSources(payload);if(name==='delta'){markdown+=payload.text;renderMarkdown()}if(name==='complete'){status.textContent='Complete.'}if(name==='error')throw new Error(payload.error)}}}catch(error){if(error.name==='AbortError')status.textContent='Cancelled.';else status.textContent=error.message}finally{cancel.classList.add('d-none')}});
 })();
 </script>
 </body>

@@ -15,9 +15,9 @@ jobs:
       - run: mvn -B -DskipTests package org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom
       - run: |
           mkdir release
-          cp target/harvex-*.jar release/
+          cp target/contextcrate-*.jar release/
           cp target/bom.* release/ 2>/dev/null || true
-          helm package charts/harvex --version '${{ inputs.version }}' --app-version '${{ inputs.version }}' --destination release
+          helm package charts/contextcrate --version '${{ inputs.version }}' --app-version '${{ inputs.version }}' --destination release
       - uses: sigstore/cosign-installer@v4.1.2
       - run: |
           for file in release/*; do cosign sign-blob --yes "$file" --bundle "$file.cosign.bundle"; done

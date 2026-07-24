@@ -1,6 +1,6 @@
-# Harvex
+# ContextCrate
 
-Harvex turns crawl configurations into a durable pipeline of raw artifacts, normalized documents, chunks, and search-index records.
+ContextCrate turns crawl configurations into a durable pipeline of raw artifacts, normalized documents, chunks, and search-index records.
 
 The default standalone profile runs in one JVM with file-backed H2, a database queue, filesystem artifacts, and Lucene. The distributed profile runs independently scalable roles with PostgreSQL, RabbitMQ, S3, and OpenSearch. Both modes share the same domain and work contracts.
 

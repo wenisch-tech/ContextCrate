@@ -10,8 +10,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: harvex, file: Dockerfile }
-          - { name: harvex-browser, file: Dockerfile-browser }
+          - { name: contextcrate, file: Dockerfile }
+          - { name: contextcrate-browser, file: Dockerfile-browser }
     permissions: { contents: read, packages: write, pull-requests: write, id-token: write, attestations: write }
     steps:
       - uses: actions/checkout@v7
@@ -38,10 +38,10 @@ jobs:
       # Keep the PR scan on the primary image. The browser image is an extension
       # of it and publishing two large vulnerability reports on every PR is noisy.
       - name: Set up Trivy
-        if: matrix.name == 'harvex'
+        if: matrix.name == 'contextcrate'
         uses: aquasecurity/setup-trivy@v0.2.6
       - name: Run Trivy scan
-        if: matrix.name == 'harvex'
+        if: matrix.name == 'contextcrate'
         shell: bash
         run: |
           set +e
@@ -70,14 +70,14 @@ jobs:
           fi
           exit 0
       - name: Upload Trivy report
-        if: always() && matrix.name == 'harvex'
+        if: always() && matrix.name == 'contextcrate'
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report-${{ github.run_id }}
           path: trivy-report.txt
           if-no-files-found: warn
       - name: Add Trivy report to pull request
-        if: always() && github.event_name == 'pull_request' && matrix.name == 'harvex'
+        if: always() && github.event_name == 'pull_request' && matrix.name == 'contextcrate'
         continue-on-error: true
         uses: actions/github-script@v8
         with:

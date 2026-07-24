@@ -1,35 +1,60 @@
-# API
+# REST API
 
-Swagger UI is available at `/api`; OpenAPI JSON is available at `/v3/api-docs`. Browser sessions use form authentication and automation may use HTTP Basic authentication over TLS.
+Swagger UI is served at `/api`; OpenAPI JSON is at `/v3/api-docs`. Content APIs use an explicit crate path. Authenticate with a session, HTTP Basic, or `X-API-KEY`.
 
-Key endpoints:
+## Crates and members
 
-- `GET/POST /api/v1/jobs`
-- `GET/PUT /api/v1/jobs/{id}`
-- `POST /api/v1/jobs/{id}/runs`
-- `POST /api/v1/jobs/runs/{id}/pause|resume|cancel`
-- `GET /api/v1/system`
-- `GET /api/v1/search?q=...`
-- `GET /api/v1/documents`
-- `GET /api/v1/documents/{id}/chunks`
-- `GET/POST /api/v1/extraction-rules`
-- `PUT/DELETE /api/v1/extraction-rules/{id}`
-- `GET /api/v1/extraction-rules/{id}/results`
-- `POST /api/v1/extraction-rules/test`
-- `GET /api/v1/extraction-results`
-- `POST /api/v1/runs/{id}/extractions/rebuild`
-- `POST /api/v1/documents/{id}/extractions/rebuild`
-- `GET /api/v1/queue/dead-letters`
-- `POST /api/v1/queue/dead-letters/{id}/requeue`
-- `POST /api/v1/index/commit`
-- `POST /api/v1/index/rebuild`
-- `POST /api/v1/answers` (SSE)
-- `POST /api/v1/backups`
+| Method | Path | Authority |
+|---|---|---|
+| GET, POST | `/api/v1/crates` | Membership list / creation policy |
+| GET, PUT | `/api/v1/crates/{crateId}` | Viewer / Owner |
+| GET, PUT | `/api/v1/crates/{crateId}/members` | Viewer / Owner |
+| DELETE | `/api/v1/crates/{crateId}/members/{userId}` | Owner |
+| POST | `/api/v1/crates/{crateId}/archive` | Owner |
+| POST | `/api/v1/crates/{crateId}/restore` | Owner |
+| POST | `/api/v1/crates/{crateId}/purge` | Owner |
 
-Pipeline envelopes are schema-versioned and contain ID, stage, payload reference, correlation ID, idempotency key, priority, attempt count, and creation time.
+Purge body: `{"confirmation":"Exact crate name"}`.
 
-Search supports lexical BM25, semantic-vector, and RRF-hybrid retrieval over indexed document and chunk fields. `GET /api/v1/search` accepts `q`, optional `limit`, `runId`, `kind` (`document` or `chunk`), and `mode` (`lexical`, `semantic`, or `hybrid`). Results include selected mode, final score, component scores, source URL, document ID, chunk ID when applicable, chunk ordinal, and a snippet. `POST /api/v1/index/rebuild` rebuilds the derived vector index from canonical records.
+## Content
 
-`POST /api/v1/answers` accepts a question plus optional chunk retrieval filters and client-supplied history, and streams `sources`, `delta`, `complete`, and `error` SSE events. It is disabled until an OpenAI-compatible chat endpoint is configured. See [RAG answer generation](answers.md).
+| Capability | Path |
+|---|---|
+| Jobs | `/api/v1/crates/{crateId}/jobs` |
+| Runs | `/api/v1/crates/{crateId}/runs` |
+| Documents | `/api/v1/crates/{crateId}/documents` |
+| Search | `/api/v1/crates/{crateId}/search?q=...&mode=hybrid` |
+| Streaming answers | `/api/v1/crates/{crateId}/answers` |
+| Extraction rules/results | `/api/v1/crates/{crateId}/extraction-rules`, `/extraction-results` |
+| Index health/rebuild | `/api/v1/crates/{crateId}/index` |
+| Audit | `/api/v1/crates/{crateId}/audit` |
 
-Extraction rules are reusable across runs. `IP_ADDRESS` ignores the pattern field and validates IPv4/IPv6 candidates; `REGEX` requires a valid Java regular expression. `DELETE /api/v1/extraction-rules/{id}` disables the rule rather than removing historical references. `GET /api/v1/extraction-rules/{id}/results` is the direct rule-scoped way to list matches. Generic extraction result queries are paginated and accept optional `runId`, `documentId`, `chunkId`, `ruleId`, and `value` filters.
+Search modes are `lexical`, `semantic`, and `hybrid`. Answers accept JSON and return server-sent events named `sources`, `delta`, `complete`, or `error`.
+
+```bash
+curl -H "X-API-KEY: $KEY" \
+  "http://localhost:8080/api/v1/crates/$CRATE/search?q=retention&kind=chunk&mode=hybrid&limit=20"
+```
+
+## Settings
+
+- `GET/PUT /api/v1/crates/{crateId}/settings/rag`
+- `GET/PUT /api/v1/crates/{crateId}/settings/providers`
+
+Provider responses never contain stored API keys. Submitting a blank key preserves the current secret. Changing embedding configuration schedules a versioned rebuild.
+
+## Keys and portability
+
+- `GET/POST /api/v1/me/api-keys`
+- `DELETE /api/v1/me/api-keys/{id}`
+- `GET/POST /api/v1/crates/{crateId}/api-keys`
+- `DELETE /api/v1/crates/{crateId}/api-keys/{id}`
+- `POST /api/v1/crates/{crateId}/exports`
+- `POST /api/v1/crate-imports/validate`
+- `POST /api/v1/crate-imports`
+
+## Administration
+
+Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructure health, dead letters, and temporary elevations. They do not expose crate documents or search without elevation.
+
+Errors use the standard API exception envelope and never redirect a REST client to another crate. The previous unscoped `/api/v1/jobs`, `/search`, `/answers`, and `/backups` contracts were removed.
