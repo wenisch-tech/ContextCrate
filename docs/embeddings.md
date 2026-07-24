@@ -27,7 +27,38 @@ HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS=1536
 HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY=stored-in-a-secret
 ```
 
-Harvex calls `POST {base-url}/embeddings` using the OpenAI request/response format. This works with OpenAI and compatible self-hosted servers. The API key is sent as a Bearer credential and must be injected from a secret store, never job JSON or version control. The text being embedded is sent to the endpoint, so use TLS and choose an endpoint consistent with your data-boundary policy. `HARVEX_EMBEDDINGS_OPENAI_COMPATIBLE_HEADERS` accepts newline-separated additional headers for compatible gateways.
+### Endpoint URL
+
+The endpoint setting is an **API base URL**. Harvex removes a trailing slash and appends
+`/embeddings`, then sends an OpenAI-format `POST` request:
+
+```text
+{base-url}/embeddings
+```
+
+Include any version prefix required by the provider, but do not include `/embeddings`
+itself. For example:
+
+| Provider | Base URL to configure | Request sent by Harvex |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1` | `POST https://api.openai.com/v1/embeddings` |
+| Ollama OpenAI-compatible API | `http://localhost:11434/v1` | `POST http://localhost:11434/v1/embeddings` |
+| Compatible gateway | `https://embedding.example/v1` | `POST https://embedding.example/v1/embeddings` |
+
+For example, configuring `http://localhost:11434` for Ollama omits its required `/v1`
+prefix and makes Harvex call `POST http://localhost:11434/embeddings`, which returns
+HTTP 404. Conversely, configuring a URL that already ends in `/embeddings` makes the
+request end in `/embeddings/embeddings`.
+
+The configured model must be an embedding model supported by that endpoint; it does
+not need to be the same model used to generate answers. Harvex expects an OpenAI-style
+response containing one vector for every input text. The configured dimensions must
+match the returned vector size.
+
+The API key, when configured, is sent as a Bearer credential and must be injected from
+a secret store, never job JSON or version control. The text being embedded is sent to
+the endpoint, so use TLS and choose an endpoint consistent with your data-boundary
+policy.
 
 ## Docker and Helm
 
@@ -35,4 +66,8 @@ The image exposes `/app/data/models` for the downloaded cache and `/models` for 
 
 ## Operations and troubleshooting
 
-Lexical retrieval remains available if embeddings are disabled (`HARVEX_EMBEDDINGS_ENABLED=false`) or unavailable. Semantic/hybrid requests fail clearly when no embedding provider is usable. Confirm the model directory is readable by UID 65532, that the ONNX/tokenizer files are complete, and that the configured endpoint returns vectors matching the configured dimension. The index health detail reports backend and embedding availability, but never credentials or source text. Search indices are derived data and are rebuilt after restore or model changes; backup bundles do not copy index internals.
+Lexical retrieval remains available if embeddings are disabled (`HARVEX_EMBEDDINGS_ENABLED=false`) or unavailable. Semantic/hybrid requests fail clearly when no embedding provider is usable. Confirm the model directory is readable by UID 65532, that the ONNX/tokenizer files are complete, and that the configured endpoint returns vectors matching the configured dimension.
+
+If a semantic search or an answer request fails with `Embedding endpoint returned HTTP 404`, check the base URL first. It normally means that the configured server does not expose `{base-url}/embeddings`—most commonly because a required version prefix such as `/v1` is missing, or because `/embeddings` was included in the configured base URL. Correct the URL, verify the model is available from that endpoint, then rebuild the index with `POST /api/v1/index/rebuild`. A rebuild is required because existing documents were indexed without vectors or with vectors from the previous model.
+
+The index health detail reports backend and embedding availability, but never credentials or source text. Search indices are derived data and are rebuilt after restore or model changes; backup bundles do not copy index internals.
