@@ -1,12 +1,13 @@
 # ContextCrate
 
-ContextCrate is a self-hosted crawling, extraction, retrieval, and cited-answer platform. Its top-level entity is a **crate**: an independently configured and authorized context workspace containing sources, crawl jobs, documents, extraction rules, provider settings, artifacts, and its own vector-index namespace.
+ContextCrate is a self-hosted ingestion, extraction, retrieval, and cited-answer platform. Its top-level entity is a **crate**: an independently configured and authorized context workspace containing sources, ingestion jobs, documents, extraction rules, provider settings, artifacts, and its own vector-index namespace.
 
 ## Capabilities
 
 - Multiple crates with Owner, Editor, and Viewer memberships.
 - Installation administration separated from crate content access, with audited 30-minute elevation.
-- HTTP and Playwright crawling with SSRF controls, robots policy, authentication, retries, leases, and dead letters.
+- Website sources with HTTP and Playwright crawling, SSRF controls, robots policy, authentication, retries, leases, and dead letters.
+- Git sources with public or token-authenticated HTTPS acquisition of Markdown and text snapshots.
 - Filesystem or S3 artifacts namespaced by crate.
 - Normalized documents, deterministic chunks, extraction rules, and rebuildable results.
 - Local ONNX or OpenAI-compatible embeddings configured per crate.
@@ -57,7 +58,8 @@ Swagger UI is available at `/api`.
 
 ```text
 GET/POST /api/v1/crates
-GET/POST /api/v1/crates/{crateId}/jobs
+GET/POST /api/v1/crates/{crateId}/sources
+GET/POST /api/v1/crates/{crateId}/sources/{sourceId}/ingestion-jobs
 GET      /api/v1/crates/{crateId}/runs
 GET      /api/v1/crates/{crateId}/documents
 GET      /api/v1/crates/{crateId}/search

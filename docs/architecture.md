@@ -1,15 +1,17 @@
 # Architecture
 
-ContextCrate is a Spring Boot application that can run all stages in one process or distribute them across control-plane, HTTP crawler, browser crawler, parser, extractor, and indexer roles.
+ContextCrate is a Spring Boot application that can run all stages in one process or distribute
+them across control-plane, website-source, Git-source, browser, parser, extractor, and indexer
+roles.
 
 ```mermaid
 flowchart LR
   UI[Crate-qualified UI/API] --> AUTH[Membership authorization]
   AUTH --> DB[(Relational store)]
   DB --> Q[Crate-aware work queue]
-  Q --> C[HTTP/browser crawl]
+  Q --> C[Website/Git connectors]
   C --> A[(crates/{crateId} artifacts)]
-  C --> P[Parse and discover]
+  C --> P[Normalize and discover]
   P --> D[(Documents and chunks)]
   D --> E[Extraction]
   D --> I[Generation-aware indexer]
@@ -22,6 +24,13 @@ flowchart LR
 `crate_id` is stored on every crate-owned row rather than inferred only through joins. Pipeline schema v2 duplicates it in the envelope and JSON payload. This deliberate redundancy lets repositories scope queries efficiently and lets workers detect inconsistent or malicious references before doing work.
 
 Delivery is at least once. Idempotency keys include crate identity, and entity relationships are verified at each stage.
+
+## Source model
+
+A source owns a stable endpoint and credentials. Any number of ingestion jobs may reference it,
+each with its own scope, ref, filters, limits, and normalization policy. An ingestion run snapshots
+both configurations. Connector-specific acquisition ends at `AcquisitionRecord`; normalization,
+extraction, and indexing are source-neutral.
 
 ## Storage adapters
 

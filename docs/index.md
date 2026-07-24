@@ -1,14 +1,14 @@
 # ContextCrate
 
-ContextCrate turns crawl configurations into a durable pipeline of raw artifacts, normalized documents, chunks, and search-index records.
+ContextCrate turns website and Git sources into a durable pipeline of raw artifacts, normalized documents, chunks, and search-index records.
 
 The default standalone profile runs in one JVM with file-backed H2, a database queue, filesystem artifacts, and Lucene. The distributed profile runs independently scalable roles with PostgreSQL, RabbitMQ, S3, and OpenSearch. Both modes share the same domain and work contracts.
 
 ## Version 1 outcome
 
-1. Create a crawl job with scope, politeness, reliability, and output settings.
-2. Start an immutable run snapshot.
-3. Fetch eligible pages while enforcing robots and network safety.
+1. Create a Website or Git source, then attach one or more ingestion jobs.
+2. Start an immutable ingestion run snapshot.
+3. Acquire eligible pages or repository files while enforcing connector safety policy.
 4. Store raw content outside the queue.
 5. Parse, normalize, extract links and metadata, and create stable chunks.
 6. Index document and chunk records.

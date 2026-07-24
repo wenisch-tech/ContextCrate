@@ -1,8 +1,10 @@
 # Pipeline behavior
 
-## Frontier
+## Source items
 
-Every discovered URL is canonicalized before insertion. A `(run_id, canonical_url)` constraint supplies the final deduplication boundary. Scope is checked both for seeds and discovered links.
+Every discovered locator is converted to a source URI before insertion. A `(run_id, source_uri)`
+constraint supplies the final deduplication boundary. Website jobs canonicalize URLs and check
+scope for seeds and discovered links. Git jobs use repository, resolved commit, and path.
 
 ## Work lifecycle
 
@@ -12,9 +14,21 @@ Local work moves through `PENDING`, `PROCESSING`, `RETRY_WAITING`, `COMPLETED`, 
 
 Java `HttpClient` is the normal fetcher. Redirect targets are resolved and safety-checked on every hop. `AUTO` first fetches HTML normally and requests one browser-rendered fetch when the response resembles a JavaScript shell. Browser workers run Playwright/Chromium and should be isolated from the control plane.
 
+## Git acquisition
+
+The Git connector clones one HTTPS repository snapshot into an isolated temporary directory.
+Blank refs use the remote default branch; explicit branches, tags, and reachable commits are
+resolved to an exact SHA stored on the ingestion run. Eligible UTF-8 `.md`, `.markdown`, and
+`.txt` files become acquisition records and raw artifacts before normalization. Temporary clones
+are removed after success or failure.
+
 ## Parsing, extraction, and indexing
 
-JSoup applies removal and content selectors, normalizes Unicode/whitespace, and extracts titles, language, description, author, headings, Open Graph values, and links. Chunks use deterministic identifiers and overlap. Lucene and OpenSearch receive equivalent field names and separate document/chunk records.
+JSoup normalizes website HTML and extracts titles, language, description, author, headings, Open
+Graph values, and links. Markdown normalization produces readable text, chooses the first heading
+as title, and retains heading context on chunks; plain text preserves readable line and paragraph
+boundaries. Chunks use deterministic identifiers and overlap. Lucene and OpenSearch receive
+equivalent field names and separate document/chunk records.
 
 Extraction is derived work over normalized `DocumentChunk.content`. Enabled extraction rules run after chunks are saved and before run completion; the first rule types are built-in IP address detection and user-supplied regular expressions. Matches are stored as relational rows with the rule, run, document, chunk, offsets, matched value, and a small context window. Extraction does not change crawling, raw artifacts, normalized document bodies, chunk IDs, or search-index contracts.
 

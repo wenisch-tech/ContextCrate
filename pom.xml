@@ -22,6 +22,8 @@
         <springdoc.version>3.0.3</springdoc.version>
         <onnxruntime.version>1.22.0</onnxruntime.version>
         <djl.version>0.34.0</djl.version>
+        <jgit.version>7.2.0.202503040940-r</jgit.version>
+        <mockito.version>5.23.0</mockito.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -49,6 +51,7 @@
         <dependency><groupId>io.micrometer</groupId><artifactId>micrometer-registry-prometheus</artifactId></dependency>
         <dependency><groupId>org.springdoc</groupId><artifactId>springdoc-openapi-starter-webmvc-ui</artifactId><version>${springdoc.version}</version></dependency>
         <dependency><groupId>org.jsoup</groupId><artifactId>jsoup</artifactId><version>${jsoup.version}</version></dependency>
+        <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><version>${jgit.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-core</artifactId><version>${lucene.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-analysis-common</artifactId><version>${lucene.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-queryparser</artifactId><version>${lucene.version}</version></dependency>
@@ -93,6 +96,13 @@
                     <execution><goals><goal>prepare-agent</goal></goals></execution>
                     <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                </configuration>
             </plugin>
             <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
         </plugins>

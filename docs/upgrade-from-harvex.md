@@ -13,7 +13,7 @@ ContextCrate is a breaking rename and data-model upgrade. Java packages, Maven a
 | `harvex.*` | `contextcrate.*` |
 | `HARVEX_*` | `CONTEXTCRATE_*` |
 | `harvex-*.jar` | `contextcrate-*.jar` |
-| `/api/v1/jobs` | `/api/v1/crates/{crateId}/jobs` |
+| `/api/v1/jobs` | `/api/v1/crates/{crateId}/sources` plus nested ingestion jobs |
 | Global index | One versioned namespace per crate |
 
 No legacy environment-variable aliases are accepted.
@@ -31,6 +31,10 @@ The script refuses to overwrite an existing ContextCrate database and copies rat
 
 New artifacts use `crates/{crateId}/...`. Keep the old database and artifact paths until the Legacy crate has been rebuilt, searched, exported, and validated.
 
+The source/ingestion migration creates one Website source and one ingestion job for every
+existing crawl job. It retains IDs, historical runs, artifacts, documents, and extraction
+results. The old `/jobs` contract has no compatibility alias.
+
 ## PostgreSQL and distributed installations
 
 The external database, bucket, exchange, or OpenSearch service does not need to be physically renamed. Update environment-variable names while retaining explicit connection values. Upgrade database migrations before starting stage workers; consumers accept schema-v1 messages during the transition and new publishers emit schema v2.
@@ -38,7 +42,7 @@ The external database, bucket, exchange, or OpenSearch service does not need to 
 ## Verification
 
 - Sign in and confirm the Legacy crate membership.
-- Compare job, run, document, and extraction counts.
+- Compare source, ingestion-job, run, document, and extraction counts.
 - Start a Legacy crate index rebuild and verify search.
 - Download a known artifact.
 - Create a second crate and confirm overlapping content does not cross search results.

@@ -52,15 +52,15 @@ public interface SearchIndex extends AutoCloseable {
       UUID runId,
       String kind,
       String title,
-      String canonicalUrl,
+      String sourceUri,
       Integer chunkOrdinal,
       String snippet,
       float score,
       Float lexicalScore,
       Float semanticScore) {
-    public SearchHit(UUID id, UUID documentId, UUID runId, String kind, String title, String canonicalUrl,
+    public SearchHit(UUID id, UUID documentId, UUID runId, String kind, String title, String sourceUri,
         Integer chunkOrdinal, String snippet, float score) {
-      this(id, documentId, runId, kind, title, canonicalUrl, chunkOrdinal, snippet, score, null, null);
+      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, null, null);
     }
   }
 

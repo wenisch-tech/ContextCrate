@@ -15,7 +15,7 @@
     <div>
       <p class="eyebrow">RUN DETAILS</p>
       <h1 class="display-6 fw-semibold" th:text="${job.name}">Job name</h1>
-      <p class="text-secondary">Detailed information about this crawl run</p>
+      <p class="text-secondary">Detailed information about this ingestion run</p>
     </div>
     <div class="d-flex gap-2">
       <a class="btn btn-outline-secondary" th:href="@{/crates/{id}(id=${crate.id})}">Back to overview</a>
@@ -44,8 +44,12 @@
             <span th:text="${run.finishedAt}"></span>
           </div>
           <div class="backend-row">
-            <span>Seed URL</span>
-            <a th:href="${config.scope.seedUrl}" target="_blank" th:text="${config.scope.seedUrl}"></a>
+            <span>Source</span>
+            <span th:text="${source.name}"></span>
+          </div>
+          <div class="backend-row" th:if="${run.resolvedRevision != null}">
+            <span>Resolved revision</span>
+            <code th:text="${run.resolvedRevision}"></code>
           </div>
         </div>
       </div>
@@ -53,36 +57,28 @@
     <div class="col-md-6">
       <div class="card panel h-100">
         <div class="card-header">Configuration</div>
-        <div class="card-body">
+        <div class="card-body" th:if="${source.connectorType.name() == 'HTTPS'}">
           <div class="backend-row">
             <span>Max depth</span>
-            <span th:text="${config.scope.maxDepth}"></span>
+            <span th:text="${config.webCrawler.scope.maxDepth}"></span>
           </div>
           <div class="backend-row">
             <span>Max pages</span>
-            <span th:text="${config.scope.maxPages}"></span>
+            <span th:text="${config.webCrawler.scope.maxPages}"></span>
           </div>
           <div class="backend-row">
             <span>User agent</span>
-            <span th:text="${config.politeness.userAgent}"></span>
+            <span th:text="${config.webCrawler.politeness.userAgent}"></span>
           </div>
           <div class="backend-row">
             <span>Render mode</span>
-            <span th:text="${config.reliability.renderMode}"></span>
+            <span th:text="${config.webCrawler.reliability.renderMode}"></span>
           </div>
-          <div class="backend-row" th:if="${config.loginConfiguration().isConfigured()}">
-            <span>Authentication</span>
-            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.contextcrate.domain.CrawlConfiguration$AuthMethod).FORM}">
-              Enabled (username: <span th:text="${config.loginConfiguration().username()}"></span>)
-            </span>
-            <span th:if="${config.loginConfiguration().authMethod() == T(tech.wenisch.contextcrate.domain.CrawlConfiguration$AuthMethod).OAUTH2}">
-              Keycloak service account (client: <span th:text="${config.loginConfiguration().clientId()}"></span>)
-            </span>
-          </div>
-          <div class="backend-row" th:if="${!config.loginConfiguration().isConfigured()}">
-            <span>Authentication</span>
-            <span>Disabled</span>
-          </div>
+        </div>
+        <div class="card-body" th:if="${source.connectorType.name() == 'GIT'}">
+          <div class="backend-row"><span>Requested ref</span><code th:text="${config.git.ref.isBlank() ? '(default branch)' : config.git.ref}"></code></div>
+          <div class="backend-row"><span>Maximum files</span><span th:text="${config.git.maxFiles}"></span></div>
+          <div class="backend-row"><span>Maximum file size</span><span th:text="${config.git.maxFileBytes}"></span></div>
         </div>
       </div>
     </div>
@@ -95,19 +91,19 @@
   </div>
 
   <div class="card panel">
-    <div class="card-header">Recent fetches</div>
+    <div class="card-header">Recent acquisitions</div>
     <div class="table-responsive">
       <table class="table mb-0 align-middle">
-        <thead><tr><th>Requested URL</th><th>Result</th><th>HTTP</th><th>Duration</th><th>Fetched</th></tr></thead>
+        <thead><tr><th>Requested locator</th><th>Result</th><th>Status</th><th>Duration</th><th>Acquired</th></tr></thead>
         <tbody>
         <tr th:each="fetch:${fetches}">
-          <td class="text-break"><a th:href="${fetch.requestedUrl}" th:text="${fetch.requestedUrl}" target="_blank" rel="noopener"></a><div class="small text-danger" th:if="${fetch.errorMessage}" th:text="${fetch.errorMessage}"></div></td>
+          <td class="text-break"><span th:text="${fetch.requestedLocator}"></span><div class="small text-danger" th:if="${fetch.errorMessage}" th:text="${fetch.errorMessage}"></div></td>
           <td><span class="status-pill" th:text="${fetch.outcome}"></span></td>
           <td th:text="${fetch.statusCode != null ? fetch.statusCode : '—'}"></td>
           <td th:text="${fetch.durationMs != null ? fetch.durationMs + ' ms' : '—'}"></td>
           <td th:text="${fetch.fetchedAt}"></td>
         </tr>
-        <tr th:if="${fetches.empty}"><td colspan="5" class="empty-state">No fetch attempts have been recorded yet.</td></tr>
+        <tr th:if="${fetches.empty}"><td colspan="5" class="empty-state">No acquisition attempts have been recorded yet.</td></tr>
         </tbody>
       </table>
     </div>

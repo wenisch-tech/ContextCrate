@@ -7,7 +7,8 @@ image:
 roles:
   all: { enabled: true, replicas: 1 }
   control-plane: { enabled: false, replicas: 1 }
-  crawler-http: { enabled: false, replicas: 1 }
+  source-web: { enabled: false, replicas: 1 }
+  source-git: { enabled: false, replicas: 1 }
   crawler-browser: { enabled: false, replicas: 1 }
   parser: { enabled: false, replicas: 1 }
   indexer: { enabled: false, replicas: 1 }

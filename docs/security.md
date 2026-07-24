@@ -6,7 +6,9 @@
 - Run browser workers with minimal Kubernetes permissions, no service-account token, constrained egress, and separate resource limits.
 - Artifact keys are normalized and cannot escape the configured filesystem root.
 - Queue messages contain references and identifiers, never raw content or credentials.
-- Do not store secrets in job JSON. S3, database, RabbitMQ, and OpenSearch credentials come from environment/secret stores.
+- S3, database, RabbitMQ, and OpenSearch credentials come from environment/secret stores. Git
+  HTTPS tokens currently live in Git ingestion-job configuration JSON; they are redacted externally but not
+  encrypted at rest, so protect database access and backups.
 - Embedding API keys must be injected from a secret store. Remote embedding providers receive the indexed/query text, so use TLS and approve the endpoint as a data processor.
 - Answer-generation API keys may come from a secret store or the authenticated Settings page. Settings-entered keys are database-resident overrides, so restrict administrative access and protect database backups with encryption. Answer providers receive the question, caller-supplied history, and retrieved chunk context; ContextCrate treats that context as untrusted and does not persist it in audit logs.
 

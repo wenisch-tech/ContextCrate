@@ -10,89 +10,62 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tech.wenisch.contextcrate.crawl.UrlPolicy;
 import tech.wenisch.contextcrate.domain.*;
-import tech.wenisch.contextcrate.domain.CrawlConfiguration.RenderMode;
-import tech.wenisch.contextcrate.domain.PipelineTypes.WorkStage;
 import tech.wenisch.contextcrate.queue.*;
 import tech.wenisch.contextcrate.repository.*;
 import tech.wenisch.contextcrate.storage.ArtifactStore;
 
 @ExtendWith(MockitoExtension.class)
 class DocumentParserTest {
-  @Mock FetchRecordRepository fetches;
-  @Mock CrawlRunRepository runs;
+  @Mock AcquisitionRecordRepository acquisitions;
+  @Mock IngestionRunRepository runs;
   @Mock NormalizedDocumentRepository documents;
   @Mock DocumentChunkRepository chunks;
-  @Mock FrontierEntryRepository frontier;
+  @Mock SourceItemRepository items;
   @Mock ArtifactStore artifacts;
+  @Mock IngestionService ingestion;
   @Mock PipelineQueue queue;
-    @Mock ExtractionService extraction;
+  @Mock ExtractionService extraction;
 
   @Test
-  void persistsAlreadyRenderedAutoFetchInsteadOfRequestingBrowserAgain() throws Exception {
-    var mapper = new ObjectMapper();
-    var codec = new ConfigurationCodec(mapper);
-    var parser =
-        new DocumentParser(
-            fetches,
-            runs,
-            documents,
-            chunks,
-            frontier,
-            artifacts,
-            codec,
-            new UrlPolicy(true),
-            queue,
-            extraction,
-            mapper);
-    UUID runId = UUID.randomUUID();
-    UUID jobId = UUID.randomUUID();
-    UUID fetchId = UUID.randomUUID();
-    UUID frontierId = UUID.randomUUID();
-    var config =
-        new CrawlConfiguration(
-            new CrawlConfiguration.Scope(
-                "https://wenisch.tech/", Set.of("wenisch.tech"), List.of(), List.of(), 1, 10, true, false),
-            CrawlConfiguration.Politeness.defaults(),
-            new CrawlConfiguration.Reliability(3, 1000, 1_000_000, true, RenderMode.AUTO),
-            new CrawlConfiguration.Output(30, "", List.of("script", "style"), 500, 50, "test"),
-            CrawlConfiguration.LoginConfiguration.defaults());
-    var run = new CrawlRun(runId, jobId, codec.write(config));
-    var fetch = new FetchRecord(fetchId, runId, frontierId, "https://wenisch.tech/");
-    fetch.success(
-        "https://wenisch.tech/",
-        200,
-        "text/html; charset=UTF-8",
-        "UTF-8",
-        runId + "/" + fetchId + ".rendered.html",
-        "sha",
-        1,
-        1);
-    var entry = new FrontierEntry(frontierId, runId, "https://wenisch.tech/", "https://wenisch.tech/", 0);
-    String html =
-        "<html><head><title>Rendered</title><link rel='canonical' href='https://wenisch.tech/'></head>"
-            + "<body><main><h1>Rendered</h1></main><script></script><script></script>"
-            + "<script></script><script></script></body></html>";
-
-    when(fetches.findById(fetchId)).thenReturn(Optional.of(fetch));
+  void markdownCreatesReadableDocumentAndHeadingAwareChunks() throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    DocumentParser parser = new DocumentParser(acquisitions, runs, documents, chunks, items,
+        artifacts, ingestion, new UrlPolicy(true), queue, extraction, mapper);
+    UUID crateId = UUID.randomUUID(), runId = UUID.randomUUID(), acquisitionId = UUID.randomUUID();
+    IngestionRun run = new IngestionRun(runId, crateId, UUID.randomUUID(), UUID.randomUUID(),
+        "{}", "{}");
+    run.resolvedRevision("abc123");
+    AcquisitionRecord acquisition = new AcquisitionRecord(acquisitionId, runId, UUID.randomUUID(),
+        "docs/readme.md");
+    acquisition.assignCrate(crateId);
+    acquisition.success("git+https://example.com/repo.git@abc123/docs/readme.md", 200,
+        "text/markdown; charset=UTF-8", "UTF-8", "artifact.md", "sha", 100, 1);
+    String markdown = "# Product docs\n\nThis is **readable** text.\n\n## Setup\n\nRun `mvn test`.";
+    when(acquisitions.findById(acquisitionId)).thenReturn(Optional.of(acquisition));
     when(runs.findById(runId)).thenReturn(Optional.of(run));
-    when(artifacts.open(fetch.getArtifactKey()))
-        .thenReturn(new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8)));
-    when(documents.findByRunIdAndCanonicalUrl(eq(runId), anyString())).thenReturn(Optional.empty());
-    when(documents.save(any(NormalizedDocument.class))).thenAnswer(invocation -> invocation.getArgument(0));
-    when(frontier.findById(frontierId)).thenReturn(Optional.of(entry));
+    when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
+    when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
+        new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000,
+            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"))));
+    when(artifacts.open("artifact.md")).thenReturn(new ByteArrayInputStream(
+        markdown.getBytes(StandardCharsets.UTF_8)));
+    when(documents.findByRunIdAndSourceUri(eq(runId), anyString())).thenReturn(Optional.empty());
+    when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-    parser.parse(new PipelinePayload(runId, fetchId));
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
 
     ArgumentCaptor<NormalizedDocument> document = ArgumentCaptor.forClass(NormalizedDocument.class);
     verify(documents).save(document.capture());
-    assertThat(document.getValue().getBody()).isEqualTo("Rendered");
-        verify(extraction).publish(document.getValue(), false);
-    verify(queue, never()).publish(argThat(message -> message.stage() == WorkStage.BROWSER_FETCH));
-    verify(queue).publish(argThat(message -> message.stage() == WorkStage.INDEX));
+    assertThat(document.getValue().getTitle()).isEqualTo("Product docs");
+    assertThat(document.getValue().getBody()).contains("readable").doesNotContain("**");
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<DocumentChunk>> created = ArgumentCaptor.forClass(List.class);
+    verify(chunks).saveAll(created.capture());
+    assertThat(created.getValue()).extracting(DocumentChunk::getHeading)
+        .contains("Product docs", "Setup");
   }
 }

@@ -14,10 +14,10 @@
   <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
       <p class="eyebrow">CONTROL PLANE</p>
-      <h1 class="display-6 fw-semibold">Crawling overview</h1>
+      <h1 class="display-6 fw-semibold">Ingestion overview</h1>
       <p class="text-secondary">A live view of work moving through ContextCrate.</p>
     </div>
-    <a class="btn btn-primary" th:href="@{/crates/{id}/jobs/new(id=${crate.id})}"><i class="bi bi-plus-lg me-1"></i>New job</a>
+    <a class="btn btn-primary" th:href="@{/crates/{id}/sources/new(id=${crate.id})}"><i class="bi bi-plus-lg me-1"></i>New source</a>
   </div>
 
   <div class="card panel p-4 mb-4">
@@ -36,11 +36,11 @@
         <span class="text-secondary small" th:text="${searchResults.hits.size()} + ' hits'"></span>
       </div>
       <div class="list-group list-group-flush">
-        <a th:each="hit:${searchResults.hits}" th:href="${hit.canonicalUrl}" target="_blank" class="list-group-item list-group-item-action bg-transparent px-0">
+        <div th:each="hit:${searchResults.hits}" class="list-group-item bg-transparent px-0">
           <div class="d-flex justify-content-between gap-3">
             <div>
-              <div class="fw-semibold" th:text="${hit.title ?: hit.canonicalUrl}"></div>
-              <div class="small text-secondary text-truncate" th:text="${hit.canonicalUrl}"></div>
+              <div class="fw-semibold" th:text="${hit.title ?: hit.sourceUri}"></div>
+              <div class="small text-secondary text-truncate" th:text="${hit.sourceUri}"></div>
             </div>
             <div class="text-end small">
               <span class="badge text-bg-secondary" th:text="${hit.kind}"></span>
@@ -48,7 +48,7 @@
             </div>
           </div>
           <p class="mb-0 mt-2 small" th:text="${hit.snippet}"></p>
-        </a>
+        </div>
         <div th:if="${searchResults.hits.empty}" class="empty-state">No indexed chunks matched this query.</div>
       </div>
     </div>
@@ -66,7 +66,7 @@
   </div>
 
   <div class="row g-3 mb-4">
-    <div class="col-6 col-xl-3"><div class="metric-card"><span>Jobs</span><strong th:text="${jobs.size()}">0</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric-card"><span>Sources / jobs</span><strong th:text="|${sources.size()} / ${jobs.size()}|">0</strong></div></div>
     <div class="col-6 col-xl-3"><div class="metric-card"><span>Runs</span><strong th:text="${runs.size()}">0</strong></div></div>
     <div class="col-6 col-xl-3"><div class="metric-card"><span>Documents</span><strong th:text="${documentCount}">0</strong></div></div>
     <div class="col-6 col-xl-3"><div class="metric-card"><span>Index</span><strong class="fs-5" th:classappend="${indexHealth.healthy} ? 'text-success' : 'text-danger'" th:text="${indexHealth.backend}">Lucene</strong></div></div>
@@ -75,18 +75,18 @@
   <div class="row g-4">
     <div class="col-xl-8">
        <section class="card panel">
-         <div class="card-header d-flex justify-content-between"><span>Recent runs</span><a th:href="@{/crates/{id}/jobs(id=${crate.id})}" class="small">Manage jobs</a></div>
+         <div class="card-header d-flex justify-content-between"><span>Recent ingestion runs</span><a th:href="@{/crates/{id}/sources(id=${crate.id})}" class="small">Manage sources</a></div>
          <div class="table-responsive">
            <table class="table mb-0 align-middle">
              <thead><tr><th>Run</th><th>Job</th><th>Status</th><th>Started</th></tr></thead>
              <tbody>
              <tr th:each="run:${runs}">
                <td class="font-monospace small"><a th:href="@{/crates/{crateId}/runs/{id}(crateId=${crate.id},id=${run.id})}" th:text="${run.id}"></a></td>
-               <td th:text="${jobNames[run.jobId]}"></td>
+               <td th:text="${jobNames[run.ingestionJobId]}"></td>
                <td><span class="status-pill" th:text="${run.status}"></span></td>
                <td th:text="${run.startedAt}"></td>
              </tr>
-             <tr th:if="${runs.empty}"><td colspan="4" class="empty-state">No runs yet. Create a crawl job to begin.</td></tr>
+             <tr th:if="${runs.empty}"><td colspan="4" class="empty-state">No runs yet. Create a source and ingestion job to begin.</td></tr>
              </tbody>
            </table>
          </div>
@@ -151,7 +151,7 @@
       const paragraph=[];while(i<lines.length&&lines[i].trim()&&!lines[i].startsWith('```')&&!/^(#{1,6})\s+/.test(lines[i])&&!/^\s*(?:[-*+]|\d+\.)\s+/.test(lines[i])&&!/^>\s?/.test(lines[i]))paragraph.push(lines[i++]);const node=document.createElement('p');paragraph.forEach((part,index)=>{if(index)node.append(document.createElement('br'));appendInline(node,part)});text.append(node);
     }
   };
-  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li');li.id='citation-'+s.citation;const a=document.createElement('a'),href=safeUrl(s.canonicalUrl);if(href){a.href=href;a.target='_blank';a.rel='noopener'}a.textContent=s.title||s.canonicalUrl;li.append(a,document.createTextNode(' — '+s.snippet));list.append(li)});sources.append(list);renderMarkdown()};
+  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li');li.id='citation-'+s.citation;const a=document.createElement('a'),href=safeUrl(s.sourceUri);if(href){a.href=href;a.target='_blank';a.rel='noopener'}a.textContent=s.title||s.sourceUri;li.append(a,document.createTextNode(' — '+s.snippet));list.append(li)});sources.append(list);renderMarkdown()};
   cancel.addEventListener('click',()=>controller?.abort());
   form.addEventListener('submit',async event=>{event.preventDefault();controller?.abort();controller=new AbortController();markdown='';sourceList=[];status.textContent='Finding sources…';text.replaceChildren();sources.replaceChildren();cancel.classList.remove('d-none');try{const response=await fetch('/api/v1/crates/'+crateId+'/answers',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:document.getElementById('answer-question').value}),signal:controller.signal});if(!response.ok)throw new Error(response.status===503?'Answer generation is not configured.':'Unable to generate an answer.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';status.textContent='Generating answer…';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop();for(const eventText of events){let name='',data='';eventText.split('\n').forEach(line=>{if(line.startsWith('event:'))name=line.slice(6).trim();if(line.startsWith('data:'))data+=line.slice(5).trim()});if(!data)continue;const payload=JSON.parse(data);if(name==='sources')renderSources(payload);if(name==='delta'){markdown+=payload.text;renderMarkdown()}if(name==='complete'){status.textContent='Complete.'}if(name==='error')throw new Error(payload.error)}}}catch(error){if(error.name==='AbortError')status.textContent='Cancelled.';else status.textContent=error.message}finally{cancel.classList.add('d-none')}});
 })();

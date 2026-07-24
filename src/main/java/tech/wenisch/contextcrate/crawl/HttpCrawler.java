@@ -29,16 +29,15 @@ import org.springframework.transaction.annotation.Transactional;
 import tech.wenisch.contextcrate.crawl.CrawlerAuthenticationService.CrawlerResponse;
 import tech.wenisch.contextcrate.domain.CrawlConfiguration;
 import tech.wenisch.contextcrate.domain.CrawlConfiguration.AuthMethod;
-import tech.wenisch.contextcrate.domain.CrawlRun;
-import tech.wenisch.contextcrate.domain.FetchRecord;
-import tech.wenisch.contextcrate.domain.FrontierEntry;
+import tech.wenisch.contextcrate.domain.IngestionRun;
+import tech.wenisch.contextcrate.domain.AcquisitionRecord;
+import tech.wenisch.contextcrate.domain.SourceItem;
 import tech.wenisch.contextcrate.queue.PipelineMessage;
 import tech.wenisch.contextcrate.queue.PipelineQueue;
-import tech.wenisch.contextcrate.repository.CrawlRunRepository;
-import tech.wenisch.contextcrate.repository.FetchRecordRepository;
-import tech.wenisch.contextcrate.repository.FrontierEntryRepository;
-import tech.wenisch.contextcrate.service.ConfigurationCodec;
-import tech.wenisch.contextcrate.service.JobService;
+import tech.wenisch.contextcrate.repository.IngestionRunRepository;
+import tech.wenisch.contextcrate.repository.AcquisitionRecordRepository;
+import tech.wenisch.contextcrate.repository.SourceItemRepository;
+import tech.wenisch.contextcrate.service.IngestionService;
 import tech.wenisch.contextcrate.service.PipelinePayload;
 import tech.wenisch.contextcrate.storage.ArtifactStore;
 
@@ -46,32 +45,32 @@ import tech.wenisch.contextcrate.storage.ArtifactStore;
 public class HttpCrawler {
   private static final int MAX_LOGIN_STEPS = 3;
   private static final Logger log = LoggerFactory.getLogger(HttpCrawler.class);
-  private final FrontierEntryRepository frontier;
-  private final CrawlRunRepository runs;
-  private final ConfigurationCodec codec;
+  private final SourceItemRepository frontier;
+  private final IngestionRunRepository runs;
+  private final IngestionService ingestion;
   private final UrlPolicy urls;
   private final RobotsService robots;
   private final HostPoliteness politeness;
   private final ArtifactStore artifacts;
-  private final FetchRecordRepository fetches;
+  private final AcquisitionRecordRepository fetches;
   private final PipelineQueue queue;
   private final CrawlerAuthenticationService authentication;
   private final Map<UUID, String> browserStorage = new ConcurrentHashMap<>();
 
   public HttpCrawler(
-      FrontierEntryRepository frontier,
-      CrawlRunRepository runs,
-      ConfigurationCodec codec,
+      SourceItemRepository frontier,
+      IngestionRunRepository runs,
+      IngestionService ingestion,
       UrlPolicy urls,
       RobotsService robots,
       HostPoliteness politeness,
       ArtifactStore artifacts,
-      FetchRecordRepository fetches,
+      AcquisitionRecordRepository fetches,
       PipelineQueue queue,
       CrawlerAuthenticationService authentication) {
     this.frontier = frontier;
     this.runs = runs;
-    this.codec = codec;
+    this.ingestion = ingestion;
     this.urls = urls;
     this.robots = robots;
     this.politeness = politeness;
@@ -83,36 +82,37 @@ public class HttpCrawler {
 
   @Transactional
   public void fetch(PipelinePayload payload, boolean browser) throws Exception {
-    FrontierEntry entry = frontier.findById(payload.entityId()).orElseThrow();
-    CrawlRun run = runs.findById(payload.runId()).orElseThrow();
+    SourceItem entry = frontier.findById(payload.entityId()).orElseThrow();
+    IngestionRun run = runs.findById(payload.runId()).orElseThrow();
     requireCrate(payload, run.getCrateId(), entry.getCrateId());
     if (run.getStatus() != RunStatus.RUNNING) {
       authentication.clear(run.getId());
       browserStorage.remove(run.getId());
       return;
     }
-    CrawlConfiguration config = codec.read(run.getConfigurationJson());
+    CrawlConfiguration config = ingestion.effectiveWeb(run);
     if (browser
         || config.reliability().renderMode() == CrawlConfiguration.RenderMode.BROWSER_ONLY) {
       fetchBrowser(entry, run, config);
       return;
     }
 
-    urls.assertSafe(entry.getUrl());
+    urls.assertSafe(entry.getLocator());
     if (config.politeness().honorRobots()
-        && !robots.allowed(entry.getUrl(), config.politeness().userAgent())) {
+        && !robots.allowed(entry.getLocator(), config.politeness().userAgent())) {
       entry.status(FrontierStatus.EXCLUDED);
       frontier.save(entry);
       return;
     }
-    politeness.await(entry.getUrl(), config.politeness().minimumDelayMillis());
+    politeness.await(entry.getLocator(), config.politeness().minimumDelayMillis());
 
     UUID fetchId = UUID.randomUUID();
-    FetchRecord record = new FetchRecord(fetchId, run.getId(), entry.getId(), entry.getUrl());
+    AcquisitionRecord record =
+        new AcquisitionRecord(fetchId, run.getId(), entry.getId(), entry.getLocator());
     record.assignCrate(run.getCrateId());
     long started = System.nanoTime();
     try {
-      CrawlerResponse response = authentication.get(run.getId(), entry.getUrl(), config);
+      CrawlerResponse response = authentication.get(run.getId(), entry.getLocator(), config);
       String type = response.headers().firstValue("Content-Type").orElse("application/octet-stream");
       String key = "crates/" + run.getCrateId() + "/runs/" + run.getId() + "/" + fetchId + extension(type);
       try (InputStream body = response.body()) {
@@ -140,7 +140,7 @@ public class HttpCrawler {
             PipelineMessage.create(
                 run.getCrateId(),
                 WorkStage.PARSE,
-                JobService.payload(run.getCrateId(), run.getId(), fetchId),
+                IngestionService.payload(run.getCrateId(), run.getId(), fetchId),
                 run.getId(),
                 run.getCrateId() + ":parse:" + fetchId,
                 50));
@@ -160,11 +160,12 @@ public class HttpCrawler {
     }
   }
 
-  private void fetchBrowser(FrontierEntry entry, CrawlRun run, CrawlConfiguration config)
+  private void fetchBrowser(SourceItem entry, IngestionRun run, CrawlConfiguration config)
       throws Exception {
-    urls.assertSafe(entry.getUrl());
+    urls.assertSafe(entry.getLocator());
     UUID fetchId = UUID.randomUUID();
-    FetchRecord record = new FetchRecord(fetchId, run.getId(), entry.getId(), entry.getUrl());
+    AcquisitionRecord record =
+        new AcquisitionRecord(fetchId, run.getId(), entry.getId(), entry.getLocator());
     record.assignCrate(run.getCrateId());
     long started = System.nanoTime();
     try (Playwright playwright = Playwright.create()) {
@@ -187,24 +188,24 @@ public class HttpCrawler {
         AtomicReference<Exception> blockedNavigation = guardNavigations(context);
         Page page = context.newPage();
         com.microsoft.playwright.Response response =
-            navigate(page, entry.getUrl(), config, blockedNavigation);
+            navigate(page, entry.getLocator(), config, blockedNavigation);
         if (config.loginConfiguration().authMethod() == AuthMethod.FORM) {
           var login = config.loginConfiguration();
           if (stored == null || hasAuthenticationForm(page, login)) {
             log.info(
                 "Browser form authentication is required for {} (stored session present={})",
-                diagnosticUrl(entry.getUrl()),
+                diagnosticUrl(entry.getLocator()),
                 stored != null);
             String authenticationUrl =
                 performBrowserLogin(page, config, blockedNavigation);
-            response = navigate(page, entry.getUrl(), config, blockedNavigation);
+            response = navigate(page, entry.getLocator(), config, blockedNavigation);
             if (hasAuthenticationForm(page, login)
                 || sameEndpoint(page.url(), authenticationUrl)) {
               throw new IllegalStateException(
                   "Browser authentication returned to the login page");
             }
             browserStorage.put(run.getId(), context.storageState());
-            log.info("Browser form authentication completed for {}", diagnosticUrl(entry.getUrl()));
+            log.info("Browser form authentication completed for {}", diagnosticUrl(entry.getLocator()));
           }
         }
         if (config.loginConfiguration().authMethod() == AuthMethod.OAUTH2
@@ -221,7 +222,7 @@ public class HttpCrawler {
           context = browser.newContext(options);
           blockedNavigation = guardNavigations(context);
           page = context.newPage();
-          response = navigate(page, entry.getUrl(), config, blockedNavigation);
+          response = navigate(page, entry.getLocator(), config, blockedNavigation);
         }
 
         byte[] bytes = page.content().getBytes(StandardCharsets.UTF_8);
@@ -248,7 +249,7 @@ public class HttpCrawler {
               PipelineMessage.create(
                   run.getCrateId(),
                   WorkStage.PARSE,
-                  JobService.payload(run.getCrateId(), run.getId(), fetchId),
+                  IngestionService.payload(run.getCrateId(), run.getId(), fetchId),
                   run.getId(),
                   run.getCrateId() + ":parse:" + fetchId,
                   50));

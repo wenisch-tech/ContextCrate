@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 
 public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDocument, UUID> {
-  Optional<NormalizedDocument> findByRunIdAndCanonicalUrl(UUID runId, String canonicalUrl);
+  Optional<NormalizedDocument> findByRunIdAndSourceUri(UUID runId, String sourceUri);
 
   List<NormalizedDocument> findByRunId(UUID runId);
 
@@ -15,4 +15,5 @@ public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDo
   List<NormalizedDocument> findTop100ByCrateIdOrderByCreatedAtDesc(UUID crateId);
   Optional<NormalizedDocument> findByIdAndCrateId(UUID id, UUID crateId);
   List<NormalizedDocument> findByCrateId(UUID crateId);
+  List<NormalizedDocument> findByCrateIdAndIndexedFalse(UUID crateId);
 }

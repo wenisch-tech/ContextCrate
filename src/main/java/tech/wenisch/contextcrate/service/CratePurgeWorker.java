@@ -33,7 +33,7 @@ public class CratePurgeWorker {
   @Transactional
   protected void deleteRows(UUID crateId) {
     for(String table:new String[]{"extraction_result","document_chunk","normalized_document",
-        "fetch_record","frontier_entry","pipeline_work_item","crawl_run","crawl_job",
+        "acquisition_record","source_item","pipeline_work_item","ingestion_run","ingestion_job","source",
         "extraction_rule","audit_log","api_key","admin_elevation","crate_index_generation",
         "crate_rag_settings","crate_provider_settings","crate_member"})
       jdbc.update("delete from "+table+" where crate_id = ?",crateId);

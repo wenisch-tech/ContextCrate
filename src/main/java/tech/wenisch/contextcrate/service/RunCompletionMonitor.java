@@ -9,12 +9,12 @@ import tech.wenisch.contextcrate.repository.*;
 
 @Component
 public class RunCompletionMonitor {
-  private final CrawlRunRepository runs;
-  private final FrontierEntryRepository frontier;
+  private final IngestionRunRepository runs;
+  private final SourceItemRepository frontier;
   private final PipelineWorkItemRepository work;
 
   public RunCompletionMonitor(
-      CrawlRunRepository runs, FrontierEntryRepository frontier, PipelineWorkItemRepository work) {
+      IngestionRunRepository runs, SourceItemRepository frontier, PipelineWorkItemRepository work) {
     this.runs = runs;
     this.frontier = frontier;
     this.work = work;

@@ -6,9 +6,9 @@ ContextCrate separates installation administration from crate membership. Being 
 
 | Capability | Viewer | Editor | Owner |
 |---|:---:|:---:|:---:|
-| Browse jobs, runs, documents, and results | ✓ | ✓ | ✓ |
+| Browse sources, ingestion jobs, runs, documents, and results | ✓ | ✓ | ✓ |
 | Search and generate answers | ✓ | ✓ | ✓ |
-| Create/edit jobs and start/cancel runs |  | ✓ | ✓ |
+| Create/edit sources/jobs and start/cancel runs |  | ✓ | ✓ |
 | Manage extraction rules and rebuilds |  | ✓ | ✓ |
 | Commit or rebuild an index |  | ✓ | ✓ |
 | Change RAG/provider settings |  |  | ✓ |

@@ -9,21 +9,23 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.crawl.HttpCrawler;
+import tech.wenisch.contextcrate.git.GitSourceRetriever;
 import tech.wenisch.contextcrate.domain.PipelineTypes.WorkStage;
 import tech.wenisch.contextcrate.queue.*;
-import tech.wenisch.contextcrate.repository.CrawlRunRepository;
+import tech.wenisch.contextcrate.repository.IngestionRunRepository;
 
 @Component
 public class PipelineCoordinator {
   private final PipelineQueue queue;
   private final ObjectMapper mapper;
   private final HttpCrawler crawler;
+  private final GitSourceRetriever git;
   private final DocumentParser parser;
   private final ExtractionService extractor;
   private final DocumentIndexer indexer;
   private final ContextCrateProperties properties;
   private final MeterRegistry metrics;
-  private final CrawlRunRepository runs;
+  private final IngestionRunRepository runs;
   private final ThreadPoolExecutor executor;
 
   @org.springframework.beans.factory.annotation.Autowired
@@ -31,15 +33,17 @@ public class PipelineCoordinator {
       PipelineQueue queue,
       ObjectMapper mapper,
       HttpCrawler crawler,
+      GitSourceRetriever git,
       DocumentParser parser,
       ExtractionService extractor,
       DocumentIndexer indexer,
       ContextCrateProperties properties,
       MeterRegistry metrics,
-      CrawlRunRepository runs) {
+      IngestionRunRepository runs) {
     this.queue = queue;
     this.mapper = mapper;
     this.crawler = crawler;
+    this.git = git;
     this.parser = parser;
     this.extractor = extractor;
     this.indexer = indexer;
@@ -67,7 +71,7 @@ public class PipelineCoordinator {
       PipelineQueue queue,ObjectMapper mapper,HttpCrawler crawler,DocumentParser parser,
       ExtractionService extractor,DocumentIndexer indexer,ContextCrateProperties properties,
       MeterRegistry metrics) {
-    this(queue,mapper,crawler,parser,extractor,indexer,properties,metrics,null);
+    this(queue,mapper,crawler,null,parser,extractor,indexer,properties,metrics,null);
   }
 
   @Scheduled(fixedDelayString = "${contextcrate.worker.poll-delay-ms:250}")
@@ -90,7 +94,8 @@ public class PipelineCoordinator {
     String role = properties.role();
     return role.equals("all")
         || switch (stage) {
-          case FETCH -> role.equals("crawler-http");
+          case WEB_FETCH -> role.equals("source-web") || role.equals("crawler-http");
+          case GIT_FETCH -> role.equals("source-git");
           case BROWSER_FETCH -> role.equals("crawler-browser");
           case PARSE, DISCOVERY -> role.equals("parser");
           case EXTRACT -> role.equals("extractor");
@@ -111,7 +116,11 @@ public class PipelineCoordinator {
       if (!message.crateId().equals(crateId))
         throw new IllegalArgumentException("Queue envelope and payload use different crates");
       switch (message.stage()) {
-        case FETCH -> crawler.fetch(payload, false);
+        case WEB_FETCH -> crawler.fetch(payload, false);
+        case GIT_FETCH -> {
+          if (git == null) throw new IllegalStateException("Git source worker is unavailable");
+          git.fetch(payload);
+        }
         case BROWSER_FETCH -> crawler.fetch(payload, true);
         case PARSE -> parser.parse(payload);
         case EXTRACT -> extractor.extract(payload);

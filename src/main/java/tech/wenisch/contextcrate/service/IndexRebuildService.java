@@ -56,6 +56,9 @@ public class IndexRebuildService {
       index.commitGeneration(crateId,generation);
       long finalCount=count;
       transactions.executeWithoutResult(status->{
+        for(var document:documents.findByCrateId(crateId)){
+          document.indexed();documents.save(document);
+        }
         for(var active:generations.findByCrateIdAndStatus(crateId,CrateIndexGeneration.Status.ACTIVE)){
           active.retire();generations.save(active);
         }

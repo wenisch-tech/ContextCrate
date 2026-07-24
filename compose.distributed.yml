@@ -28,9 +28,12 @@ services:
     <<: *contextcrate
     ports: ["8080:8080"]
     environment: { <<: *environment, CONTEXTCRATE_ROLE: control-plane }
-  crawler-http:
+  source-web:
     <<: *contextcrate
-    environment: { <<: *environment, CONTEXTCRATE_ROLE: crawler-http }
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: source-web }
+  source-git:
+    <<: *contextcrate
+    environment: { <<: *environment, CONTEXTCRATE_ROLE: source-git }
   crawler-browser:
     <<: *contextcrate
     image: ghcr.io/wenisch-tech/contextcrate-browser:latest

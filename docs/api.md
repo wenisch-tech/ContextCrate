@@ -20,7 +20,8 @@ Purge body: `{"confirmation":"Exact crate name"}`.
 
 | Capability | Path |
 |---|---|
-| Jobs | `/api/v1/crates/{crateId}/jobs` |
+| Sources | `/api/v1/crates/{crateId}/sources` |
+| Ingestion jobs | `/api/v1/crates/{crateId}/sources/{sourceId}/ingestion-jobs` |
 | Runs | `/api/v1/crates/{crateId}/runs` |
 | Documents | `/api/v1/crates/{crateId}/documents` |
 | Search | `/api/v1/crates/{crateId}/search?q=...&mode=hybrid` |
@@ -58,3 +59,49 @@ Provider responses never contain stored API keys. Submitting a blank key preserv
 Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructure health, dead letters, and temporary elevations. They do not expose crate documents or search without elevation.
 
 Errors use the standard API exception envelope and never redirect a REST client to another crate. The previous unscoped `/api/v1/jobs`, `/search`, `/answers`, and `/backups` contracts were removed.
+
+## Sources and ingestion jobs
+
+Create a Git source:
+
+```json
+{
+  "name": "Product repository",
+  "connectorType": "GIT",
+  "configuration": {
+    "git": {
+      "repositoryUrl": "https://git.example.com/team/product.git",
+      "username": "git",
+      "token": "secret"
+    }
+  }
+}
+```
+
+The token is never returned. Source responses expose `tokenConfigured` instead. Submitting a
+blank token on update preserves the existing token.
+
+Attach any number of jobs at
+`POST /api/v1/crates/{crateId}/sources/{sourceId}/ingestion-jobs`:
+
+```json
+{
+  "name": "Documentation",
+  "configuration": {
+    "git": {
+      "ref": "main",
+      "includePatterns": ["docs/**", "README.md"],
+      "excludePatterns": ["docs/archive/**"],
+      "maxFiles": 10000,
+      "maxFileBytes": 1048576,
+      "output": {"chunkSize": 2000, "chunkOverlap": 200}
+    }
+  }
+}
+```
+
+Start it with `POST .../ingestion-jobs/{jobId}/runs`. A Git run records its resolved commit in
+`resolvedRevision`. Website sources use `connectorType: HTTPS`; their source configuration
+owns the HTTPS URL, while each job owns crawl scope, request behavior, authentication, and output policy.
+
+The former crate-qualified `/jobs` endpoint is intentionally not retained.

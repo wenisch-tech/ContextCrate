@@ -8,4 +8,20 @@
 
 Answer generation is now available through a configured OpenAI-compatible streaming endpoint. Feedback and evaluation remain prerequisites for ranking optimization.
 
-No crawler or normalized-document contract needs to change for these phases; new index versions are rebuilt from the canonical relational data.
+New index versions are rebuilt from the canonical relational data.
+
+## Source ingestion roadmap
+
+The first Git connector deliberately supports full snapshots of UTF-8 Markdown and text over
+HTTPS. Later ingestion work will add:
+
+1. SSH credentials and verified host keys, encrypted credential storage, and external secret references.
+2. Incremental commit-diff ingestion, webhooks, schedules, and deletion reconciliation.
+3. Sparse checkout, multi-branch jobs, repository history, submodules, and Git LFS object retrieval.
+4. Repository-wide transfer/storage quotas and stronger redirect-aware transport policy.
+5. Additional encodings and normalizers for HTML files, source code, PDF, and Office documents.
+
+Current limitations: no SSH, scheduling, webhooks, incremental synchronization, history,
+submodules, LFS objects, symlinks, or repository-wide transfer quota. Only `.md`, `.markdown`, and
+`.txt` are accepted; files must be valid UTF-8. Git tokens are redacted from APIs, logs, audits,
+and exports but remain plaintext in the ingestion-job configuration JSON.

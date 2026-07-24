@@ -11,9 +11,13 @@ curl -X POST -H "X-API-KEY: $PERSONAL_KEY" \
   -F "file=@crate.zip" "http://localhost:8080/api/v1/crate-imports"
 ```
 
-Import creates a new crate and remaps job, run, frontier, fetch, document, chunk, rule, and result identifiers. Artifacts receive new crate-prefixed keys. Imported documents are queued for a fresh vector namespace.
+Import creates a new crate and remaps source, ingestion-job, run, source-item, acquisition,
+document, chunk, rule, and result identifiers. Artifacts receive new crate-prefixed keys. Imported
+documents are queued for a fresh vector namespace. Schema-v1 bundles are accepted and their crawl
+jobs become Website source/ingestion-job pairs.
 
-Secrets, users, memberships, API keys, elevations, and audit records are intentionally absent. Configure crawler and provider credentials after import.
+Secrets, users, memberships, API keys, elevations, and audit records are intentionally absent.
+Configure source and provider credentials after import.
 
 !!! warning
     A crate export is not a complete installation backup. Use database and object-store snapshots for disaster recovery and keep all components from the same recovery point.

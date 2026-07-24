@@ -9,7 +9,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.CrawlConfiguration;
-import tech.wenisch.contextcrate.domain.CrawlJob;
 import tech.wenisch.contextcrate.domain.PipelineTypes.ExtractionType;
 import tech.wenisch.contextcrate.index.SearchIndex;
 import tech.wenisch.contextcrate.queue.PipelineQueue;
@@ -23,8 +22,10 @@ import tech.wenisch.contextcrate.domain.*;
 @Controller
 @RequestMapping("/crates/{crateId}")
 public class UiController {
-  private final JobService jobs;
-  private final ConfigurationCodec codec;
+  private final SourceService sources;
+  private final IngestionService ingestion;
+  private final SourceConfigurationCodec sourceCodec;
+  private final IngestionConfigurationCodec ingestionCodec;
   private final ContextCrateProperties properties;
   private final PipelineQueue queue;
   private final SearchIndex index;
@@ -33,15 +34,18 @@ public class UiController {
   private final RagSettingsService ragSettings;
   private final RuntimeProviderSettings providerSettings;
   private final LocalOnnxEmbeddingProvider localEmbeddings;
-  private final FetchRecordRepository fetchRecords;
-  private final FrontierEntryRepository frontierEntries;
+  private final AcquisitionRecordRepository acquisitionRecords;
+  private final SourceItemRepository sourceItems;
   private final CrateService crates;
   private final CrateAccessService access;
   private final IndexRebuildService rebuild;
+  private final DocumentIndexRecoveryService indexRecovery;
 
   public UiController(
-      JobService jobs,
-      ConfigurationCodec codec,
+      SourceService sources,
+      IngestionService ingestion,
+      SourceConfigurationCodec sourceCodec,
+      IngestionConfigurationCodec ingestionCodec,
       ContextCrateProperties properties,
       PipelineQueue queue,
       SearchIndex index,
@@ -50,11 +54,13 @@ public class UiController {
       RagSettingsService ragSettings,
       RuntimeProviderSettings providerSettings,
       LocalOnnxEmbeddingProvider localEmbeddings,
-      FetchRecordRepository fetchRecords,
-      FrontierEntryRepository frontierEntries, CrateService crates, CrateAccessService access,
-      IndexRebuildService rebuild) {
-    this.jobs = jobs;
-    this.codec = codec;
+      AcquisitionRecordRepository acquisitionRecords,
+      SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
+      IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery) {
+    this.sources = sources;
+    this.ingestion = ingestion;
+    this.sourceCodec = sourceCodec;
+    this.ingestionCodec = ingestionCodec;
     this.properties = properties;
     this.queue = queue;
     this.index = index;
@@ -63,11 +69,12 @@ public class UiController {
     this.ragSettings = ragSettings;
     this.providerSettings = providerSettings;
     this.localEmbeddings = localEmbeddings;
-    this.fetchRecords = fetchRecords;
-    this.frontierEntries = frontierEntries;
+    this.acquisitionRecords = acquisitionRecords;
+    this.sourceItems = sourceItems;
     this.crates = crates;
     this.access = access;
     this.rebuild = rebuild;
+    this.indexRecovery = indexRecovery;
   }
 
   @ModelAttribute
@@ -79,13 +86,14 @@ public class UiController {
 
   @GetMapping({"", "/"})
   String dashboard(@PathVariable UUID crateId,@RequestParam(defaultValue = "") String q, Model model) throws Exception {
-    var allJobs = jobs.jobs(crateId);
+    var allJobs = ingestion.allJobs(crateId);
+    model.addAttribute("sources", sources.list(crateId));
     model.addAttribute("jobs", allJobs);
-    model.addAttribute("runs", jobs.runs(crateId));
+    model.addAttribute("runs", ingestion.runs(crateId));
     model.addAttribute(
         "jobNames",
         allJobs.stream()
-            .collect(java.util.stream.Collectors.toMap(CrawlJob::getId, CrawlJob::getName)));
+            .collect(java.util.stream.Collectors.toMap(IngestionJob::getId, IngestionJob::getName)));
     model.addAttribute("properties", properties);
     model.addAttribute("indexHealth", index.health(crateId));
     model.addAttribute(
@@ -100,313 +108,292 @@ public class UiController {
     return "dashboard";
   }
 
-  @GetMapping("/jobs")
-  String jobList(@PathVariable UUID crateId,Model model) {
-    model.addAttribute("jobs", jobs.jobs(crateId));
-    model.addAttribute("codec", codec);
-    return "jobs";
+  @GetMapping("/sources")
+  String sourceList(@PathVariable UUID crateId, Model model) {
+    model.addAttribute("sources", sources.list(crateId));
+    model.addAttribute("sourceService", sources);
+    model.addAttribute("sourceCodec", sourceCodec);
+    return "sources";
   }
 
-  @GetMapping("/jobs/new")
-  String newJob() {
-    return "job-form";
+  @GetMapping("/sources/new")
+  String newSource(Model model) {
+    model.addAttribute("connectorTypes", ConnectorType.values());
+    return "source-form";
   }
 
-  @GetMapping("/jobs/{id}/edit")
-  String editJob(@PathVariable UUID crateId,@PathVariable UUID id, Model model) {
-    var job = jobs.requireJob(crateId,id);
-    var config = codec.read(job.getConfigurationJson());
+  @PostMapping("/sources")
+  String createSource(@PathVariable UUID crateId, @RequestParam String name,
+      @RequestParam(defaultValue = "") String description,
+      @RequestParam ConnectorType connectorType, @RequestParam String endpoint) {
+    access.requireMutable(crateId,CrateMember.Role.EDITOR);
+    SourceConfiguration config = connectorType == ConnectorType.GIT
+        ? SourceConfiguration.git(endpoint)
+        : SourceConfiguration.https(endpoint);
+    Source source = sources.create(crateId, name, description, connectorType, config);
+    return "redirect:/crates/" + crateId + "/sources/" + source.getId();
+  }
+
+  @GetMapping("/sources/{sourceId}")
+  String sourceDetails(@PathVariable UUID crateId, @PathVariable UUID sourceId, Model model) {
+    Source source = sources.require(crateId, sourceId);
+    model.addAttribute("source", source);
+    model.addAttribute("sourceConfig", sourceCodec.read(source.getConfigurationJson(),
+        source.getConnectorType()).withoutSecrets());
+    model.addAttribute("jobs", ingestion.jobs(crateId, sourceId));
+    model.addAttribute("ingestionCodec", ingestionCodec);
+    return "source-details";
+  }
+
+  @GetMapping("/sources/{sourceId}/edit")
+  String editSource(@PathVariable UUID crateId, @PathVariable UUID sourceId, Model model) {
+    Source source = sources.require(crateId, sourceId);
+    model.addAttribute("source", source);
+    model.addAttribute("config", sourceCodec.read(source.getConfigurationJson(),
+        source.getConnectorType()).withoutSecrets());
+    model.addAttribute("connectorTypes", ConnectorType.values());
+    return "source-form";
+  }
+
+  @PostMapping("/sources/{sourceId}/update")
+  String updateSource(@PathVariable UUID crateId, @PathVariable UUID sourceId,
+      @RequestParam String name, @RequestParam(defaultValue = "") String description,
+      @RequestParam String endpoint) {
+    access.requireMutable(crateId, CrateMember.Role.EDITOR);
+    Source source = sources.require(crateId, sourceId);
+    SourceConfiguration config = source.getConnectorType() == ConnectorType.GIT
+        ? SourceConfiguration.git(endpoint)
+        : SourceConfiguration.https(endpoint);
+    sources.update(crateId, sourceId, name, description, config, source.isEnabled());
+    return "redirect:/crates/" + crateId + "/sources/" + sourceId;
+  }
+
+  @GetMapping("/sources/{sourceId}/ingestion-jobs/new")
+  String newIngestionJob(@PathVariable UUID crateId, @PathVariable UUID sourceId, Model model) {
+    Source source = sources.require(crateId, sourceId);
+    model.addAttribute("source", source);
+    model.addAttribute("sourceConfig", sourceCodec.read(source.getConfigurationJson(),
+        source.getConnectorType()));
+    return "ingestion-job-form";
+  }
+
+  @GetMapping("/sources/{sourceId}/ingestion-jobs/{jobId}/edit")
+  String editIngestionJob(@PathVariable UUID crateId, @PathVariable UUID sourceId,
+      @PathVariable UUID jobId, Model model) {
+    Source source = sources.require(crateId, sourceId);
+    IngestionJob job = ingestion.requireJob(crateId, sourceId, jobId);
+    model.addAttribute("source", source);
+    model.addAttribute("sourceConfig", sourceCodec.read(source.getConfigurationJson(),
+        source.getConnectorType()));
     model.addAttribute("job", job);
-    model.addAttribute("config", config);
-    return "job-edit";
+    model.addAttribute("config", ingestionCodec.read(job.getConfigurationJson(),
+        source.getConnectorType()));
+    return "ingestion-job-form";
   }
 
-    @PostMapping("/jobs")
-    String create(
-        @PathVariable UUID crateId,@RequestParam String name,
-        @RequestParam String seedUrl,
-        @RequestParam String allowedHost,
-        @RequestParam int maxDepth,
-        @RequestParam int maxPages,
-        @RequestParam(defaultValue = "false") boolean allowSubdomains,
-        @RequestParam(defaultValue = "ContextCrateBot/0.1") String userAgent,
-        @RequestParam(defaultValue = "") String contact,
-        @RequestParam(defaultValue = "false") boolean honorRobots,
-        @RequestParam(defaultValue = "1000") long delayMillis,
-        @RequestParam(defaultValue = "15000") int timeoutMillis,
-        @RequestParam(defaultValue = "3") int maxAttempts,
-        @RequestParam(defaultValue = "1000") long backoffMillis,
-        @RequestParam(defaultValue = "10") long maxBodyMegabytes,
-        @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
-        @RequestParam(defaultValue = "30") int retentionDays,
-        @RequestParam(defaultValue = "") String contentSelector,
-        @RequestParam(defaultValue = "2000") int chunkSize,
-        @RequestParam(defaultValue = "200") int chunkOverlap,
-        @RequestParam(defaultValue = "") String formAuthUsername,
-        @RequestParam(defaultValue = "") String formAuthPassword,
-        @RequestParam(defaultValue = "") String authLoginPageUrl,
-        @RequestParam(defaultValue = "false") boolean authDirectLogin,
-        @RequestParam(defaultValue = "NONE") CrawlConfiguration.AuthMethod authMethod,
-        @RequestParam(defaultValue = "") String oauthUsername,
-        @RequestParam(defaultValue = "") String oauthPassword,
-        @RequestParam(defaultValue = "") String authServerUrl,
-        @RequestParam(defaultValue = "") String authRealm,
-        @RequestParam(defaultValue = "") String authClientId,
-        @RequestParam(defaultValue = "") String authClientSecret) {
-      var c =
-          configurationFromForm(
-              null,
-              seedUrl,
-              allowedHost,
-              maxDepth,
-              maxPages,
-              allowSubdomains,
-              userAgent,
-              contact,
-              honorRobots,
-              delayMillis,
-              timeoutMillis,
-              maxAttempts,
-              backoffMillis,
-              maxBodyMegabytes,
-              renderMode,
-              retentionDays,
-              contentSelector,
-              chunkSize,
-              chunkOverlap,
-              formAuthUsername,
-              formAuthPassword,
-              authLoginPageUrl,
-              authDirectLogin,
-              authMethod,
-              oauthUsername,
-              oauthPassword,
-              authServerUrl,
-              authRealm,
-              authClientId,
-              authClientSecret);
-      access.requireMutable(crateId,CrateMember.Role.EDITOR);
-      jobs.create(crateId,name, c);
-      return "redirect:/crates/"+crateId+"/jobs";
-    }
-
-  @PostMapping("/jobs/{id}/update")
-  String updateJob(
-      @PathVariable UUID crateId,@PathVariable UUID id,
-      @RequestParam String name,
-      @RequestParam String seedUrl,
-      @RequestParam String allowedHost,
-      @RequestParam int maxDepth,
-      @RequestParam int maxPages,
-      @RequestParam(defaultValue = "false") boolean allowSubdomains,
-      @RequestParam(defaultValue = "ContextCrateBot/0.1") String userAgent,
-      @RequestParam(defaultValue = "") String contact,
-      @RequestParam(defaultValue = "false") boolean honorRobots,
-      @RequestParam(defaultValue = "1000") long delayMillis,
-      @RequestParam(defaultValue = "15000") int timeoutMillis,
-      @RequestParam(defaultValue = "3") int maxAttempts,
-      @RequestParam(defaultValue = "1000") long backoffMillis,
-      @RequestParam(defaultValue = "10") long maxBodyMegabytes,
-      @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
-      @RequestParam(defaultValue = "30") int retentionDays,
-      @RequestParam(defaultValue = "") String contentSelector,
+  @PostMapping("/sources/{sourceId}/ingestion-jobs")
+  String createIngestionJob(@PathVariable UUID crateId, @PathVariable UUID sourceId,
+      @RequestParam String name, @RequestParam(defaultValue = "") String seedUrl,
+      @RequestParam(defaultValue = "") String allowedHost,
+      @RequestParam(defaultValue = "") String ref,
+      @RequestParam(defaultValue = "") String gitUsername,
+      @RequestParam(defaultValue = "") String gitToken,
+      @RequestParam(defaultValue = "**") String includePatterns,
+      @RequestParam(defaultValue = "") String excludePatterns,
+      @RequestParam(defaultValue = "3") int maxDepth,
+      @RequestParam(defaultValue = "1000") int maxPages,
+      @RequestParam(defaultValue = "10000") int maxFiles,
+      @RequestParam(defaultValue = "1048576") long maxFileBytes,
       @RequestParam(defaultValue = "2000") int chunkSize,
       @RequestParam(defaultValue = "200") int chunkOverlap,
-      @RequestParam(defaultValue = "") String formAuthUsername,
-      @RequestParam(defaultValue = "") String formAuthPassword,
-      @RequestParam(defaultValue = "") String authLoginPageUrl,
-      @RequestParam(defaultValue = "false") boolean authDirectLogin,
+      @RequestParam(defaultValue = "") String includeUrlPatterns,
+      @RequestParam(defaultValue = "") String excludeUrlPatterns,
+      @RequestParam(defaultValue = "false") boolean allowSubdomains,
+      @RequestParam(defaultValue = "true") boolean discoverSitemaps,
+      @RequestParam(defaultValue = "ContextCrateBot/0.1") String userAgent,
+      @RequestParam(defaultValue = "") String contact,
+      @RequestParam(defaultValue = "true") boolean honorRobots,
+      @RequestParam(defaultValue = "1") int perHostConcurrency,
+      @RequestParam(defaultValue = "1000") long minimumDelayMillis,
+      @RequestParam(defaultValue = "15000") int timeoutMillis,
+      @RequestParam(defaultValue = "3") int maxAttempts,
+      @RequestParam(defaultValue = "1000") long initialBackoffMillis,
+      @RequestParam(defaultValue = "10000000") long maxBodyBytes,
+      @RequestParam(defaultValue = "true") boolean deduplicateContent,
+      @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+      @RequestParam(defaultValue = "30") int rawRetentionDays,
+      @RequestParam(defaultValue = "") String contentSelector,
+      @RequestParam(defaultValue = "script,style,nav,footer,aside") String removeSelectors,
+      @RequestParam(defaultValue = "default") String logicalIndex,
       @RequestParam(defaultValue = "NONE") CrawlConfiguration.AuthMethod authMethod,
-      @RequestParam(defaultValue = "") String oauthUsername,
-      @RequestParam(defaultValue = "") String oauthPassword,
+      @RequestParam(defaultValue = "") String loginPageUrl,
+      @RequestParam(defaultValue = "") String username,
+      @RequestParam(defaultValue = "") String password,
+      @RequestParam(defaultValue = "username") String usernameField,
+      @RequestParam(defaultValue = "password") String passwordField,
+      @RequestParam(defaultValue = "button[type='submit'], input[type='submit']") String submitSelector,
+      @RequestParam(defaultValue = "") String successUrlPattern,
+      @RequestParam(defaultValue = "") String successContentPattern,
+      @RequestParam(defaultValue = "false") boolean directLogin,
       @RequestParam(defaultValue = "") String authServerUrl,
-      @RequestParam(defaultValue = "") String authRealm,
-      @RequestParam(defaultValue = "") String authClientId,
-      @RequestParam(defaultValue = "") String authClientSecret) {
-    access.requireMutable(crateId,CrateMember.Role.EDITOR);
-    var job = jobs.requireJob(crateId,id);
-    var existing = codec.read(job.getConfigurationJson());
-    var c =
-        configurationFromForm(
-            existing,
-            seedUrl,
-            allowedHost,
-            maxDepth,
-            maxPages,
-            allowSubdomains,
-            userAgent,
-            contact,
-            honorRobots,
-            delayMillis,
-            timeoutMillis,
-            maxAttempts,
-            backoffMillis,
-            maxBodyMegabytes,
-            renderMode,
-            retentionDays,
-            contentSelector,
-            chunkSize,
-            chunkOverlap,
-            formAuthUsername,
-            formAuthPassword,
-            authLoginPageUrl,
-            authDirectLogin,
-            authMethod,
-            oauthUsername,
-            oauthPassword,
-            authServerUrl,
-            authRealm,
-            authClientId,
-            authClientSecret);
-    jobs.update(crateId, id, name, c, job.isEnabled());
-    return "redirect:/crates/"+crateId+"/jobs";
+      @RequestParam(defaultValue = "") String clientId,
+      @RequestParam(defaultValue = "") String clientSecret,
+      @RequestParam(defaultValue = "") String realm) {
+    access.requireMutable(crateId, CrateMember.Role.EDITOR);
+    Source source = sources.require(crateId, sourceId);
+    ingestion.create(crateId, sourceId, name, formConfiguration(source, seedUrl, allowedHost, ref,
+        gitUsername, gitToken,
+        includePatterns, excludePatterns, maxDepth, maxPages, maxFiles, maxFileBytes,
+        chunkSize, chunkOverlap, includeUrlPatterns, excludeUrlPatterns, allowSubdomains,
+        discoverSitemaps, userAgent, contact, honorRobots, perHostConcurrency,
+        minimumDelayMillis, timeoutMillis, maxAttempts, initialBackoffMillis, maxBodyBytes,
+        deduplicateContent, renderMode, rawRetentionDays, contentSelector, removeSelectors,
+        logicalIndex, authMethod, loginPageUrl, username, password, usernameField, passwordField,
+        submitSelector, successUrlPattern, successContentPattern, directLogin, authServerUrl,
+        clientId, clientSecret, realm));
+    return "redirect:/crates/" + crateId + "/sources/" + sourceId;
   }
 
-  @PostMapping("/jobs/{id}/start")
-  String start(@PathVariable UUID crateId,@PathVariable UUID id) {
-    access.requireMutable(crateId,CrateMember.Role.EDITOR);
-    jobs.start(crateId,id);
-    return "redirect:/crates/"+crateId;
+  @PostMapping("/sources/{sourceId}/ingestion-jobs/{jobId}/update")
+  String updateIngestionJob(@PathVariable UUID crateId, @PathVariable UUID sourceId,
+      @PathVariable UUID jobId, @RequestParam String name,
+      @RequestParam(defaultValue = "") String seedUrl,
+      @RequestParam(defaultValue = "") String allowedHost,
+      @RequestParam(defaultValue = "") String ref,
+      @RequestParam(defaultValue = "") String gitUsername,
+      @RequestParam(defaultValue = "") String gitToken,
+      @RequestParam(defaultValue = "**") String includePatterns,
+      @RequestParam(defaultValue = "") String excludePatterns,
+      @RequestParam(defaultValue = "3") int maxDepth,
+      @RequestParam(defaultValue = "1000") int maxPages,
+      @RequestParam(defaultValue = "10000") int maxFiles,
+      @RequestParam(defaultValue = "1048576") long maxFileBytes,
+      @RequestParam(defaultValue = "2000") int chunkSize,
+      @RequestParam(defaultValue = "200") int chunkOverlap,
+      @RequestParam(defaultValue = "") String includeUrlPatterns,
+      @RequestParam(defaultValue = "") String excludeUrlPatterns,
+      @RequestParam(defaultValue = "false") boolean allowSubdomains,
+      @RequestParam(defaultValue = "true") boolean discoverSitemaps,
+      @RequestParam(defaultValue = "ContextCrateBot/0.1") String userAgent,
+      @RequestParam(defaultValue = "") String contact,
+      @RequestParam(defaultValue = "true") boolean honorRobots,
+      @RequestParam(defaultValue = "1") int perHostConcurrency,
+      @RequestParam(defaultValue = "1000") long minimumDelayMillis,
+      @RequestParam(defaultValue = "15000") int timeoutMillis,
+      @RequestParam(defaultValue = "3") int maxAttempts,
+      @RequestParam(defaultValue = "1000") long initialBackoffMillis,
+      @RequestParam(defaultValue = "10000000") long maxBodyBytes,
+      @RequestParam(defaultValue = "true") boolean deduplicateContent,
+      @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+      @RequestParam(defaultValue = "30") int rawRetentionDays,
+      @RequestParam(defaultValue = "") String contentSelector,
+      @RequestParam(defaultValue = "script,style,nav,footer,aside") String removeSelectors,
+      @RequestParam(defaultValue = "default") String logicalIndex,
+      @RequestParam(defaultValue = "NONE") CrawlConfiguration.AuthMethod authMethod,
+      @RequestParam(defaultValue = "") String loginPageUrl,
+      @RequestParam(defaultValue = "") String username,
+      @RequestParam(defaultValue = "") String password,
+      @RequestParam(defaultValue = "username") String usernameField,
+      @RequestParam(defaultValue = "password") String passwordField,
+      @RequestParam(defaultValue = "button[type='submit'], input[type='submit']") String submitSelector,
+      @RequestParam(defaultValue = "") String successUrlPattern,
+      @RequestParam(defaultValue = "") String successContentPattern,
+      @RequestParam(defaultValue = "false") boolean directLogin,
+      @RequestParam(defaultValue = "") String authServerUrl,
+      @RequestParam(defaultValue = "") String clientId,
+      @RequestParam(defaultValue = "") String clientSecret,
+      @RequestParam(defaultValue = "") String realm) {
+    access.requireMutable(crateId, CrateMember.Role.EDITOR);
+    Source source = sources.require(crateId, sourceId);
+    IngestionJob job = ingestion.requireJob(crateId, sourceId, jobId);
+    ingestion.update(crateId, sourceId, jobId, name,
+        formConfiguration(source, seedUrl, allowedHost, ref, gitUsername, gitToken,
+            includePatterns, excludePatterns,
+            maxDepth, maxPages, maxFiles, maxFileBytes, chunkSize, chunkOverlap,
+            includeUrlPatterns, excludeUrlPatterns, allowSubdomains, discoverSitemaps, userAgent,
+            contact, honorRobots, perHostConcurrency, minimumDelayMillis, timeoutMillis,
+            maxAttempts, initialBackoffMillis, maxBodyBytes, deduplicateContent, renderMode,
+            rawRetentionDays, contentSelector, removeSelectors, logicalIndex, authMethod,
+            loginPageUrl, username, password, usernameField, passwordField, submitSelector,
+            successUrlPattern, successContentPattern, directLogin, authServerUrl, clientId,
+            clientSecret, realm),
+        job.isEnabled());
+    return "redirect:/crates/" + crateId + "/sources/" + sourceId;
+  }
+
+  @PostMapping("/sources/{sourceId}/ingestion-jobs/{jobId}/start")
+  String start(@PathVariable UUID crateId, @PathVariable UUID sourceId,
+      @PathVariable UUID jobId) {
+    access.requireMutable(crateId, CrateMember.Role.EDITOR);
+    ingestion.start(crateId, sourceId, jobId);
+    return "redirect:/crates/" + crateId;
   }
 
   @GetMapping("/runs/{id}")
   String runDetails(@PathVariable UUID crateId,@PathVariable UUID id, Model model) throws Exception {
-    var run = jobs.requireRun(crateId,id);
-    var job = jobs.requireJob(crateId,run.getJobId());
-    var config = codec.read(run.getConfigurationJson());
+    var run = ingestion.requireRun(crateId,id);
+    var job = ingestion.requireJob(crateId,run.getIngestionJobId());
+    var source = sources.require(crateId,run.getSourceId());
+    var config = ingestionCodec.read(run.getJobConfigurationJson(), source.getConnectorType());
 
     model.addAttribute("run", run);
     model.addAttribute("job", job);
+    model.addAttribute("source", source);
     model.addAttribute("config", config);
 
-    model.addAttribute("fetches", fetchRecords.findTop100ByRunIdOrderByFetchedAtDesc(id));
-    model.addAttribute("frontierTotal", frontierEntries.countByRunId(id));
+    model.addAttribute("fetches", acquisitionRecords.findTop100ByRunIdOrderByFetchedAtDesc(id));
+    model.addAttribute("frontierTotal", sourceItems.countByRunId(id));
     model.addAttribute(
         "frontierFetched",
-        frontierEntries.countByRunIdAndStatus(
+        sourceItems.countByRunIdAndStatus(
             id, tech.wenisch.contextcrate.domain.PipelineTypes.FrontierStatus.FETCHED));
     model.addAttribute(
         "frontierFailed",
-        frontierEntries.countByRunIdAndStatus(
+        sourceItems.countByRunIdAndStatus(
             id, tech.wenisch.contextcrate.domain.PipelineTypes.FrontierStatus.FAILED));
 
     return "run-details";
   }
 
-  private static CrawlConfiguration configurationFromForm(
-      CrawlConfiguration existing,
-      String seedUrl,
-      String allowedHost,
-      int maxDepth,
-      int maxPages,
-      boolean allowSubdomains,
-      String userAgent,
-      String contact,
-      boolean honorRobots,
-      long delayMillis,
-      int timeoutMillis,
-      int maxAttempts,
-      long backoffMillis,
-      long maxBodyMegabytes,
-      CrawlConfiguration.RenderMode renderMode,
-      int retentionDays,
-      String contentSelector,
-      int chunkSize,
-      int chunkOverlap,
-      String formAuthUsername,
-      String formAuthPassword,
-      String authLoginPageUrl,
-      boolean authDirectLogin,
-      CrawlConfiguration.AuthMethod authMethod,
-      String oauthUsername,
-      String oauthPassword,
-      String authServerUrl,
-      String authRealm,
-      String authClientId,
-      String authClientSecret) {
-    CrawlConfiguration defaults = new CrawlConfiguration(null, null, null, null, null);
-    CrawlConfiguration base = existing == null ? defaults : existing;
+  private static IngestionConfiguration formConfiguration(Source source, String seedUrl,
+      String allowedHost, String ref, String gitUsername, String gitToken,
+      String includePatterns, String excludePatterns,
+      int maxDepth, int maxPages, int maxFiles, long maxFileBytes, int chunkSize,
+      int chunkOverlap, String includeUrlPatterns, String excludeUrlPatterns,
+      boolean allowSubdomains, boolean discoverSitemaps, String userAgent, String contact,
+      boolean honorRobots, int perHostConcurrency, long minimumDelayMillis, int timeoutMillis,
+      int maxAttempts, long initialBackoffMillis, long maxBodyBytes, boolean deduplicateContent,
+      CrawlConfiguration.RenderMode renderMode, int rawRetentionDays, String contentSelector,
+      String removeSelectors, String logicalIndex, CrawlConfiguration.AuthMethod authMethod,
+      String loginPageUrl, String username, String password, String usernameField,
+      String passwordField, String submitSelector, String successUrlPattern,
+      String successContentPattern, boolean directLogin, String authServerUrl, String clientId,
+      String clientSecret, String realm) {
+    CrawlConfiguration.Output output = new CrawlConfiguration.Output(
+        rawRetentionDays, contentSelector, csv(removeSelectors), chunkSize, chunkOverlap, logicalIndex);
+    if (source.getConnectorType() == ConnectorType.GIT)
+      return IngestionConfiguration.git(new IngestionConfiguration.Git(ref, blankToNull(gitUsername),
+          blankToNull(gitToken), csv(includePatterns), csv(excludePatterns), maxFiles,
+          maxFileBytes, output));
+    CrawlConfiguration.Politeness politeness = new CrawlConfiguration.Politeness(userAgent,
+        contact, honorRobots, perHostConcurrency, minimumDelayMillis, timeoutMillis);
+    CrawlConfiguration.Reliability reliability = new CrawlConfiguration.Reliability(maxAttempts,
+        initialBackoffMillis, maxBodyBytes, deduplicateContent, renderMode);
+    CrawlConfiguration.LoginConfiguration login = new CrawlConfiguration.LoginConfiguration(
+        blankToNull(loginPageUrl), blankToNull(username), blankToNull(password), usernameField,
+        passwordField, submitSelector, new CrawlConfiguration.SuccessDetection(
+            blankToNull(successUrlPattern), blankToNull(successContentPattern)), directLogin,
+        blankToNull(authServerUrl), blankToNull(clientId), blankToNull(clientSecret),
+        blankToNull(realm), authMethod);
+    return IngestionConfiguration.web(new CrawlConfiguration(
+        new CrawlConfiguration.Scope(seedUrl, new java.util.LinkedHashSet<>(csv(allowedHost)),
+            csv(includeUrlPatterns), csv(excludeUrlPatterns), maxDepth, maxPages,
+            allowSubdomains, discoverSitemaps), politeness, reliability, output, login));
+  }
 
-    Set<String> allowedHosts =
-        existing == null
-            ? new LinkedHashSet<>()
-            : new LinkedHashSet<>(base.scope().allowedHosts());
-    allowedHosts.add(allowedHost);
-    var oldLogin = base.loginConfiguration();
-    var login =
-        switch (authMethod) {
-          case NONE -> CrawlConfiguration.LoginConfiguration.defaults();
-          case FORM ->
-              new CrawlConfiguration.LoginConfiguration(
-                  blankToNull(authLoginPageUrl),
-                  blankToNull(formAuthUsername),
-                  blankToNull(formAuthPassword),
-                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
-                      ? oldLogin.usernameField()
-                      : "username",
-                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
-                      ? oldLogin.passwordField()
-                      : "password",
-                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
-                      ? oldLogin.submitSelector()
-                      : "button[type='submit'], input[type='submit']",
-                  oldLogin.authMethod() == CrawlConfiguration.AuthMethod.FORM
-                      ? oldLogin.successDetection()
-                      : new CrawlConfiguration.SuccessDetection(null, null),
-                  authDirectLogin,
-                  null,
-                  null,
-                  null,
-                  null,
-                  authMethod);
-          case OAUTH2 ->
-              new CrawlConfiguration.LoginConfiguration(
-                  null,
-                  blankToNull(oauthUsername),
-                  blankToNull(oauthPassword),
-                  "username",
-                  "password",
-                  "button[type='submit'], input[type='submit']",
-                  new CrawlConfiguration.SuccessDetection(null, null),
-                  false,
-                  blankToNull(authServerUrl),
-                  blankToNull(authClientId),
-                  blankToNull(authClientSecret),
-                  blankToNull(authRealm),
-                  authMethod);
-        };
-
-    return new CrawlConfiguration(
-        new CrawlConfiguration.Scope(
-            seedUrl,
-            allowedHosts,
-            base.scope().includePatterns(),
-            base.scope().excludePatterns(),
-            maxDepth,
-            maxPages,
-            allowSubdomains,
-            base.scope().discoverSitemaps()),
-        new CrawlConfiguration.Politeness(
-            userAgent,
-            contact,
-            honorRobots,
-            base.politeness().perHostConcurrency(),
-            delayMillis,
-            timeoutMillis),
-        new CrawlConfiguration.Reliability(
-            maxAttempts,
-            backoffMillis,
-            maxBodyMegabytes * 1_000_000,
-            base.reliability().deduplicateContent(),
-            renderMode),
-        new CrawlConfiguration.Output(
-            retentionDays,
-            contentSelector,
-            base.output().removeSelectors(),
-            chunkSize,
-            chunkOverlap,
-            base.output().logicalIndex()),
-        login);
+  private static List<String> csv(String value) {
+    return value == null || value.isBlank() ? List.of()
+        : Arrays.stream(value.split(",")).map(String::trim).filter(v -> !v.isBlank()).toList();
   }
 
   private static String blankToNull(String value) {
@@ -416,14 +403,22 @@ public class UiController {
   @GetMapping("/documents")
   String docs(@PathVariable UUID crateId,Model model) {
     model.addAttribute("documents", documents.findTop100ByCrateIdOrderByCreatedAtDesc(crateId));
+    model.addAttribute("unindexedCount", documents.findByCrateIdAndIndexedFalse(crateId).size());
     return "documents";
+  }
+
+  @PostMapping("/documents/retry-unindexed")
+  String retryUnindexedDocuments(@PathVariable UUID crateId) {
+    access.requireMutable(crateId, CrateMember.Role.EDITOR);
+    indexRecovery.enqueueMissing(crateId);
+    return "redirect:/crates/" + crateId + "/documents";
   }
 
   @GetMapping("/extractions")
   String extractions(@PathVariable UUID crateId,Model model) {
     model.addAttribute("rules", extraction.rules(crateId));
     model.addAttribute("types", ExtractionType.values());
-    model.addAttribute("runs", jobs.runs(crateId));
+    model.addAttribute("runs", ingestion.runs(crateId));
     model.addAttribute(
         "results", extraction.search(crateId,null, null, null, null, null, PageRequest.of(0, 50)));
     model.addAttribute("extraction", extraction);
@@ -450,7 +445,7 @@ public class UiController {
 
   @PostMapping("/extractions/runs/{id}/rebuild")
   String rebuildRunExtractions(@PathVariable UUID crateId,@PathVariable UUID id) {
-    access.requireMutable(crateId,CrateMember.Role.EDITOR);jobs.requireRun(crateId,id);
+    access.requireMutable(crateId,CrateMember.Role.EDITOR);ingestion.requireRun(crateId,id);
     extraction.rebuildRun(crateId,id);
     return "redirect:/crates/"+crateId+"/extractions";
   }

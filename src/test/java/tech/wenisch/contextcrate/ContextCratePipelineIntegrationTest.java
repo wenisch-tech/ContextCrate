@@ -13,10 +13,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import tech.wenisch.contextcrate.domain.CrateIds;
 import tech.wenisch.contextcrate.domain.CrawlConfiguration;
+import tech.wenisch.contextcrate.domain.ConnectorType;
+import tech.wenisch.contextcrate.domain.IngestionConfiguration;
+import tech.wenisch.contextcrate.domain.SourceConfiguration;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 import tech.wenisch.contextcrate.index.SearchIndex;
 import tech.wenisch.contextcrate.repository.NormalizedDocumentRepository;
-import tech.wenisch.contextcrate.service.JobService;
+import tech.wenisch.contextcrate.service.IngestionService;
+import tech.wenisch.contextcrate.service.SourceService;
 
 @SpringBootTest(
     properties = {
@@ -28,7 +32,8 @@ import tech.wenisch.contextcrate.service.JobService;
     })
 @ActiveProfiles("test")
 class ContextCratePipelineIntegrationTest {
-  @Autowired JobService jobs;
+  @Autowired SourceService sources;
+  @Autowired IngestionService ingestion;
   @Autowired NormalizedDocumentRepository documents;
   @Autowired SearchIndex index;
   private HttpServer server;
@@ -79,8 +84,11 @@ class ContextCratePipelineIntegrationTest {
                 2, 10, 1_000_000, true, CrawlConfiguration.RenderMode.HTTP_ONLY),
             new CrawlConfiguration.Output(1, "main", List.of("script", "style"), 500, 50, "test"),
             CrawlConfiguration.LoginConfiguration.defaults());
-    var job = jobs.create(CrateIds.LEGACY, "Fixture", config);
-    jobs.start(CrateIds.LEGACY, job.getId());
+    var source = sources.create(CrateIds.LEGACY, "Fixture website", null, ConnectorType.HTTPS,
+        SourceConfiguration.https(seed));
+    var job = ingestion.create(CrateIds.LEGACY, source.getId(), "Fixture",
+        IngestionConfiguration.web(config));
+    ingestion.start(CrateIds.LEGACY, source.getId(), job.getId());
     long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
     while (System.nanoTime() < deadline) {
       var found = documents.findAll();

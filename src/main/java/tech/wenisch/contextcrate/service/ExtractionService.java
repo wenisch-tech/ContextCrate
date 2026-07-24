@@ -123,7 +123,7 @@ public class ExtractionService {
         PipelineMessage.create(
             document.getCrateId(),
             WorkStage.EXTRACT,
-            JobService.payload(document.getCrateId(), document.getRunId(), document.getId()),
+            IngestionService.payload(document.getCrateId(), document.getRunId(), document.getId()),
             document.getRunId(),
             document.getCrateId() + ":" + key,
             30));

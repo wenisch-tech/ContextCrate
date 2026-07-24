@@ -20,7 +20,8 @@ public final class PipelineTypes {
   }
 
   public enum WorkStage {
-    FETCH,
+    WEB_FETCH,
+    GIT_FETCH,
     BROWSER_FETCH,
     PARSE,
     DISCOVERY,

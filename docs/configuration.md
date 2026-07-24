@@ -12,7 +12,12 @@
 
 Local queue and file-backed H2 require `role=all`. Lucene requires a singleton indexer and a local or correctly shared index path. Filesystem artifacts need a shared volume when accessed by multiple processes.
 
-## Crawl configuration
+## Sources and ingestion jobs
+
+A source owns its endpoint and credentials. Multiple ingestion jobs can reuse the source with
+different scopes, refs, path filters, limits, and normalization settings.
+
+### Website jobs
 
 - **Scope:** seed, allowed hosts, subdomains, glob includes/excludes, maximum depth/pages, and sitemap intent.
 - **Politeness:** identifying user agent/contact, robots enforcement, per-host concurrency, delay, and request timeout.
@@ -23,9 +28,23 @@ Robots enforcement is on by default. Private, loopback, link-local, metadata, an
 
 ### Form authentication and SSO
 
-For a site protected by a separate identity provider, such as a website behind Keycloak, select **Form-based Authentication** and set the **Authentication entry URL** to a protected page. Harvex follows the redirect to the identity provider, submits each configured credential step together with hidden form state, follows the callback, and keeps the resulting cookies for the crawl run. It supports both a single username/password form and Keycloak's identifier-first username-then-password sequence. A direct login-form URL remains supported. Authentication logs record the redacted endpoint, detected credential step, HTTP status, and redirect path; they never include passwords, OIDC state, authorization codes, or session codes.
+HTTPS authentication is configured on the ingestion job, so different jobs from one source can use different access paths. Select **FORM** for a login page, or **Keycloak / OAuth2** for a Keycloak server, realm, and client. ContextCrate follows the identity-provider flow, submits configured credential steps with hidden form state, follows the callback, and keeps cookies only for that ingestion run. Authentication logs record the redacted endpoint, detected credential step, HTTP status, and redirect path; they never include passwords, OIDC state, authorization codes, or session codes.
 
 The supported standard flows do not include MFA, CAPTCHA, consent pages, or required-action workflows. Authentication redirects may leave the configured crawl hosts, but every destination is still checked by the crawler's private-network and SSRF protections; identity-provider pages are not added to the crawl frontier.
+
+### Git jobs
+
+Git sources accept repository URLs. Each Git ingestion job holds optional username/token credentials,
+the remote default branch or a branch, tag, or reachable commit, plus include/exclude globs. The
+defaults are 10,000 files, 1 MiB per file, and all eligible repository paths.
+
+Only valid UTF-8 `.md`, `.markdown`, and `.txt` files are normalized. SSH, filesystem remotes,
+symlinks, submodules, Git LFS objects, repository history, webhooks, scheduling, and incremental
+synchronization are not supported yet. There is no repository-wide transfer quota. Each run
+acquires a complete selected-ref snapshot.
+
+Git tokens are removed from API responses, logs, audit messages, and exports, but they are stored
+as plaintext in the ingestion-job configuration JSON. Protect database access and backups accordingly.
 
 ## Environment examples
 

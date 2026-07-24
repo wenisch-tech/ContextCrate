@@ -14,12 +14,14 @@ public class CrateOperationsApiController {
   private final CrateAccessService access;private final NormalizedDocumentRepository documents;
   private final DocumentChunkRepository chunks;private final AuditLogRepository audits;
   private final SearchIndex index;private final IndexRebuildService rebuild;
+  private final DocumentIndexRecoveryService indexRecovery;
   private final CrateIndexGenerationRepository generations;
   public CrateOperationsApiController(CrateAccessService access,NormalizedDocumentRepository documents,
       DocumentChunkRepository chunks,AuditLogRepository audits,SearchIndex index,
-      IndexRebuildService rebuild,CrateIndexGenerationRepository generations){
+      IndexRebuildService rebuild,DocumentIndexRecoveryService indexRecovery,
+      CrateIndexGenerationRepository generations){
     this.access=access;this.documents=documents;this.chunks=chunks;this.audits=audits;
-    this.index=index;this.rebuild=rebuild;this.generations=generations;
+    this.index=index;this.rebuild=rebuild;this.indexRecovery=indexRecovery;this.generations=generations;
   }
   @GetMapping("/documents") public List<NormalizedDocument> documents(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.VIEWER);
@@ -40,6 +42,11 @@ public class CrateOperationsApiController {
   @PostMapping("/index/rebuild") @ResponseStatus(HttpStatus.ACCEPTED)
   public void rebuild(@PathVariable UUID crateId){
     access.requireMutable(crateId,CrateMember.Role.EDITOR);rebuild.rebuildAsync(crateId);
+  }
+  @PostMapping("/index/retry-unindexed") @ResponseStatus(HttpStatus.ACCEPTED)
+  public Map<String,Integer> retryUnindexed(@PathVariable UUID crateId){
+    access.requireMutable(crateId,CrateMember.Role.EDITOR);
+    return Map.of("queued",indexRecovery.enqueueMissing(crateId));
   }
   @GetMapping("/audit") public List<AuditLog> audit(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.OWNER);return audits.findTop100ByCrateIdOrderByCreatedAtDesc(crateId);

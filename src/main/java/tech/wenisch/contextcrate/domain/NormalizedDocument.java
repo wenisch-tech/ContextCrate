@@ -7,7 +7,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "normalized_document",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"run_id", "canonical_url"}))
+    uniqueConstraints = @UniqueConstraint(columnNames = {"run_id", "source_uri"}))
 public class NormalizedDocument {
   @Id private UUID id;
 
@@ -17,11 +17,11 @@ public class NormalizedDocument {
   @Column(name = "run_id", nullable = false)
   private UUID runId;
 
-  @Column(name = "fetch_id", nullable = false)
-  private UUID fetchId;
+  @Column(name = "acquisition_id", nullable = false)
+  private UUID acquisitionId;
 
-  @Column(name = "canonical_url", nullable = false, length = 4096)
-  private String canonicalUrl;
+  @Column(name = "source_uri", nullable = false, length = 4096)
+  private String sourceUri;
 
   @Column(length = 1000)
   private String title;
@@ -54,8 +54,8 @@ public class NormalizedDocument {
   public NormalizedDocument(
       UUID id,
       UUID runId,
-      UUID fetchId,
-      String canonicalUrl,
+      UUID acquisitionId,
+      String sourceUri,
       String title,
       String language,
       String description,
@@ -66,8 +66,8 @@ public class NormalizedDocument {
     this.id = id;
     this.crateId = CrateIds.LEGACY;
     this.runId = runId;
-    this.fetchId = fetchId;
-    this.canonicalUrl = canonicalUrl;
+    this.acquisitionId = acquisitionId;
+    this.sourceUri = sourceUri;
     this.title = title;
     this.language = language;
     this.description = description;
@@ -95,12 +95,12 @@ public class NormalizedDocument {
     return runId;
   }
 
-  public UUID getFetchId() {
-    return fetchId;
+  public UUID getAcquisitionId() {
+    return acquisitionId;
   }
 
-  public String getCanonicalUrl() {
-    return canonicalUrl;
+  public String getSourceUri() {
+    return sourceUri;
   }
 
   public String getTitle() {

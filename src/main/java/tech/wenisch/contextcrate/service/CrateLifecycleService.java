@@ -9,18 +9,20 @@ import tech.wenisch.contextcrate.repository.*;
 @Service
 public class CrateLifecycleService {
   private final CrateRepository crates;
-  private final CrawlJobRepository jobs;
-  private final CrawlRunRepository runs;
+  private final SourceRepository sources;
+  private final IngestionJobRepository jobs;
+  private final IngestionRunRepository runs;
   private final PipelineWorkItemRepository work;
   private final CrateAccessService access;
   private final AuditLogRepository audits;
   private final CratePurgeWorker purgeWorker;
 
   public CrateLifecycleService(
-      CrateRepository crates, CrawlJobRepository jobs, CrawlRunRepository runs,
+      CrateRepository crates, SourceRepository sources, IngestionJobRepository jobs,
+      IngestionRunRepository runs,
       PipelineWorkItemRepository work, CrateAccessService access, AuditLogRepository audits,
       CratePurgeWorker purgeWorker) {
-    this.crates=crates;this.jobs=jobs;this.runs=runs;this.work=work;this.access=access;
+    this.crates=crates;this.sources=sources;this.jobs=jobs;this.runs=runs;this.work=work;this.access=access;
     this.audits=audits;this.purgeWorker=purgeWorker;
   }
 
@@ -28,6 +30,9 @@ public class CrateLifecycleService {
   public Crate archive(UUID crateId) {
     access.require(crateId, CrateMember.Role.OWNER);
     Crate crate=crates.findById(crateId).orElseThrow();crate.archiveRequested();
+    for(var source:sources.findByCrateIdOrderByCreatedAtDesc(crateId)){
+      source.update(source.getName(),source.getDescription(),source.getConfigurationJson(),false);sources.save(source);
+    }
     for(var job:jobs.findByCrateIdOrderByCreatedAtDesc(crateId)){
       job.update(job.getName(),job.getConfigurationJson(),false);jobs.save(job);
     }

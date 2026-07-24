@@ -1,6 +1,8 @@
 # Crates
 
-A **crate** is ContextCrate's mandatory isolation and collaboration boundary. It contains crawl jobs, runs, artifacts, normalized documents, chunks, extraction rules and results, retrieval settings, provider credentials, and vector-index generations.
+A **crate** is ContextCrate's mandatory isolation and collaboration boundary. It contains sources,
+ingestion jobs and runs, artifacts, normalized documents, chunks, extraction rules and results,
+retrieval settings, provider credentials, and vector-index generations.
 
 The term *namespace* is reserved for the physical Lucene directory or OpenSearch index owned by a crate. It is never used as a synonym for a crate in the UI or API.
 
@@ -10,7 +12,8 @@ Every persisted content record carries `crate_id`. Queue envelopes and payloads 
 
 ```mermaid
 flowchart TB
-  C[Crate] --> J[Crawl jobs and runs]
+  C[Crate] --> S[Sources]
+  S --> J[Ingestion jobs and runs]
   C --> E[Extraction rules]
   C --> P[Provider and RAG settings]
   C --> A[Artifact prefix]
@@ -38,7 +41,7 @@ Users without a membership see crate onboarding when creation is allowed. Otherw
 stateDiagram-v2
   [*] --> ACTIVE
   ACTIVE --> ARCHIVING: owner archives
-  ARCHIVING --> ARCHIVED: jobs stopped and work cancelled
+  ARCHIVING --> ARCHIVED: sources/jobs stopped and work cancelled
   ARCHIVED --> ACTIVE: owner restores
   ARCHIVED --> PURGING: confirmed purge
   PURGING --> [*]: all stores cleaned
@@ -56,6 +59,9 @@ Changing the embedding configuration creates a background generation. The old ge
 
 ## Portable crates
 
-Owners can export a crate with or without raw artifacts. Bundles contain a schema-versioned manifest and SHA-256 checksums. Provider keys, crawler passwords, users, memberships, API keys, elevations, and audit logs are excluded.
+Owners can export a crate with or without raw artifacts. Bundles contain a schema-versioned
+manifest and SHA-256 checksums. Provider keys, source credentials, users, memberships, API keys,
+elevations, and audit logs are excluded.
 
-Import always creates a new crate and remaps internal UUIDs. Missing credentials must be entered by the new owner, and imported documents are queued for indexing into a new namespace.
+Import always creates a new crate and remaps internal UUIDs. Missing source credentials must be
+entered by the new owner, and imported documents are queued for indexing into a new namespace.
