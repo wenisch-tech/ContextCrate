@@ -20,7 +20,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tech.wenisch.harvex.crawl.CrawlerAuthenticationService.CrawlerResponse;
@@ -41,6 +44,8 @@ import tech.wenisch.harvex.storage.ArtifactStore;
 
 @Service
 public class HttpCrawler {
+  private static final int MAX_LOGIN_STEPS = 3;
+  private static final Logger log = LoggerFactory.getLogger(HttpCrawler.class);
   private final FrontierEntryRepository frontier;
   private final CrawlRunRepository runs;
   private final ConfigurationCodec codec;
@@ -175,16 +180,27 @@ public class HttpCrawler {
         }
 
         BrowserContext context = browser.newContext(options);
+        AtomicReference<Exception> blockedNavigation = guardNavigations(context);
         Page page = context.newPage();
-        com.microsoft.playwright.Response response = navigate(page, entry.getUrl(), config);
-        if (config.loginConfiguration().authMethod() == AuthMethod.FORM
-            && (stored == null
-                || loginUrl(page.url(), config.loginConfiguration().loginPageUrl()))) {
-          performBrowserLogin(page, config);
-          browserStorage.put(run.getId(), context.storageState());
-          response = navigate(page, entry.getUrl(), config);
-          if (loginUrl(page.url(), config.loginConfiguration().loginPageUrl())) {
-            throw new IllegalStateException("Browser authentication did not leave the login page");
+        com.microsoft.playwright.Response response =
+            navigate(page, entry.getUrl(), config, blockedNavigation);
+        if (config.loginConfiguration().authMethod() == AuthMethod.FORM) {
+          var login = config.loginConfiguration();
+          if (stored == null || hasAuthenticationForm(page, login)) {
+            log.info(
+                "Browser form authentication is required for {} (stored session present={})",
+                diagnosticUrl(entry.getUrl()),
+                stored != null);
+            String authenticationUrl =
+                performBrowserLogin(page, config, blockedNavigation);
+            response = navigate(page, entry.getUrl(), config, blockedNavigation);
+            if (hasAuthenticationForm(page, login)
+                || sameEndpoint(page.url(), authenticationUrl)) {
+              throw new IllegalStateException(
+                  "Browser authentication returned to the login page");
+            }
+            browserStorage.put(run.getId(), context.storageState());
+            log.info("Browser form authentication completed for {}", diagnosticUrl(entry.getUrl()));
           }
         }
         if (config.loginConfiguration().authMethod() == AuthMethod.OAUTH2
@@ -199,8 +215,9 @@ public class HttpCrawler {
                           "Authorization",
                           "Bearer " + authentication.bearerToken(run.getId(), config)));
           context = browser.newContext(options);
+          blockedNavigation = guardNavigations(context);
           page = context.newPage();
-          response = navigate(page, entry.getUrl(), config);
+          response = navigate(page, entry.getUrl(), config, blockedNavigation);
         }
 
         byte[] bytes = page.content().getBytes(StandardCharsets.UTF_8);
@@ -245,27 +262,150 @@ public class HttpCrawler {
     }
   }
 
-  private static com.microsoft.playwright.Response navigate(
-      Page page, String url, CrawlConfiguration config) {
-    return page.navigate(
-        url,
-        new Page.NavigateOptions()
-            .setTimeout((double) config.politeness().timeoutMillis())
-            .setWaitUntil(WaitUntilState.NETWORKIDLE));
+  private com.microsoft.playwright.Response navigate(
+      Page page,
+      String url,
+      CrawlConfiguration config,
+      AtomicReference<Exception> blockedNavigation) {
+    try {
+      com.microsoft.playwright.Response response =
+          page.navigate(
+              url,
+              new Page.NavigateOptions()
+                  .setTimeout((double) config.politeness().timeoutMillis())
+                  .setWaitUntil(WaitUntilState.NETWORKIDLE));
+      throwIfNavigationBlocked(blockedNavigation);
+      return response;
+    } catch (RuntimeException exception) {
+      throwIfNavigationBlocked(blockedNavigation);
+      throw exception;
+    }
   }
 
-  private void performBrowserLogin(Page page, CrawlConfiguration config) throws Exception {
+  private String performBrowserLogin(
+      Page page,
+      CrawlConfiguration config,
+      AtomicReference<Exception> blockedNavigation)
+      throws Exception {
     var login = config.loginConfiguration();
     urls.assertSafe(login.loginPageUrl());
-    if (!loginUrl(page.url(), login.loginPageUrl())) navigate(page, login.loginPageUrl(), config);
-    page.fill(nameSelector(login.usernameField()), login.username());
-    page.fill(nameSelector(login.passwordField()), login.password());
-    page.click(login.submitSelector());
-    page.waitForLoadState(
-        LoadState.NETWORKIDLE,
-        new Page.WaitForLoadStateOptions()
-            .setTimeout((double) config.politeness().timeoutMillis()));
+    if (!hasAuthenticationForm(page, login)) {
+      navigate(page, login.loginPageUrl(), config, blockedNavigation);
+    }
+    if (!hasAuthenticationForm(page, login)) {
+      throw new IllegalStateException("No compatible browser login form was found");
+    }
+    String authenticationUrl = page.url();
+    log.info("Browser authentication entry resolved to {}", diagnosticUrl(authenticationUrl));
+    boolean submittedUsername = false;
+    boolean submittedPassword = false;
+    for (int step = 0; step < MAX_LOGIN_STEPS; step++) {
+      boolean hasUsername = hasActiveField(page, login.usernameField());
+      boolean hasPassword = hasActiveField(page, login.passwordField());
+      String stepDescription = credentialStepDescription(hasUsername, hasPassword);
+      log.info(
+          "Browser authentication step {}/{} at {}: {} field(s) detected",
+          step + 1,
+          MAX_LOGIN_STEPS,
+          diagnosticUrl(page.url()),
+          stepDescription);
+      if ((hasUsername && submittedUsername && !hasPassword)
+          || (hasPassword && submittedPassword)) {
+        throw new IllegalStateException(
+            "Browser login form was still present after submitting "
+                + stepDescription
+                + " at "
+                + diagnosticUrl(page.url()));
+      }
+      if (hasUsername && !submittedUsername) {
+        page.fill(nameSelector(login.usernameField()), login.username());
+        submittedUsername = true;
+      }
+      if (hasPassword) {
+        page.fill(nameSelector(login.passwordField()), login.password());
+        submittedPassword = true;
+      }
+      try {
+        log.info("Submitting browser {} form at {}", stepDescription, diagnosticUrl(page.url()));
+        page.click(submitSelector(page, login));
+        page.waitForLoadState(
+            LoadState.NETWORKIDLE,
+            new Page.WaitForLoadStateOptions()
+                .setTimeout((double) config.politeness().timeoutMillis()));
+        throwIfNavigationBlocked(blockedNavigation);
+      } catch (RuntimeException exception) {
+        throwIfNavigationBlocked(blockedNavigation);
+        throw exception;
+      }
+      String rejection = browserLoginRejection(page);
+      if (rejection != null) {
+        log.warn(
+            "Browser authentication was rejected after submitting {} at {}: {}",
+            stepDescription,
+            diagnosticUrl(page.url()),
+            rejection);
+        throw new IllegalStateException(
+            "Browser login was rejected after submitting " + stepDescription + ": " + rejection);
+      }
+      log.info(
+          "Browser authentication step {}/{} completed at {}; next credential form present={}",
+          step + 1,
+          MAX_LOGIN_STEPS,
+          diagnosticUrl(page.url()),
+          hasAuthenticationForm(page, login));
+      if (!hasAuthenticationForm(page, login)) {
+        verifyBrowserLogin(page, login, authenticationUrl);
+        return authenticationUrl;
+      }
+    }
+    throw new IllegalStateException("Browser login did not complete within " + MAX_LOGIN_STEPS + " steps");
+  }
 
+  private AtomicReference<Exception> guardNavigations(BrowserContext context) {
+    AtomicReference<Exception> blocked = new AtomicReference<>();
+    context.route(
+        "**/*",
+        route -> {
+          if (!route.request().isNavigationRequest()) {
+            route.resume();
+            return;
+          }
+          try {
+            urls.assertSafe(route.request().url());
+            route.resume();
+          } catch (Exception exception) {
+            blocked.compareAndSet(null, exception);
+            route.abort();
+          }
+        });
+    return blocked;
+  }
+
+  private static void throwIfNavigationBlocked(AtomicReference<Exception> blocked) {
+    Exception cause = blocked.getAndSet(null);
+    if (cause != null) {
+      throw new SecurityException(
+          "Browser navigation was blocked by the URL safety policy: " + cause.getMessage(),
+          cause);
+    }
+  }
+
+  private static boolean hasAuthenticationForm(
+      Page page, CrawlConfiguration.LoginConfiguration login) {
+    return hasActiveField(page, login.usernameField()) || hasActiveField(page, login.passwordField());
+  }
+
+  private static boolean hasActiveField(Page page, String name) {
+    return page
+            .locator(nameSelector(name) + ":not([type='hidden']):not([disabled]):not([readonly])")
+            .count()
+        > 0;
+  }
+
+  private static void verifyBrowserLogin(
+      Page page, CrawlConfiguration.LoginConfiguration login, String authenticationUrl) {
+    String rejection = browserLoginRejection(page);
+    if (rejection != null) throw new IllegalStateException("Browser login was rejected: " + rejection);
     var success = login.successDetection();
     if (success.urlPattern() != null && !success.urlPattern().isBlank()) {
       if (!Pattern.compile(success.urlPattern()).matcher(page.url()).find()) {
@@ -277,27 +417,77 @@ public class HttpCrawler {
           .find()) {
         throw new IllegalStateException("Browser login success content did not match");
       }
-    } else if (loginUrl(page.url(), login.loginPageUrl())
-        || page.locator(nameSelector(login.passwordField())).count() > 0) {
+    } else if (sameEndpoint(page.url(), authenticationUrl)
+        || hasAuthenticationForm(page, login)) {
       throw new IllegalStateException("Browser login form remained visible");
     }
+  }
+
+  private static String submitSelector(
+      Page page, CrawlConfiguration.LoginConfiguration login) {
+    if (page.locator(login.submitSelector()).count() > 0) return login.submitSelector();
+    return "button[type='submit'], input[type='submit']";
   }
 
   private static String nameSelector(String name) {
     return "[name=\"" + name.replace("\\", "\\\\").replace("\"", "\\\"") + "\"]";
   }
 
-  private static boolean loginUrl(String actual, String configured) {
-    if (actual == null || configured == null) return false;
+  private static String browserLoginRejection(Page page) {
+    for (String selector :
+        new String[] {
+          "#kc-error-message", ".kc-feedback-text", ".alert-error",
+          ".pf-c-alert.pf-m-danger"
+        }) {
+      var locator = page.locator(selector);
+      if (locator.count() > 0) {
+        String text = locator.first().textContent();
+        if (text != null && !text.isBlank()) return concise(text);
+      }
+    }
+    String pageId = page.locator("body").getAttribute("data-page-id");
+    return "login-error".equalsIgnoreCase(pageId)
+        ? "identity provider returned its login error page"
+        : null;
+  }
+
+  private static String credentialStepDescription(boolean hasUsername, boolean hasPassword) {
+    if (hasUsername && hasPassword) return "username and password";
+    return hasUsername ? "username" : "password";
+  }
+
+  private static String concise(String text) {
+    String normalized = text.replaceAll("\\s+", " ").trim();
+    return normalized.length() <= 300 ? normalized : normalized.substring(0, 297) + "...";
+  }
+
+  /** Do not put OIDC state, authorization codes, or session codes into application logs. */
+  private static String diagnosticUrl(String raw) {
+    try {
+      java.net.URI uri = java.net.URI.create(raw);
+      return uri.getScheme() + "://" + uri.getAuthority() + normalize(uri.getPath());
+    } catch (RuntimeException exception) {
+      return "[unparseable URL]";
+    }
+  }
+
+  private static boolean sameEndpoint(String actual, String expected) {
+    if (actual == null || expected == null) return false;
     try {
       java.net.URI left = java.net.URI.create(actual);
-      java.net.URI right = java.net.URI.create(configured);
+      java.net.URI right = java.net.URI.create(expected);
       return left.getScheme().equalsIgnoreCase(right.getScheme())
           && left.getHost().equalsIgnoreCase(right.getHost())
+          && effectivePort(left) == effectivePort(right)
           && normalize(left.getPath()).equals(normalize(right.getPath()));
     } catch (RuntimeException e) {
       return false;
     }
+  }
+
+  private static int effectivePort(java.net.URI uri) {
+    if (uri.getPort() >= 0) return uri.getPort();
+    return uri.getScheme().equalsIgnoreCase("https") ? 443 : 80;
   }
 
   private static String normalize(String path) {

@@ -58,6 +58,35 @@ class JobServiceAuthenticationTest {
     assertThat(saved.loginConfiguration().password()).isNull();
   }
 
+  @Test
+  void blankOauthPasswordRetainsPasswordGrantSecretWithoutUsingClientSecret() {
+    job.update(
+        "job",
+        codec.write(configuration(oauthPassword("stored-password"))),
+        false);
+
+    service.update(id, "renamed", configuration(oauthPassword(null)), false);
+
+    CrawlConfiguration saved = codec.read(job.getConfigurationJson());
+    assertThat(saved.loginConfiguration().username()).isEqualTo("alice");
+    assertThat(saved.loginConfiguration().password()).isEqualTo("stored-password");
+    assertThat(saved.loginConfiguration().clientSecret()).isNull();
+  }
+
+  @Test
+  void blankOauthClientSecretRetainsServiceAccountSecret() {
+    job.update(
+        "job",
+        codec.write(configuration(oauthClient("stored-client-secret"))),
+        false);
+
+    service.update(id, "renamed", configuration(oauthClient(null)), false);
+
+    CrawlConfiguration saved = codec.read(job.getConfigurationJson());
+    assertThat(saved.loginConfiguration().username()).isNull();
+    assertThat(saved.loginConfiguration().clientSecret()).isEqualTo("stored-client-secret");
+  }
+
   private static CrawlConfiguration configuration(
       CrawlConfiguration.LoginConfiguration login) {
     return new CrawlConfiguration(null, null, null, null, login);
@@ -78,5 +107,39 @@ class JobServiceAuthenticationTest {
         null,
         null,
         CrawlConfiguration.AuthMethod.FORM);
+  }
+
+  private static CrawlConfiguration.LoginConfiguration oauthPassword(String password) {
+    return new CrawlConfiguration.LoginConfiguration(
+        null,
+        "alice",
+        password,
+        "username",
+        "password",
+        "button[type='submit']",
+        null,
+        false,
+        "https://keycloak.example.com",
+        "crawler",
+        null,
+        "realm",
+        CrawlConfiguration.AuthMethod.OAUTH2);
+  }
+
+  private static CrawlConfiguration.LoginConfiguration oauthClient(String clientSecret) {
+    return new CrawlConfiguration.LoginConfiguration(
+        null,
+        null,
+        null,
+        "username",
+        "password",
+        "button[type='submit']",
+        null,
+        false,
+        "https://keycloak.example.com",
+        "crawler",
+        clientSecret,
+        "realm",
+        CrawlConfiguration.AuthMethod.OAUTH2);
   }
 }

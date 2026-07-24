@@ -21,6 +21,12 @@ Local queue and file-backed H2 require `role=all`. Lucene requires a singleton i
 
 Robots enforcement is on by default. Private, loopback, link-local, metadata, and multicast destinations are blocked. `harvex.crawler.allow-private-networks=true` exists for controlled intranet deployments and tests; use it only with trusted job administrators.
 
+### Form authentication and SSO
+
+For a site protected by a separate identity provider, such as a website behind Keycloak, select **Form-based Authentication** and set the **Authentication entry URL** to a protected page. Harvex follows the redirect to the identity provider, submits each configured credential step together with hidden form state, follows the callback, and keeps the resulting cookies for the crawl run. It supports both a single username/password form and Keycloak's identifier-first username-then-password sequence. A direct login-form URL remains supported. Authentication logs record the redacted endpoint, detected credential step, HTTP status, and redirect path; they never include passwords, OIDC state, authorization codes, or session codes.
+
+The supported standard flows do not include MFA, CAPTCHA, consent pages, or required-action workflows. Authentication redirects may leave the configured crawl hosts, but every destination is still checked by the crawler's private-network and SSRF protections; identity-provider pages are not added to the crawl frontier.
+
 ## Environment examples
 
 Spring properties map to uppercase underscore environment variables. Distributed connection variables are shown in `compose.distributed.yml`. AWS credentials use the standard AWS SDK provider chain.

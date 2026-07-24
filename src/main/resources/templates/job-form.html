@@ -14,26 +14,27 @@
       <input type="radio" class="form-check-input" id="authMethodForm" name="authMethod" value="FORM">
       <label class="form-check-label" for="authMethodForm">Form-based Authentication</label>
     </div>
-    <div class="form-check">
-      <input type="radio" class="form-check-input" id="authMethodOAuth2" name="authMethod" value="OAUTH2">
-      <label class="form-check-label" for="authMethodOAuth2">Keycloak service account / client credentials</label>
-    </div>
+     <div class="form-check">
+       <input type="radio" class="form-check-input" id="authMethodOAuth2" name="authMethod" value="OAUTH2">
+       <label class="form-check-label" for="authMethodOAuth2">Keycloak OAuth2 (service account or direct access)</label>
+     </div>
   </div>
 
   <!-- Form-based Authentication Fields -->
   <div id="formAuthFields" class="auth-method-fields">
     <div class="row g-3">
       <div class="col-md-4">
-        <label class="form-label" for="authUsername">Username</label>
-        <input id="authUsername" class="form-control" name="authUsername" placeholder="Username for login">
+        <label class="form-label" for="formAuthUsername">Username</label>
+        <input id="formAuthUsername" class="form-control" name="formAuthUsername" placeholder="Username for login">
       </div>
       <div class="col-md-4">
-        <label class="form-label" for="authPassword">Password</label>
-        <input id="authPassword" class="form-control" name="authPassword" type="password" autocomplete="new-password" placeholder="Password for login">
+        <label class="form-label" for="formAuthPassword">Password</label>
+        <input id="formAuthPassword" class="form-control" name="formAuthPassword" type="password" autocomplete="new-password" placeholder="Password for login">
       </div>
       <div class="col-md-3">
-        <label class="form-label" for="authLoginPageUrl">Login page URL</label>
-        <input id="authLoginPageUrl" class="form-control" name="authLoginPageUrl" placeholder="https://example.com/login">
+        <label class="form-label" for="authLoginPageUrl">Authentication entry URL</label>
+        <input id="authLoginPageUrl" class="form-control" name="authLoginPageUrl" type="url" placeholder="https://wordpress.example.com/protected-page">
+        <div class="form-text">Use a protected page that redirects to the login form, or a direct login-form URL.</div>
       </div>
     </div>
   </div>
@@ -55,8 +56,19 @@
         <input type="text" class="form-control" id="authClientId" name="authClientId" placeholder="myclient">
       </div>
       <div class="col-md-6">
-        <label class="form-label" for="authClientSecret">Client Secret</label>
+        <label class="form-label" for="authClientSecret">Client Secret (for service accounts)</label>
         <input type="password" class="form-control" id="authClientSecret" name="authClientSecret" autocomplete="new-password" placeholder="Client secret">
+        <div class="form-text">Required for client credentials grant, leave empty for password grant</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="oauthUsername">Username (for direct access)</label>
+        <input id="oauthUsername" class="form-control" name="oauthUsername" placeholder="Username for OAuth2 password grant">
+        <div class="form-text">Required for password grant, leave empty for client credentials</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="oauthPassword">Password (for direct access)</label>
+        <input id="oauthPassword" class="form-control" name="oauthPassword" type="password" autocomplete="new-password" placeholder="Password for OAuth2 password grant">
+        <div class="form-text">Required for password grant, leave empty for client credentials</div>
       </div>
     </div>
   </div>

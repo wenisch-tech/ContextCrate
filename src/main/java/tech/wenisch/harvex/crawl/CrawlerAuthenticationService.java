@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import tech.wenisch.harvex.domain.CrawlConfiguration;
 import tech.wenisch.harvex.domain.CrawlConfiguration.AuthMethod;
@@ -35,6 +37,8 @@ import tech.wenisch.harvex.service.KeycloakTokenService.AuthenticationException;
 @Service
 public class CrawlerAuthenticationService {
   private static final int MAX_REDIRECTS = 8;
+  private static final int MAX_LOGIN_STEPS = 3;
+  private static final Logger log = LoggerFactory.getLogger(CrawlerAuthenticationService.class);
   private final UrlPolicy urls;
   private final KeycloakTokenService tokens;
   private final HttpClient anonymousClient;
@@ -85,7 +89,11 @@ public class CrawlerAuthenticationService {
     FormSession session = formSession(runId, config);
     session.touch();
     CrawlerResponse response = sendGet(session.client(), url, config, null, 0);
-    if (!retried && isLoginUrl(response.url(), config.loginConfiguration().loginPageUrl())) {
+    if (!retried && session.isAuthenticationUrl(response.url())) {
+      log.info(
+          "Form session expired while fetching {}; authentication endpoint {} was reached again; retrying once",
+          diagnosticUrl(url),
+          diagnosticUrl(response.url()));
       response.body().close();
       formSessions.remove(runId);
       return formGet(runId, url, config, true);
@@ -117,7 +125,7 @@ public class CrawlerAuthenticationService {
       if (existing == null) {
         CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
         FormSession created = new FormSession(newClient(cookies));
-        authenticate(created, config);
+        created.authenticationUrl(authenticate(created, config));
         formSessions.put(runId, created);
         existing = created;
       }
@@ -125,9 +133,10 @@ public class CrawlerAuthenticationService {
     }
   }
 
-  private void authenticate(FormSession session, CrawlConfiguration config) throws Exception {
+  private String authenticate(FormSession session, CrawlConfiguration config) throws Exception {
     LoginConfiguration login = config.loginConfiguration();
     urls.assertSafe(login.loginPageUrl());
+    log.info("Starting form authentication at {}", diagnosticUrl(login.loginPageUrl()));
     TextResponse page =
         sendForText(
             session.client(),
@@ -141,54 +150,148 @@ public class CrawlerAuthenticationService {
     if (page.status() >= 400) {
       throw new AuthenticationException("Login page returned HTTP " + page.status());
     }
+    log.info(
+        "Authentication entry resolved to {} with HTTP {}",
+        diagnosticUrl(page.url()),
+        page.status());
 
-    Document document = Jsoup.parse(page.body(), page.url());
-    Element form = findLoginForm(document, login);
-    if (form == null) throw new AuthenticationException("No compatible login form was found");
-    String action = form.absUrl("action");
-    if (action.isBlank()) action = page.url();
-    urls.assertSafe(action);
+    String authenticationUrl = page.url();
+    boolean submittedUsername = false;
+    boolean submittedPassword = false;
+    for (int step = 0; step < MAX_LOGIN_STEPS; step++) {
+      Document document = Jsoup.parse(page.body(), page.url());
+      Element form = findAuthenticationForm(document, login);
+      if (form == null) {
+        throw new AuthenticationException(
+            "No compatible login form was found at " + diagnosticUrl(page.url()));
+      }
 
-    Map<String, String> values = new LinkedHashMap<>();
-    for (Element input : form.select("input[name]")) {
-      String type = input.attr("type");
-      if (type.equalsIgnoreCase("hidden")) values.put(input.attr("name"), input.val());
+      boolean hasUsername = hasActiveNamedElement(form, login.usernameField());
+      boolean hasPassword = hasActiveNamedElement(form, login.passwordField());
+      String stepDescription = credentialStepDescription(hasUsername, hasPassword);
+      log.info(
+          "Authentication step {}/{} at {}: {} field(s) detected",
+          step + 1,
+          MAX_LOGIN_STEPS,
+          diagnosticUrl(page.url()),
+          stepDescription);
+      if ((hasUsername && submittedUsername && !hasPassword)
+          || (hasPassword && submittedPassword)) {
+        throw formStillPresent(page.url(), stepDescription, document);
+      }
+
+      String action = form.absUrl("action");
+      if (action.isBlank()) action = page.url();
+      urls.assertSafe(action);
+      Map<String, String> values = formValues(form, login);
+      if (hasUsername && !submittedUsername) {
+        values.put(login.usernameField(), login.username());
+        submittedUsername = true;
+      } else if (hasUsername) {
+        Element username = firstActiveNamedElement(form, login.usernameField());
+        if (username != null && username.hasAttr("value")) {
+          values.put(login.usernameField(), username.val());
+        }
+      }
+      if (hasPassword) {
+        values.put(login.passwordField(), login.password());
+        submittedPassword = true;
+      }
+      log.info(
+          "Submitting {} form to {} with {} non-secret field(s)",
+          stepDescription,
+          diagnosticUrl(action),
+          values.size() - (hasUsername ? 1 : 0) - (hasPassword ? 1 : 0));
+
+      TextResponse result =
+          sendForText(
+              session.client(),
+              loginRequest(action, page.url(), values, config),
+              config,
+              0);
+      if (result.status() >= 400) {
+        throw new AuthenticationException("Login submission returned HTTP " + result.status());
+      }
+      Document resultDocument = Jsoup.parse(result.body(), result.url());
+      String rejection = loginRejection(resultDocument);
+      if (rejection != null) {
+        log.warn(
+            "Authentication was rejected after submitting {} at {}: {}",
+            stepDescription,
+            diagnosticUrl(result.url()),
+            rejection);
+        throw new AuthenticationException(
+            "Login was rejected after submitting " + stepDescription + ": " + rejection);
+      }
+      Element nextForm = findAuthenticationForm(resultDocument, login);
+      log.info(
+          "Authentication step {}/{} completed with HTTP {} at {}; next credential form present={}",
+          step + 1,
+          MAX_LOGIN_STEPS,
+          result.status(),
+          diagnosticUrl(result.url()),
+          nextForm != null);
+      if (nextForm == null) {
+        verifyLogin(result, login);
+        log.info("Form authentication completed at {}", diagnosticUrl(result.url()));
+        return authenticationUrl;
+      }
+      page = result;
     }
-    Element submit = form.selectFirst(login.submitSelector());
-    if (submit != null && submit.hasAttr("name")) values.put(submit.attr("name"), submit.val());
-    values.put(login.usernameField(), login.username());
-    values.put(login.passwordField(), login.password());
-
-    HttpRequest request =
-        HttpRequest.newBuilder(URI.create(action))
-            .timeout(timeout(config))
-            .header("User-Agent", userAgent(config))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
-            .POST(HttpRequest.BodyPublishers.ofString(form(values)))
-            .build();
-    TextResponse result = sendForText(session.client(), request, config, 0);
-    verifyLogin(result, login);
+    throw new AuthenticationException("Login did not complete within " + MAX_LOGIN_STEPS + " steps");
   }
 
-  private static Element findLoginForm(Document document, LoginConfiguration login) {
+  private static Element findAuthenticationForm(Document document, LoginConfiguration login) {
     for (Element form : document.select("form")) {
-      boolean username = hasNamedElement(form, login.usernameField());
-      boolean password = hasNamedElement(form, login.passwordField());
+      boolean username = hasActiveNamedElement(form, login.usernameField());
+      boolean password = hasActiveNamedElement(form, login.passwordField());
       if (username && password) return form;
+      if (username || password) return form;
     }
     return null;
   }
 
-  private static boolean hasNamedElement(Element parent, String name) {
-    return parent.select("[name]").stream().anyMatch(element -> element.attr("name").equals(name));
+  private static boolean hasActiveNamedElement(Element parent, String name) {
+    return firstActiveNamedElement(parent, name) != null;
+  }
+
+  private static Element firstActiveNamedElement(Element parent, String name) {
+    return parent.select("[name]").stream()
+        .filter(
+            element ->
+                element.attr("name").equals(name)
+                    && !element.attr("type").equalsIgnoreCase("hidden")
+                    && !element.hasAttr("disabled")
+                    && !element.hasAttr("readonly"))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static Map<String, String> formValues(Element form, LoginConfiguration login) {
+    Map<String, String> values = new LinkedHashMap<>();
+    for (Element input : form.select("input[name]")) {
+      if (input.attr("type").equalsIgnoreCase("hidden")) values.put(input.attr("name"), input.val());
+    }
+    Element submit = form.selectFirst(login.submitSelector());
+    if (submit == null) submit = form.selectFirst("button[type='submit'], input[type='submit']");
+    if (submit != null && submit.hasAttr("name")) values.put(submit.attr("name"), submit.val());
+    return values;
+  }
+
+  private HttpRequest loginRequest(
+      String action, String referer, Map<String, String> values, CrawlConfiguration config) {
+    return HttpRequest.newBuilder(URI.create(action))
+        .timeout(timeout(config))
+        .header("User-Agent", userAgent(config))
+        .header("Referer", referer)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
+        .POST(HttpRequest.BodyPublishers.ofString(form(values)))
+        .build();
   }
 
   private static void verifyLogin(TextResponse response, LoginConfiguration login)
       throws AuthenticationException {
-    if (response.status() >= 400) {
-      throw new AuthenticationException("Login submission returned HTTP " + response.status());
-    }
     var success = login.successDetection();
     if (success.urlPattern() != null && !success.urlPattern().isBlank()) {
       if (!Pattern.compile(success.urlPattern()).matcher(response.url()).find()) {
@@ -205,9 +308,63 @@ public class CrawlerAuthenticationService {
       return;
     }
     Document result = Jsoup.parse(response.body(), response.url());
-    if (findLoginForm(result, login) != null
-        || isLoginUrl(response.url(), login.loginPageUrl())) {
+    String rejection = loginRejection(result);
+    if (rejection != null) {
+      throw new AuthenticationException("Login was rejected: " + rejection);
+    }
+    if (findAuthenticationForm(result, login) != null) {
       throw new AuthenticationException("Login form was still present after submitting credentials");
+    }
+  }
+
+  /**
+   * Keycloak can render a terminal {@code login-error} page without a credential form. Treating
+   * that page as success created a broken session and hid the useful error message from users.
+   */
+  private static String loginRejection(Document document) {
+    for (String selector :
+        new String[] {
+          "#kc-error-message", ".kc-feedback-text", ".alert-error",
+          ".pf-c-alert.pf-m-danger"
+        }) {
+      Element message = document.selectFirst(selector);
+      if (message != null && !message.text().isBlank()) return concise(message.text());
+    }
+    if ("login-error".equalsIgnoreCase(document.body().attr("data-page-id"))) {
+      return "identity provider returned its login error page";
+    }
+    return null;
+  }
+
+  private static AuthenticationException formStillPresent(
+      String url, String stepDescription, Document document) {
+    String message =
+        "Login form was still present after submitting "
+            + stepDescription
+            + " at "
+            + diagnosticUrl(url);
+    String rejection = loginRejection(document);
+    if (rejection != null) message += ": " + rejection;
+    return new AuthenticationException(message);
+  }
+
+  private static String credentialStepDescription(boolean hasUsername, boolean hasPassword) {
+    if (hasUsername && hasPassword) return "username and password";
+    return hasUsername ? "username" : "password";
+  }
+
+  private static String concise(String text) {
+    String normalized = text.replaceAll("\\s+", " ").trim();
+    return normalized.length() <= 300 ? normalized : normalized.substring(0, 297) + "...";
+  }
+
+  /** Do not put OIDC state, authorization codes, or session codes into application logs. */
+  private static String diagnosticUrl(String raw) {
+    try {
+      URI uri = URI.create(raw);
+      return uri.getScheme() + "://" + uri.getAuthority() + normalizePath(uri.getPath());
+    } catch (RuntimeException exception) {
+      return "[unparseable URL]";
     }
   }
 
@@ -253,14 +410,32 @@ public class CrawlerAuthenticationService {
               .uri()
               .resolve(response.headers().firstValue("Location").orElseThrow())
               .toString();
-      HttpRequest follow =
+      log.info(
+          "Authentication redirect {} {} -> {}",
+          response.statusCode(),
+          diagnosticUrl(request.uri().toString()),
+          diagnosticUrl(next));
+      HttpRequest.Builder follow =
           HttpRequest.newBuilder(URI.create(next))
               .timeout(timeout(config))
               .header("User-Agent", userAgent(config))
-              .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
-              .GET()
-              .build();
-      return sendForText(client, follow, config, redirects + 1);
+              .header("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
+      if (preservesMethod(response.statusCode())) {
+        request
+            .headers()
+            .firstValue("Content-Type")
+            .ifPresent(value -> follow.header("Content-Type", value));
+        request
+            .headers()
+            .firstValue("Referer")
+            .ifPresent(value -> follow.header("Referer", value));
+        follow.method(
+            request.method(),
+            request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()));
+      } else {
+        follow.GET();
+      }
+      return sendForText(client, follow.build(), config, redirects + 1);
     }
     return new TextResponse(response.statusCode(), response.uri().toString(), response.body());
   }
@@ -278,6 +453,10 @@ public class CrawlerAuthenticationService {
     return status >= 300 && status < 400;
   }
 
+  private static boolean preservesMethod(int status) {
+    return status == 307 || status == 308;
+  }
+
   private static boolean sameOrigin(String first, String second) {
     URI left = URI.create(first);
     URI right = URI.create(second);
@@ -291,13 +470,18 @@ public class CrawlerAuthenticationService {
     return uri.getScheme().equalsIgnoreCase("https") ? 443 : 80;
   }
 
-  private static boolean isLoginUrl(String actual, String configured) {
-    if (actual == null || configured == null) return false;
-    URI first = URI.create(actual);
-    URI second = URI.create(configured);
-    return first.getScheme().equalsIgnoreCase(second.getScheme())
-        && first.getHost().equalsIgnoreCase(second.getHost())
-        && normalizePath(first.getPath()).equals(normalizePath(second.getPath()));
+  private static boolean sameEndpoint(String actual, String expected) {
+    if (actual == null || expected == null) return false;
+    try {
+      URI first = URI.create(actual);
+      URI second = URI.create(expected);
+      return first.getScheme().equalsIgnoreCase(second.getScheme())
+          && first.getHost().equalsIgnoreCase(second.getHost())
+          && effectivePort(first) == effectivePort(second)
+          && normalizePath(first.getPath()).equals(normalizePath(second.getPath()));
+    } catch (RuntimeException exception) {
+      return false;
+    }
   }
 
   private static String normalizePath(String path) {
@@ -328,6 +512,7 @@ public class CrawlerAuthenticationService {
   private static final class FormSession {
     private final HttpClient client;
     private volatile Instant lastUsed = Instant.now();
+    private volatile String authenticationUrl;
 
     private FormSession(HttpClient client) {
       this.client = client;
@@ -343,6 +528,14 @@ public class CrawlerAuthenticationService {
 
     private void touch() {
       lastUsed = Instant.now();
+    }
+
+    private boolean isAuthenticationUrl(String url) {
+      return sameEndpoint(url, authenticationUrl);
+    }
+
+    private void authenticationUrl(String authenticationUrl) {
+      this.authenticationUrl = authenticationUrl;
     }
   }
 

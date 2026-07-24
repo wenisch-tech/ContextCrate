@@ -59,7 +59,9 @@ public class ConfigurationCodec {
     migrated.put("password", password);
     migrated.put("usernameField", valueOr(old, "usernameField", "username"));
     migrated.put("passwordField", valueOr(old, "passwordField", "password"));
-    migrated.put("submitSelector", valueOr(old, "submitSelector", "button[type='submit']"));
+    migrated.put(
+        "submitSelector",
+        valueOr(old, "submitSelector", "button[type='submit'], input[type='submit']"));
     migrated.set(
         "successDetection",
         old.has("successDetection") && !old.get("successDetection").isNull()

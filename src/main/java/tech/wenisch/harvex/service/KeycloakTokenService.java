@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import tech.wenisch.harvex.crawl.UrlPolicy;
 import tech.wenisch.harvex.domain.CrawlConfiguration.LoginConfiguration;
 
-/** Obtains Keycloak service-account tokens using the OAuth2 client-credentials grant. */
+/** Obtains Keycloak tokens using OAuth2 client-credentials or password grants. */
 @Service
 public class KeycloakTokenService {
   private final HttpClient client;
@@ -43,12 +43,21 @@ public class KeycloakTokenService {
     String tokenUrl = base + "/realms/" + realm + "/protocol/openid-connect/token";
     urls.assertSafe(tokenUrl);
 
-    String body =
-        "client_id="
-            + form(config.clientId())
-            + "&client_secret="
-            + form(config.clientSecret())
+    String body;
+    if (config.username() != null && !config.username().isBlank() &&
+        config.password() != null && !config.password().isBlank()) {
+      // Use password grant for direct access
+      body = "client_id=" + form(config.clientId())
+            + "&username=" + form(config.username())
+            + "&password=" + form(config.password())
+            + "&grant_type=password";
+    } else {
+      // Use client credentials grant for service accounts
+      body = "client_id=" + form(config.clientId())
+            + "&client_secret=" + form(config.clientSecret())
             + "&grant_type=client_credentials";
+    }
+
     HttpRequest request =
         HttpRequest.newBuilder(URI.create(tokenUrl))
             .timeout(Duration.ofSeconds(15))
@@ -78,12 +87,20 @@ public class KeycloakTokenService {
   }
 
   private static void validate(LoginConfiguration config) {
-    if (config == null
-        || blank(config.authServerUrl())
-        || blank(config.realm())
-        || blank(config.clientId())
-        || blank(config.clientSecret())) {
+    if (config == null || blank(config.authServerUrl()) || blank(config.realm()) || blank(config.clientId())) {
       throw new IllegalArgumentException("OAuth2 configuration is incomplete");
+    }
+
+    // For password grant, username and password are required
+    if (config.username() != null && !config.username().isBlank() &&
+        (config.password() == null || config.password().isBlank())) {
+      throw new IllegalArgumentException("OAuth2 password grant requires both username and password");
+    }
+
+    // For client credentials grant, client secret is required
+    if ((config.username() == null || config.username().isBlank()) &&
+        (config.clientSecret() == null || config.clientSecret().isBlank())) {
+      throw new IllegalArgumentException("OAuth2 client credentials grant requires client secret");
     }
   }
 

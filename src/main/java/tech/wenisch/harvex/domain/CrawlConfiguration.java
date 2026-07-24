@@ -137,7 +137,7 @@ public record CrawlConfiguration(
           passwordField == null || passwordField.isBlank() ? "password" : passwordField;
       submitSelector =
           submitSelector == null || submitSelector.isBlank()
-              ? "button[type='submit']"
+              ? "button[type='submit'], input[type='submit']"
               : submitSelector;
       successDetection =
           successDetection == null ? new SuccessDetection(null, null) : successDetection;
@@ -151,7 +151,7 @@ public record CrawlConfiguration(
           null,
           "username",
           "password",
-          "button[type='submit']",
+          "button[type='submit'], input[type='submit']",
           new SuccessDetection(null, null),
           false,
           null,
@@ -165,10 +165,17 @@ public record CrawlConfiguration(
     public boolean isConfigured() {
       if (authMethod == null || authMethod == AuthMethod.NONE) return false;
       if (authMethod == AuthMethod.OAUTH2) {
-        return authServerUrl != null && !authServerUrl.isBlank() &&
-               clientId != null && !clientId.isBlank() &&
-               clientSecret != null && !clientSecret.isBlank() &&
-               realm != null && !realm.isBlank();
+        // OAuth2 can use either client_credentials (service account) or password grant (direct access)
+        boolean hasServerAndRealm = authServerUrl != null && !authServerUrl.isBlank() &&
+                                   realm != null && !realm.isBlank() &&
+                                   clientId != null && !clientId.isBlank();
+
+        // A configured username selects direct access and therefore also requires a password.
+        if (username != null && !username.isBlank()) {
+          return hasServerAndRealm && password != null && !password.isBlank();
+        }
+        // Without a username, use the client-credentials service account.
+        return hasServerAndRealm && clientSecret != null && !clientSecret.isBlank();
       } else {
         return loginPageUrl != null && !loginPageUrl.isBlank() &&
                username != null && !username.isBlank() &&

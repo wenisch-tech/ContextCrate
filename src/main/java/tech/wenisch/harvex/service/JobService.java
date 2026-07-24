@@ -145,13 +145,23 @@ public class JobService {
               null,
               login.authMethod());
     } else if (login.authMethod() == CrawlConfiguration.AuthMethod.OAUTH2
-        && oldLogin.authMethod() == CrawlConfiguration.AuthMethod.OAUTH2
-        && (login.clientSecret() == null || login.clientSecret().isBlank())) {
+        && oldLogin.authMethod() == CrawlConfiguration.AuthMethod.OAUTH2) {
+      boolean passwordGrant = login.username() != null && !login.username().isBlank();
+      String password =
+          passwordGrant
+                  && Objects.equals(login.username(), oldLogin.username())
+                  && (login.password() == null || login.password().isBlank())
+              ? oldLogin.password()
+              : login.password();
+      String clientSecret =
+          !passwordGrant && (login.clientSecret() == null || login.clientSecret().isBlank())
+              ? oldLogin.clientSecret()
+              : login.clientSecret();
       login =
           new CrawlConfiguration.LoginConfiguration(
               null,
-              null,
-              null,
+              login.username(),
+              password,
               login.usernameField(),
               login.passwordField(),
               login.submitSelector(),
@@ -159,7 +169,7 @@ public class JobService {
               login.directLogin(),
               login.authServerUrl(),
               login.clientId(),
-              oldLogin.clientSecret(),
+              clientSecret,
               login.realm(),
               login.authMethod());
     }
