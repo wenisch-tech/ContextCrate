@@ -29,7 +29,7 @@ public class CrateSettingsApiController {
     var e=providers.effectiveEmbedding(crateId);var a=providers.effectiveAnswer(crateId);
     return new ProviderView(e.enabled(),e.provider(),e.localModelId(),e.localRevision(),
         e.localDownloadUrl(),e.localCachePath().toString(),e.localModelPath()==null?null:e.localModelPath().toString(),
-        e.openaiBaseUrl(),e.openaiModel(),e.openaiDimensions(),a.enabled(),a.baseUrl(),a.model());
+        e.openaiBaseUrl(),e.openaiModel(),e.openaiDimensions(),e.openaiMaxInputCharacters(),a.enabled(),a.baseUrl(),a.model());
   }
   @PutMapping("/providers") public ProviderView providers(@PathVariable UUID crateId,@RequestBody RuntimeProviderSettings.ProviderForm form){
     access.require(crateId,CrateMember.Role.OWNER);
@@ -42,6 +42,6 @@ public class CrateSettingsApiController {
       boolean structuredSources,String retrievalMode,int sourceLimit){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
-      String openaiBaseUrl,String openaiModel,int openaiDimensions,boolean answeringEnabled,
+      String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean answeringEnabled,
       String answeringBaseUrl,String answeringModel){}
 }

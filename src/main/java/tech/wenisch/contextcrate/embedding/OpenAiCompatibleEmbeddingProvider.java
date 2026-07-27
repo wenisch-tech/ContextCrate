@@ -33,16 +33,27 @@ public class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
     var request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
         .header("Content-Type", "application/json");
     if (config.openaiApiKey() != null && !config.openaiApiKey().isBlank()) request.header("Authorization", "Bearer " + config.openaiApiKey());
-    String payload = mapper.writeValueAsString(Map.of("model", config.openaiModel(), "input", texts, "encoding_format", "float"));
+    List<String> inputs = texts.stream().map(text -> limit(text, config.openaiMaxInputCharacters())).toList();
+    String payload = mapper.writeValueAsString(Map.of("model", config.openaiModel(), "input", inputs, "encoding_format", "float"));
     var response = client.send(request.POST(HttpRequest.BodyPublishers.ofString(payload)).build(), HttpResponse.BodyHandlers.ofString());
-    if (response.statusCode() / 100 != 2) throw new IllegalStateException("Embedding endpoint returned HTTP " + response.statusCode());
+    if (response.statusCode() / 100 != 2) {
+      String detail = response.body().replaceAll("[\\r\\n\\t]+", " ").trim();
+      if (detail.length() > 1000) detail = detail.substring(0, 1000) + "…";
+      throw new IllegalStateException("Embedding endpoint returned HTTP " + response.statusCode()
+          + (detail.isBlank() ? "" : ": " + detail));
+    }
     JsonNode data = mapper.readTree(response.body()).path("data");
     List<float[]> vectors = new ArrayList<>();
     for (JsonNode item : data) { float[] vector = new float[item.path("embedding").size()]; for (int i=0;i<vector.length;i++) vector[i]=(float)item.path("embedding").get(i).asDouble(); vectors.add(normalize(vector)); }
-    if (vectors.size() != texts.size() || vectors.isEmpty()) throw new IllegalStateException("Embedding endpoint returned an invalid response");
+    if (vectors.size() != inputs.size() || vectors.isEmpty()) throw new IllegalStateException("Embedding endpoint returned an invalid response");
     dimensions = vectors.getFirst().length;
     if (vectors.stream().anyMatch(v -> v.length != dimensions)) throw new IllegalStateException("Embedding endpoint returned inconsistent dimensions");
     return vectors;
   }
   static float[] normalize(float[] v) { double sum=0; for(float x:v) sum+=x*x; double n=Math.sqrt(sum); if(n==0) throw new IllegalStateException("Embedding vector is zero"); for(int i=0;i<v.length;i++) v[i]/=(float)n; return v; }
+  private static String limit(String input, int maxCharacters) {
+    String value = input == null ? "" : input;
+    if (value.codePointCount(0, value.length()) <= maxCharacters) return value;
+    return value.substring(0, value.offsetByCodePoints(0, maxCharacters));
+  }
 }

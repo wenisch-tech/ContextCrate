@@ -25,7 +25,33 @@ CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL=https://embedding.example/v1
 CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL=text-embedding-model
 CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS=1536
 CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY=stored-in-a-secret
+CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MAX_INPUT_CHARACTERS=8000
 ```
+
+### Input limits and chunking
+
+OpenAI-compatible embedding APIs have model-specific input limits. ContextCrate stores the
+normalized document body and also divides it into ordered chunks. Indexing embeds the document
+record plus each chunk; chunk records are what preserve coverage of the full source text for
+semantic search.
+
+For an OpenAI-compatible provider, **Maximum input characters** in the crate's **Settings →
+Providers** page (or `CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MAX_INPUT_CHARACTERS`) is a
+per-request safety limit. It defaults to 8,000 characters. During parsing, ContextCrate reduces
+the configured ingestion chunk size to this limit and persists additional chunks as needed.
+Therefore an oversized document is represented by multiple indexed chunks rather than losing its
+tail. Existing documents keep their stored chunks; run the ingestion job again to re-chunk content
+created before this setting was introduced.
+
+The document-level embedding is a short representative vector and is capped at the same limit.
+Its full text remains available for lexical retrieval. Semantic and hybrid retrieval should use
+chunk results to cover the complete document.
+
+The limit is expressed in characters because an arbitrary OpenAI-compatible endpoint does not
+expose its tokenizer to ContextCrate. It is a safety cap, not an exact token conversion. For a
+model with a 512-token limit, begin with 2,000 characters and reduce it if the endpoint still
+reports a context-window error. Set the ingestion chunk size at or below the same value; overlap
+is automatically reduced if necessary.
 
 ### Endpoint URL
 

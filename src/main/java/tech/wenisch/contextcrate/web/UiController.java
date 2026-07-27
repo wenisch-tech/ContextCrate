@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.CrawlConfiguration;
 import tech.wenisch.contextcrate.domain.PipelineTypes.ExtractionType;
@@ -30,6 +31,7 @@ public class UiController {
   private final PipelineQueue queue;
   private final SearchIndex index;
   private final NormalizedDocumentRepository documents;
+  private final DocumentChunkRepository documentChunks;
   private final ExtractionService extraction;
   private final RagSettingsService ragSettings;
   private final RuntimeProviderSettings providerSettings;
@@ -40,6 +42,7 @@ public class UiController {
   private final CrateAccessService access;
   private final IndexRebuildService rebuild;
   private final DocumentIndexRecoveryService indexRecovery;
+  private final PipelineWorkItemRepository pipelineWork;
 
   public UiController(
       SourceService sources,
@@ -50,13 +53,15 @@ public class UiController {
       PipelineQueue queue,
       SearchIndex index,
       NormalizedDocumentRepository documents,
+      DocumentChunkRepository documentChunks,
       ExtractionService extraction,
       RagSettingsService ragSettings,
       RuntimeProviderSettings providerSettings,
       LocalOnnxEmbeddingProvider localEmbeddings,
       AcquisitionRecordRepository acquisitionRecords,
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
-      IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery) {
+      IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
+      PipelineWorkItemRepository pipelineWork) {
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -65,6 +70,7 @@ public class UiController {
     this.queue = queue;
     this.index = index;
     this.documents = documents;
+    this.documentChunks = documentChunks;
     this.extraction = extraction;
     this.ragSettings = ragSettings;
     this.providerSettings = providerSettings;
@@ -75,6 +81,7 @@ public class UiController {
     this.access = access;
     this.rebuild = rebuild;
     this.indexRecovery = indexRecovery;
+    this.pipelineWork = pipelineWork;
   }
 
   @ModelAttribute
@@ -351,6 +358,7 @@ public class UiController {
         "frontierFailed",
         sourceItems.countByRunIdAndStatus(
             id, tech.wenisch.contextcrate.domain.PipelineTypes.FrontierStatus.FAILED));
+    model.addAttribute("pipelineWork", pipelineWork.findTop100ByCorrelationIdOrderByUpdatedAtDesc(id));
 
     return "run-details";
   }
@@ -402,15 +410,25 @@ public class UiController {
 
   @GetMapping("/documents")
   String docs(@PathVariable UUID crateId,Model model) {
-    model.addAttribute("documents", documents.findTop100ByCrateIdOrderByCreatedAtDesc(crateId));
+    var values = documents.findTop100ByCrateIdOrderByCreatedAtDesc(crateId);
+    var counts = values.isEmpty() ? java.util.Map.<UUID, Long>of()
+        : documentChunks.countByDocumentIdIn(values.stream().map(NormalizedDocument::getId).toList())
+            .stream().collect(java.util.stream.Collectors.toMap(
+                DocumentChunkRepository.ChunkCount::getDocumentId,
+                DocumentChunkRepository.ChunkCount::getChunkCount));
+    model.addAttribute("documents", values);
+    model.addAttribute("chunkCounts", counts);
     model.addAttribute("unindexedCount", documents.findByCrateIdAndIndexedFalse(crateId).size());
     return "documents";
   }
 
   @PostMapping("/documents/retry-unindexed")
-  String retryUnindexedDocuments(@PathVariable UUID crateId) {
+  String retryUnindexedDocuments(@PathVariable UUID crateId, RedirectAttributes redirect) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
-    indexRecovery.enqueueMissing(crateId);
+    int queued = indexRecovery.enqueueMissing(crateId);
+    redirect.addFlashAttribute("indexRecoveryMessage", queued == 0
+        ? "No unindexed documents were found."
+        : "Queued " + queued + " document" + (queued == 1 ? "" : "s") + " for indexing recovery.");
     return "redirect:/crates/" + crateId + "/documents";
   }
 
@@ -492,11 +510,12 @@ public class UiController {
       @RequestParam String embeddingCachePath, @RequestParam(required=false) String embeddingModelPath,
       @RequestParam(required=false) String embeddingBaseUrl, @RequestParam(required=false) String embeddingRemoteModel,
       @RequestParam(required=false) String embeddingApiKey, @RequestParam int embeddingDimensions,
+      @RequestParam int embeddingMaxInputCharacters,
       @RequestParam(defaultValue="false") boolean answeringEnabled, @RequestParam(required=false) String answeringBaseUrl,
       @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     var previous = providerSettings.effectiveEmbedding(crateId);
-    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
+    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
     if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString()))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";

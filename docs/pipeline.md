@@ -30,6 +30,11 @@ as title, and retains heading context on chunks; plain text preserves readable l
 boundaries. Chunks use deterministic identifiers and overlap. Lucene and OpenSearch receive
 equivalent field names and separate document/chunk records.
 
+For OpenAI-compatible embedding providers, parsing also applies the configured maximum embedding
+input-character limit to chunks. If the ingestion chunk size is larger, the parser creates smaller
+persisted chunks before indexing. This avoids sending an oversized chunk to the embedding endpoint
+and lets semantic retrieval cover every section of a long source document.
+
 Extraction is derived work over normalized `DocumentChunk.content`. Enabled extraction rules run after chunks are saved and before run completion; the first rule types are built-in IP address detection and user-supplied regular expressions. Matches are stored as relational rows with the rule, run, document, chunk, offsets, matched value, and a small context window. Extraction does not change crawling, raw artifacts, normalized document bodies, chunk IDs, or search-index contracts.
 
 Extraction results are rebuildable. Rebuilding a run or document deletes the scoped derived matches and enqueues fresh extraction work with a new work idempotency key, while automatic extraction uses stable document-level idempotency. Rule deletion disables the rule so historical result rows keep their rule reference.

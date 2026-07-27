@@ -108,6 +108,25 @@
       </table>
     </div>
   </div>
+
+  <div class="card panel mt-4">
+    <div class="card-header">Pipeline activity</div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Stage</th><th>Status</th><th>Attempts</th><th>Last updated</th><th>Last error</th></tr></thead>
+        <tbody>
+        <tr th:each="item:${pipelineWork}">
+          <td th:text="${item.stage}"></td>
+          <td><span class="status-pill" th:text="${item.status}"></span></td>
+          <td th:text="${item.attempts}"></td>
+          <td th:text="${item.updatedAt}"></td>
+          <td class="text-danger text-break" th:text="${item.lastError ?: '—'}"></td>
+        </tr>
+        <tr th:if="${pipelineWork.empty}"><td colspan="5" class="empty-state">No pipeline work has been recorded yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </main>
 <script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -15,6 +15,9 @@ import tech.wenisch.contextcrate.config.RuntimeProviderSettings;
 
 @Component
 public class LocalOnnxEmbeddingProvider implements EmbeddingProvider {
+  // The bundled multilingual-e5-small ONNX model has a 512-token position limit. Document
+  // chunks are already bounded, but a normalized document body is not and can be much larger.
+  private static final int MAX_SEQUENCE_TOKENS = 512;
   private final RuntimeProviderSettings settings;
   private volatile HuggingFaceTokenizer tokenizer;
   private volatile OrtEnvironment environment;
@@ -69,8 +72,8 @@ public class LocalOnnxEmbeddingProvider implements EmbeddingProvider {
   }
   private float[] embedOne(String text) throws Exception {
     Encoding encoding = tokenizer.encode(text);
-    long[] ids = encoding.getIds(); long[] mask = encoding.getAttentionMask();
-    long[] types = encoding.getTypeIds(); long[] shape = {1, ids.length};
+    long[] ids = limit(encoding.getIds()); long[] mask = limit(encoding.getAttentionMask());
+    long[] types = limit(encoding.getTypeIds()); long[] shape = {1, ids.length};
     try (OnnxTensor inputIds = OnnxTensor.createTensor(environment, LongBuffer.wrap(ids), shape);
          OnnxTensor attention = OnnxTensor.createTensor(environment, LongBuffer.wrap(mask), shape);
          OnnxTensor tokenTypes = OnnxTensor.createTensor(environment, LongBuffer.wrap(types), shape);
@@ -81,6 +84,9 @@ public class LocalOnnxEmbeddingProvider implements EmbeddingProvider {
       for(int j=0;j<vector.length;j++) vector[j]/=count;
       return OpenAiCompatibleEmbeddingProvider.normalize(vector);
     }
+  }
+  private static long[] limit(long[] values) {
+    return values.length <= MAX_SEQUENCE_TOKENS ? values : Arrays.copyOf(values, MAX_SEQUENCE_TOKENS);
   }
   @Override public synchronized void close() throws Exception { if(session != null) session.close(); if(environment != null) environment.close(); session=null;loadedRoot=null; }
 }

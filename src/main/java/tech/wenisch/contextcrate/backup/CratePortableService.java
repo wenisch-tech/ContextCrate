@@ -87,6 +87,7 @@ public class CratePortableService {
         embedding.localCachePath().toString(),
         embedding.localModelPath() == null ? null : embedding.localModelPath().toString(),
         embedding.openaiBaseUrl(), embedding.openaiModel(), embedding.openaiDimensions(),
+        embedding.openaiMaxInputCharacters(),
         answering.enabled(), answering.baseUrl(), answering.model())));
     entries.put("data.json", mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
     if (includeArtifacts) for (var record : acquisitions.findByCrateId(crateId))
@@ -305,7 +306,7 @@ public class CratePortableService {
         nullable(p, "localModelId"), nullable(p, "localRevision"), nullable(p, "localDownloadUrl"),
         nullable(p, "localCachePath"), nullable(p, "localModelPath"),
         nullable(p, "openaiBaseUrl"), nullable(p, "openaiModel"), null,
-        p.path("openaiDimensions").asInt(1536), p.path("answeringEnabled").asBoolean(),
+        p.path("openaiDimensions").asInt(1536), p.path("openaiMaxInputCharacters").asInt(8000), p.path("answeringEnabled").asBoolean(),
         nullable(p, "answeringBaseUrl"), nullable(p, "answeringModel"), null));
   }
 
@@ -351,5 +352,6 @@ public class CratePortableService {
   public record ProviderExport(boolean embeddingsEnabled, String embeddingProvider,
       String localModelId, String localRevision, String localDownloadUrl, String localCachePath,
       String localModelPath, String openaiBaseUrl, String openaiModel, int openaiDimensions,
-      boolean answeringEnabled, String answeringBaseUrl, String answeringModel) {}
+      int openaiMaxInputCharacters, boolean answeringEnabled, String answeringBaseUrl,
+      String answeringModel) {}
 }

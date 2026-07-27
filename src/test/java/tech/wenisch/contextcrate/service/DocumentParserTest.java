@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tech.wenisch.contextcrate.crawl.UrlPolicy;
+import tech.wenisch.contextcrate.config.RuntimeProviderSettings;
 import tech.wenisch.contextcrate.domain.*;
 import tech.wenisch.contextcrate.queue.*;
 import tech.wenisch.contextcrate.repository.*;
@@ -29,12 +30,13 @@ class DocumentParserTest {
   @Mock IngestionService ingestion;
   @Mock PipelineQueue queue;
   @Mock ExtractionService extraction;
+  @Mock RuntimeProviderSettings providers;
 
   @Test
   void markdownCreatesReadableDocumentAndHeadingAwareChunks() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     DocumentParser parser = new DocumentParser(acquisitions, runs, documents, chunks, items,
-        artifacts, ingestion, new UrlPolicy(true), queue, extraction, mapper);
+        artifacts, ingestion, new UrlPolicy(true), queue, extraction, mapper, providers);
     UUID crateId = UUID.randomUUID(), runId = UUID.randomUUID(), acquisitionId = UUID.randomUUID();
     IngestionRun run = new IngestionRun(runId, crateId, UUID.randomUUID(), UUID.randomUUID(),
         "{}", "{}");
@@ -55,6 +57,9 @@ class DocumentParserTest {
         markdown.getBytes(StandardCharsets.UTF_8)));
     when(documents.findByRunIdAndSourceUri(eq(runId), anyString())).thenReturn(Optional.empty());
     when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(providers.effectiveEmbedding(crateId)).thenReturn(new RuntimeProviderSettings.Embedding(
+        true, "local", "model", "revision", "url", java.nio.file.Path.of("models"), null,
+        null, null, null, 384, 8000));
 
     parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
 

@@ -5,6 +5,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
@@ -16,6 +18,7 @@ import tech.wenisch.contextcrate.repository.IngestionRunRepository;
 
 @Component
 public class PipelineCoordinator {
+  private static final Logger log = LoggerFactory.getLogger(PipelineCoordinator.class);
   private final PipelineQueue queue;
   private final ObjectMapper mapper;
   private final HttpCrawler crawler;
@@ -128,12 +131,24 @@ public class PipelineCoordinator {
         case DISCOVERY -> {}
       }
       queue.acknowledge(message.id());
+      log.info("Pipeline work completed: id={}, stage={}, run={}, crate={}, attempt={}",
+          message.id(), message.stage(), message.correlationId(), crateId, message.attempts());
       metrics.counter("contextcrate.pipeline.completed", "stage", message.stage().name()).increment();
     } catch (Exception e) {
+      String error = safe(e);
       queue.retry(
           message.id(),
           Duration.ofSeconds(Math.min(300, 1L << Math.min(message.attempts(), 8))),
-          safe(e));
+          error);
+      if (message.attempts() >= properties.worker().maxAttempts()) {
+        log.error("Pipeline work dead-lettered: id={}, stage={}, run={}, crate={}, attempts={}, error={}",
+            message.id(), message.stage(), message.correlationId(), message.crateId(),
+            message.attempts(), error);
+      } else {
+        log.warn("Pipeline work failed and will be retried: id={}, stage={}, run={}, crate={}, attempt={}, error={}",
+            message.id(), message.stage(), message.correlationId(), message.crateId(),
+            message.attempts(), error);
+      }
       metrics.counter("contextcrate.pipeline.failed", "stage", message.stage().name()).increment();
     } finally {
       metrics
@@ -143,12 +158,15 @@ public class PipelineCoordinator {
   }
 
   private static String safe(Exception e) {
-    String message = e.getMessage();
-    return (message == null ? e.getClass().getSimpleName() : message)
-        .substring(
-            0,
-            Math.min(
-                4000, message == null ? e.getClass().getSimpleName().length() : message.length()));
+    StringBuilder detail = new StringBuilder();
+    for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+      String message = cause.getMessage();
+      if (message == null || message.isBlank()) continue;
+      if (!detail.isEmpty()) detail.append("; caused by: ");
+      detail.append(message);
+      if (detail.length() >= 4000) break;
+    }
+    return detail.isEmpty() ? e.getClass().getSimpleName() : detail.substring(0, Math.min(4000, detail.length()));
   }
 
   @jakarta.annotation.PreDestroy

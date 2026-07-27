@@ -1,6 +1,8 @@
 package tech.wenisch.contextcrate.service;
 
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tech.wenisch.contextcrate.domain.PipelineTypes.WorkStage;
@@ -10,6 +12,7 @@ import tech.wenisch.contextcrate.repository.NormalizedDocumentRepository;
 /** Re-enqueues documents whose persisted index indicator was not completed. */
 @Service
 public class DocumentIndexRecoveryService {
+  private static final Logger log = LoggerFactory.getLogger(DocumentIndexRecoveryService.class);
   private final NormalizedDocumentRepository documents;
   private final PipelineQueue queue;
 
@@ -29,6 +32,7 @@ public class DocumentIndexRecoveryService {
           document.getRunId(), crateId + ":index-recovery:" + document.getId() + ":" + UUID.randomUUID(),
           75));
     }
+    log.info("Queued indexing recovery: crate={}, documents={}", crateId, missing.size());
     return missing.size();
   }
 }

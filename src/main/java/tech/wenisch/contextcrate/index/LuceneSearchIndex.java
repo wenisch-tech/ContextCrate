@@ -64,10 +64,23 @@ public class LuceneSearchIndex implements SearchIndex {
     try {
       docs.add(document(source, embedding(source.getBody())));
       for(var c:chunks) docs.add(chunk(source,c,embedding(c.getContent())));
-    } catch(Exception e) { throw new IOException("Could not create document embeddings", e); }
+    } catch(Exception e) {
+      throw new IOException("Could not create document embeddings: " + errorDetail(e), e);
+    }
     writer.deleteDocuments(new Term("parent_id",source.getId().toString())); writer.addDocuments(docs); writer.commit();
   }
   private float[] embedding(String text) throws Exception { return embeddings.available() ? embeddings.embedDocuments(List.of(text)).getFirst() : null; }
+  private static String errorDetail(Exception error) {
+    StringBuilder detail = new StringBuilder();
+    for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+      String message = cause.getMessage();
+      if (message == null || message.isBlank()) continue;
+      if (!detail.isEmpty()) detail.append("; caused by: ");
+      detail.append(message);
+      if (detail.length() >= 3500) break;
+    }
+    return detail.isEmpty() ? error.getClass().getSimpleName() : detail.toString();
+  }
   private static org.apache.lucene.document.Document document(NormalizedDocument d, float[] vector) { var doc=new org.apache.lucene.document.Document(); common(doc,d); doc.add(new StringField("kind","document",Field.Store.YES)); doc.add(new StoredField("body",d.getBody())); doc.add(new TextField("text",d.getBody(),Field.Store.NO)); vector(doc,vector); return doc; }
   private static org.apache.lucene.document.Document chunk(NormalizedDocument p, DocumentChunk c, float[] vector) { var doc=new org.apache.lucene.document.Document(); common(doc,p); doc.add(new StringField("kind","chunk",Field.Store.YES)); doc.add(new StringField("id",c.getId().toString(),Field.Store.YES)); doc.add(new IntPoint("ordinal",c.getOrdinal())); doc.add(new StoredField("ordinal_stored",c.getOrdinal())); if(c.getHeading()!=null)doc.add(new TextField("heading",c.getHeading(),Field.Store.YES)); doc.add(new TextField("text",c.getContent(),Field.Store.YES)); vector(doc,vector); return doc; }
   private static void vector(org.apache.lucene.document.Document doc,float[] vector) { if(vector!=null) doc.add(new KnnFloatVectorField("embedding",vector,VectorSimilarityFunction.COSINE)); }

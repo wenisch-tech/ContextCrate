@@ -13,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tech.wenisch.contextcrate.crawl.UrlPolicy;
+import tech.wenisch.contextcrate.config.RuntimeProviderSettings;
 import tech.wenisch.contextcrate.domain.*;
 import tech.wenisch.contextcrate.queue.*;
 import tech.wenisch.contextcrate.repository.*;
@@ -32,11 +33,13 @@ public class DocumentParser {
   private final PipelineQueue queue;
   private final ExtractionService extraction;
   private final ObjectMapper mapper;
+  private final RuntimeProviderSettings providers;
 
   public DocumentParser(AcquisitionRecordRepository acquisitions, IngestionRunRepository runs,
       NormalizedDocumentRepository documents, DocumentChunkRepository chunks,
       SourceItemRepository items, ArtifactStore artifacts, IngestionService ingestion,
-      UrlPolicy urls, PipelineQueue queue, ExtractionService extraction, ObjectMapper mapper) {
+      UrlPolicy urls, PipelineQueue queue, ExtractionService extraction, ObjectMapper mapper,
+      RuntimeProviderSettings providers) {
     this.acquisitions = acquisitions;
     this.runs = runs;
     this.documents = documents;
@@ -48,6 +51,7 @@ public class DocumentParser {
     this.queue = queue;
     this.extraction = extraction;
     this.mapper = mapper;
+    this.providers = providers;
   }
 
   @Transactional
@@ -145,7 +149,9 @@ public class DocumentParser {
         Hashing.sha256(body), metadata);
     value.assignCrate(run.getCrateId());
     NormalizedDocument document = documents.save(value);
-    chunks.saveAll(chunk(document, sections, output.chunkSize(), output.chunkOverlap()));
+    int chunkSize = effectiveChunkSize(run, output.chunkSize());
+    int chunkOverlap = Math.min(output.chunkOverlap(), Math.max(0, chunkSize - 1));
+    chunks.saveAll(chunk(document, sections, chunkSize, chunkOverlap));
     extraction.publish(document, false);
     queue.publish(PipelineMessage.create(run.getCrateId(), WorkStage.INDEX,
         IngestionService.payload(run.getCrateId(), run.getId(), document.getId()), run.getId(),
@@ -245,6 +251,11 @@ public class DocumentParser {
       }
     }
     return result;
+  }
+  private int effectiveChunkSize(IngestionRun run, int configuredSize) {
+    var embedding = providers.effectiveEmbedding(run.getCrateId());
+    if (!"openai-compatible".equals(embedding.provider())) return configuredSize;
+    return Math.min(configuredSize, embedding.openaiMaxInputCharacters());
   }
 
   private static Element preferredRoot(org.jsoup.nodes.Document page) {
