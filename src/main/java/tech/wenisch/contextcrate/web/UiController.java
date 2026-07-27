@@ -18,6 +18,7 @@ import tech.wenisch.contextcrate.service.*;
 import tech.wenisch.contextcrate.answer.RagSettingsService;
 import tech.wenisch.contextcrate.config.RuntimeProviderSettings;
 import tech.wenisch.contextcrate.embedding.LocalOnnxEmbeddingProvider;
+import tech.wenisch.contextcrate.reranking.ConfigurableRerankingProvider;
 import tech.wenisch.contextcrate.domain.*;
 
 @Controller
@@ -36,6 +37,7 @@ public class UiController {
   private final RagSettingsService ragSettings;
   private final RuntimeProviderSettings providerSettings;
   private final LocalOnnxEmbeddingProvider localEmbeddings;
+  private final ConfigurableRerankingProvider reranking;
   private final AcquisitionRecordRepository acquisitionRecords;
   private final SourceItemRepository sourceItems;
   private final CrateService crates;
@@ -58,6 +60,7 @@ public class UiController {
       RagSettingsService ragSettings,
       RuntimeProviderSettings providerSettings,
       LocalOnnxEmbeddingProvider localEmbeddings,
+      ConfigurableRerankingProvider reranking,
       AcquisitionRecordRepository acquisitionRecords,
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
@@ -75,6 +78,7 @@ public class UiController {
     this.ragSettings = ragSettings;
     this.providerSettings = providerSettings;
     this.localEmbeddings = localEmbeddings;
+    this.reranking = reranking;
     this.acquisitionRecords = acquisitionRecords;
     this.sourceItems = sourceItems;
     this.crates = crates;
@@ -486,6 +490,7 @@ public class UiController {
     model.addAttribute("rag", ragSettings.current(crateId));
     model.addAttribute("answering", properties.answering());
     model.addAttribute("embeddingProvider", providerSettings.effectiveEmbedding(crateId));
+    model.addAttribute("rerankingProvider", providerSettings.effectiveReranking(crateId));
     model.addAttribute("answerProvider", providerSettings.effectiveAnswer(crateId));
     return "settings";
   }
@@ -511,11 +516,18 @@ public class UiController {
       @RequestParam(required=false) String embeddingBaseUrl, @RequestParam(required=false) String embeddingRemoteModel,
       @RequestParam(required=false) String embeddingApiKey, @RequestParam int embeddingDimensions,
       @RequestParam int embeddingMaxInputCharacters,
+      @RequestParam(defaultValue="false") boolean rerankingEnabled, @RequestParam String rerankingProvider,
+      @RequestParam int rerankingCandidateLimit, @RequestParam(required=false) String rerankingModelId,
+      @RequestParam(required=false) String rerankingRevision, @RequestParam(required=false) String rerankingDownloadUrl,
+      @RequestParam(required=false) String rerankingCachePath, @RequestParam(required=false) String rerankingModelPath,
+      @RequestParam(required=false) String rerankingBaseUrl, @RequestParam(required=false) String rerankingRemoteModel,
+      @RequestParam(required=false) String rerankingApiKey, @RequestParam int rerankingMaxInputCharacters,
+      @RequestParam int rerankingTimeoutSeconds,
       @RequestParam(defaultValue="false") boolean answeringEnabled, @RequestParam(required=false) String answeringBaseUrl,
       @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     var previous = providerSettings.effectiveEmbedding(crateId);
-    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
+    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
     if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString()))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";
@@ -529,5 +541,13 @@ public class UiController {
       throw new IllegalStateException("Select and save the local embedding provider before downloading a model");
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){localEmbeddings.downloadModel();}
     return java.util.Map.of("status", "Local embedding model is ready");
+  }
+
+  @PostMapping("/settings/providers/reranking/local/download")
+  @ResponseBody
+  java.util.Map<String, String> downloadLocalRerankingModel(@PathVariable UUID crateId) throws Exception {
+    access.requireMutable(crateId,CrateMember.Role.OWNER);
+    try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){reranking.downloadModel();}
+    return java.util.Map.of("status", "Local reranking model is ready");
   }
 }

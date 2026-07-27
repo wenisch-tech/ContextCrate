@@ -57,10 +57,16 @@ public interface SearchIndex extends AutoCloseable {
       String snippet,
       float score,
       Float lexicalScore,
-      Float semanticScore) {
+      Float semanticScore,
+      Float rerankScore,
+      @com.fasterxml.jackson.annotation.JsonIgnore String content) {
     public SearchHit(UUID id, UUID documentId, UUID runId, String kind, String title, String sourceUri,
         Integer chunkOrdinal, String snippet, float score) {
-      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, null, null);
+      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, null, null, null, null);
+    }
+    public SearchHit(UUID id, UUID documentId, UUID runId, String kind, String title, String sourceUri,
+        Integer chunkOrdinal, String snippet, float score, Float lexicalScore, Float semanticScore) {
+      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, lexicalScore, semanticScore, null, null);
     }
   }
 

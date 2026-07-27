@@ -11,11 +11,14 @@ import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.DocumentChunk;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 import tech.wenisch.contextcrate.embedding.EmbeddingProvider;
+import tech.wenisch.contextcrate.reranking.RerankingProvider;
+import tech.wenisch.contextcrate.reranking.DisabledRerankingProvider;
 import tech.wenisch.contextcrate.repository.CrateRepository;
 
 @Component
@@ -23,11 +26,16 @@ import tech.wenisch.contextcrate.repository.CrateRepository;
 public class LuceneSearchIndex implements SearchIndex {
   private static final int MAX_OPEN_WRITERS = 32;
   private final Path root; private final StandardAnalyzer analyzer = new StandardAnalyzer();
-  private final EmbeddingProvider embeddings; private final ContextCrateProperties.Retrieval retrieval;
+  private final EmbeddingProvider embeddings; private final RerankingProvider reranking; private final ContextCrateProperties.Retrieval retrieval;
   private final Map<String, IndexWriter> writers = new LinkedHashMap<>();
   private final CrateRepository crates;
+  @Autowired
+  public LuceneSearchIndex(ContextCrateProperties properties, EmbeddingProvider embeddings,RerankingProvider reranking,CrateRepository crates) {
+    root = properties.index().path().toAbsolutePath().normalize(); this.embeddings=embeddings;this.reranking=reranking;this.crates=crates; retrieval=properties.retrieval();
+  }
+  /** Compatibility constructor for direct callers that predate reranking. */
   public LuceneSearchIndex(ContextCrateProperties properties, EmbeddingProvider embeddings,CrateRepository crates) {
-    root = properties.index().path().toAbsolutePath().normalize(); this.embeddings=embeddings;this.crates=crates; retrieval=properties.retrieval();
+    this(properties,embeddings,new DisabledRerankingProvider(),crates);
   }
   @Override public synchronized void initialize(UUID crateId) throws IOException {
     writer(crateId,generation(crateId));
@@ -94,7 +102,9 @@ public class LuceneSearchIndex implements SearchIndex {
   private SearchResults searchScoped(SearchRequest request)throws IOException{
     var writer=writer(request.crateId(),generation(request.crateId())); if(request.query().isBlank())return new SearchResults(request.query(),mode(request),List.of()); writer.commit();
     String mode=mode(request); try(var reader=DirectoryReader.open(writer)) { var searcher=new IndexSearcher(reader); List<SearchHit> lexical=mode.equals("semantic")?List.of():lexical(searcher,request); List<SearchHit> semantic=mode.equals("lexical")?List.of():semantic(searcher,request);
-      return new SearchResults(request.query(),mode, mode.equals("hybrid") ? fuse(lexical,semantic,request.limit()) : limit(mode.equals("lexical")?lexical:semantic,request.limit()));
+      int candidates=RerankingSearchSupport.candidateLimit(request,reranking,retrieval.candidateLimit());
+      List<SearchHit> found=mode.equals("hybrid") ? fuse(lexical,semantic,candidates) : limit(mode.equals("lexical")?lexical:semantic,candidates);
+      return new SearchResults(request.query(),mode,RerankingSearchSupport.apply(request,found,reranking));
     } catch(Exception e) { if(e instanceof IOException io)throw io; throw new IOException("Search failed",e); }
   }
   private String mode(SearchRequest r) { return r.mode()!=null?r.mode():(embeddings.available()?retrieval.defaultMode():"lexical"); }
@@ -104,8 +114,8 @@ public class LuceneSearchIndex implements SearchIndex {
   private Query filters(SearchRequest r) { var b=new BooleanQuery.Builder(); addFilters(b,r); return b.build(); }
   private static void addFilters(BooleanQuery.Builder b,SearchRequest r){if(r.kind()!=null)b.add(new TermQuery(new Term("kind",r.kind())),BooleanClause.Occur.FILTER);if(r.runId()!=null)b.add(new TermQuery(new Term("run_id",r.runId().toString())),BooleanClause.Occur.FILTER);}
   private List<SearchHit> hits(IndexSearcher s,TopDocs found,String query,boolean lexical)throws IOException {var out=new ArrayList<SearchHit>();var stored=s.storedFields();for(var score:found.scoreDocs){var doc=stored.document(score.doc);out.add(hit(doc,score.score,query,lexical));}return out;}
-  private static SearchHit hit(org.apache.lucene.document.Document d,float score,String q,boolean lexical){String kind=d.get("kind");UUID docId=UUID.fromString(d.get("parent_id"));UUID id=UUID.fromString(kind.equals("chunk")?d.get("id"):d.get("parent_id"));String text=kind.equals("chunk")?d.get("text"):d.get("body");Integer ordinal=kind.equals("chunk")?d.getField("ordinal_stored").numericValue().intValue():null;return new SearchHit(id,docId,UUID.fromString(d.get("run_id")),kind,d.get("title"),d.get("url"),ordinal,snippet(text,q),score,lexical?score:null,lexical?null:score);}
-  private List<SearchHit> fuse(List<SearchHit>a,List<SearchHit>b,int limit){Map<UUID,SearchHit> all=new LinkedHashMap<>();Map<UUID,Float> scores=new HashMap<>();for(int i=0;i<a.size();i++){var h=a.get(i);all.put(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}for(int i=0;i<b.size();i++){var h=b.get(i);all.putIfAbsent(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}return all.values().stream().map(h->new SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),scores.get(h.id()),find(a,h.id(),true),find(b,h.id(),false))).sorted(Comparator.comparing(SearchHit::score).reversed().thenComparing(h->h.id().toString())).limit(limit).toList();}
+  private static SearchHit hit(org.apache.lucene.document.Document d,float score,String q,boolean lexical){String kind=d.get("kind");UUID docId=UUID.fromString(d.get("parent_id"));UUID id=UUID.fromString(kind.equals("chunk")?d.get("id"):d.get("parent_id"));String text=kind.equals("chunk")?d.get("text"):d.get("body");Integer ordinal=kind.equals("chunk")?d.getField("ordinal_stored").numericValue().intValue():null;return new SearchHit(id,docId,UUID.fromString(d.get("run_id")),kind,d.get("title"),d.get("url"),ordinal,snippet(text,q),score,lexical?score:null,lexical?null:score,null,text);}
+  private List<SearchHit> fuse(List<SearchHit>a,List<SearchHit>b,int limit){Map<UUID,SearchHit> all=new LinkedHashMap<>();Map<UUID,Float> scores=new HashMap<>();for(int i=0;i<a.size();i++){var h=a.get(i);all.put(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}for(int i=0;i<b.size();i++){var h=b.get(i);all.putIfAbsent(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}return all.values().stream().map(h->new SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),scores.get(h.id()),find(a,h.id(),true),find(b,h.id(),false),null,h.content())).sorted(Comparator.comparing(SearchHit::score).reversed().thenComparing(h->h.id().toString())).limit(limit).toList();}
   private static Float find(List<SearchHit>x,UUID id,boolean lexical){return x.stream().filter(h->h.id().equals(id)).map(h->lexical?h.lexicalScore():h.semanticScore()).findFirst().orElse(null);} private static List<SearchHit> limit(List<SearchHit>x,int n){return x.stream().limit(n).toList();}
   @Override public synchronized void commit(UUID crateId)throws IOException{writer(crateId,generation(crateId)).commit();}
   @Override public synchronized void commitGeneration(UUID crateId,int generation)throws IOException{writer(crateId,generation).commit();}

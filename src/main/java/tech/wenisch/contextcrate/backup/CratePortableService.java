@@ -20,7 +20,7 @@ import tech.wenisch.contextcrate.storage.*;
 
 @Service
 public class CratePortableService {
-  private static final int SCHEMA = 2;
+  private static final int SCHEMA = 3;
   private final ObjectMapper mapper;
   private final CrateService crates;
   private final CrateAccessService access;
@@ -80,6 +80,7 @@ public class CratePortableService {
     data.set("results", mapper.valueToTree(results.findByCrateId(crateId)));
     data.set("rag", mapper.valueToTree(rag.current(crateId)));
     var embedding = providers.effectiveEmbedding(crateId);
+    var reranking = providers.effectiveReranking(crateId);
     var answering = providers.effectiveAnswer(crateId);
     data.set("providers", mapper.valueToTree(new ProviderExport(
         embedding.enabled(), embedding.provider(), embedding.localModelId(),
@@ -88,6 +89,11 @@ public class CratePortableService {
         embedding.localModelPath() == null ? null : embedding.localModelPath().toString(),
         embedding.openaiBaseUrl(), embedding.openaiModel(), embedding.openaiDimensions(),
         embedding.openaiMaxInputCharacters(),
+        reranking.enabled(), reranking.provider(), reranking.candidateLimit(), reranking.localModelId(),
+        reranking.localRevision(), reranking.localDownloadUrl(), reranking.localCachePath().toString(),
+        reranking.localModelPath() == null ? null : reranking.localModelPath().toString(),
+        reranking.cohereBaseUrl(), reranking.cohereModel(), reranking.cohereMaxInputCharacters(),
+        reranking.cohereTimeoutSeconds(),
         answering.enabled(), answering.baseUrl(), answering.model())));
     entries.put("data.json", mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
     if (includeArtifacts) for (var record : acquisitions.findByCrateId(crateId))
@@ -306,7 +312,7 @@ public class CratePortableService {
         nullable(p, "localModelId"), nullable(p, "localRevision"), nullable(p, "localDownloadUrl"),
         nullable(p, "localCachePath"), nullable(p, "localModelPath"),
         nullable(p, "openaiBaseUrl"), nullable(p, "openaiModel"), null,
-        p.path("openaiDimensions").asInt(1536), p.path("openaiMaxInputCharacters").asInt(8000), p.path("answeringEnabled").asBoolean(),
+        p.path("openaiDimensions").asInt(1536), p.path("openaiMaxInputCharacters").asInt(8000), p.path("rerankingEnabled").asBoolean(false), textOr(p,"rerankingProvider","local"), p.path("rerankingCandidateLimit").asInt(30), nullable(p,"rerankingLocalModelId"), nullable(p,"rerankingLocalRevision"), nullable(p,"rerankingLocalDownloadUrl"), nullable(p,"rerankingLocalCachePath"), nullable(p,"rerankingLocalModelPath"), nullable(p,"rerankingCohereBaseUrl"), nullable(p,"rerankingCohereModel"), null, p.path("rerankingCohereMaxInputCharacters").asInt(4000), p.path("rerankingCohereTimeoutSeconds").asInt(30), p.path("answeringEnabled").asBoolean(),
         nullable(p, "answeringBaseUrl"), nullable(p, "answeringModel"), null));
   }
 
@@ -322,7 +328,7 @@ public class CratePortableService {
       }
     }
     Manifest manifest = mapper.readValue(required(entries, "manifest.json"), Manifest.class);
-    if (manifest.schemaVersion() != 1 && manifest.schemaVersion() != SCHEMA)
+    if (manifest.schemaVersion() != 1 && manifest.schemaVersion() != 2 && manifest.schemaVersion() != SCHEMA)
       throw new IOException("Unsupported crate export schema");
     for (var checksum : manifest.checksums().entrySet())
       if (!Hashing.sha256(required(entries, checksum.getKey())).equals(checksum.getValue()))
@@ -344,6 +350,7 @@ public class CratePortableService {
     return node.hasNonNull(field) && !node.path(field).asText().isBlank()
         ? node.path(field).asText() : null;
   }
+  private static String textOr(JsonNode node,String field,String fallback){String value=text(node,field);return value.isBlank()?fallback:value;}
 
   public record Manifest(int schemaVersion, Instant createdAt, String crateName,
       boolean includesArtifacts, Map<String, String> checksums) {}
@@ -352,6 +359,10 @@ public class CratePortableService {
   public record ProviderExport(boolean embeddingsEnabled, String embeddingProvider,
       String localModelId, String localRevision, String localDownloadUrl, String localCachePath,
       String localModelPath, String openaiBaseUrl, String openaiModel, int openaiDimensions,
-      int openaiMaxInputCharacters, boolean answeringEnabled, String answeringBaseUrl,
+      int openaiMaxInputCharacters, boolean rerankingEnabled, String rerankingProvider,
+      int rerankingCandidateLimit, String rerankingLocalModelId, String rerankingLocalRevision,
+      String rerankingLocalDownloadUrl, String rerankingLocalCachePath, String rerankingLocalModelPath,
+      String rerankingCohereBaseUrl, String rerankingCohereModel, int rerankingCohereMaxInputCharacters,
+      int rerankingCohereTimeoutSeconds, boolean answeringEnabled, String answeringBaseUrl,
       String answeringModel) {}
 }

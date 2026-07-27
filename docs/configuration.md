@@ -61,3 +61,9 @@ Answer generation is disabled by default. Set `CONTEXTCRATE_ANSWERING_ENABLED=tr
 After the provider is configured, use the crate-specific authenticated **Settings** page to choose strict knowledge-base-only answers, history permission, citation behavior, default retrieval mode, and source count. Those runtime policies are stored in the database; provider connection details remain environment/secret configuration.
 
 Each crate Settings page can override embedding and answer-provider values such as provider kind, enabled state, model, endpoint URL, dimensions, local model paths, and API keys. Database overrides take precedence over environment values. API keys entered in Settings are stored in the ContextCrate database; protect database access and backups with encryption.
+
+## Reranking
+
+Reranking is disabled by default and can rescore the retrieval candidate pool before results are
+shown or used for RAG. Configure a local ONNX cross-encoder or Cohere-compatible endpoint with
+`CONTEXTCRATE_RERANKING_*`, or override every setting per crate in the UI. See [Reranking](reranking.md).

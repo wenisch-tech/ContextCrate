@@ -13,6 +13,7 @@ public record ContextCrateProperties(
     Artifacts artifacts,
     Index index,
     Embeddings embeddings,
+    Reranking reranking,
     Retrieval retrieval,
     Answering answering,
     Worker worker,
@@ -22,7 +23,7 @@ public record ContextCrateProperties(
   public ContextCrateProperties(
       String profile, String role, Queue queue, Database database, Artifacts artifacts, Index index,
       Worker worker, Security security) {
-    this(profile, role, queue, database, artifacts, index, null, null, null, worker, security);
+    this(profile, role, queue, database, artifacts, index, null, null, null, null, worker, security);
   }
 
   @ConstructorBinding
@@ -40,6 +41,7 @@ public record ContextCrateProperties(
             ? new Index("lucene", Path.of("data/index"), "http://localhost:9200", "contextcrate")
             : index;
     embeddings = embeddings == null ? Embeddings.defaults() : embeddings;
+    reranking = reranking == null ? Reranking.defaults() : reranking;
     retrieval = retrieval == null ? new Retrieval("hybrid", "rrf", 60, 100) : retrieval;
     answering = answering == null ? Answering.defaults() : answering;
     worker = worker == null ? new Worker(8, 30, 5) : worker;
@@ -115,17 +117,48 @@ public record ContextCrateProperties(
     }
   }
 
+  /** Query-time cross-encoder reranking. It is disabled by default to preserve existing latency. */
+  public record Reranking(boolean enabled, String provider, int candidateLimit, Local local,
+                          CohereCompatible cohereCompatible) {
+    static Reranking defaults() {
+      return new Reranking(false, "local", 30, Local.defaults(),
+          new CohereCompatible(null, null, null, 4000, 30));
+    }
+    public Reranking {
+      provider = defaulted(provider, "local");
+      candidateLimit = Math.max(1, Math.min(candidateLimit, 100));
+      local = local == null ? Local.defaults() : local;
+      cohereCompatible = cohereCompatible == null
+          ? new CohereCompatible(null, null, null, 4000, 30) : cohereCompatible;
+    }
+    public record Local(String modelId, String revision, String downloadUrl, Path cachePath,
+                        Path modelPath, int downloadTimeoutSeconds) {
+      static Local defaults() { return new Local(null, null, null, Path.of("data/models"), null, 120); }
+      public Local {
+        cachePath = cachePath == null ? Path.of("data/models") : cachePath;
+        downloadTimeoutSeconds = Math.max(5, downloadTimeoutSeconds);
+      }
+    }
+    public record CohereCompatible(String baseUrl, String model, String apiKey,
+                                   int maxInputCharacters, int timeoutSeconds) {
+      public CohereCompatible {
+        maxInputCharacters = maxInputCharacters < 256 ? 4000 : maxInputCharacters;
+        timeoutSeconds = Math.max(5, timeoutSeconds);
+      }
+    }
+  }
+
   public record Answering(boolean enabled, String provider, OpenAiCompatible openaiCompatible,
                           String retrievalMode, int sourceLimit, int contextTokenBudget,
                           int maxHistoryMessages, double temperature, int maxOutputTokens) {
     static Answering defaults() {
-      return new Answering(false, "openai-compatible", new OpenAiCompatible(null, null, null, null, 60), "hybrid", 8, 6000, 10, 0.2, 800);
+      return new Answering(false, "openai-compatible", new OpenAiCompatible(null, null, null, null, 60), "hybrid", 12, 6000, 10, 0.2, 800);
     }
     public Answering {
       provider = defaulted(provider, "openai-compatible");
       openaiCompatible = openaiCompatible == null ? new OpenAiCompatible(null, null, null, null, 60) : openaiCompatible;
       retrievalMode = defaulted(retrievalMode, "hybrid");
-      sourceLimit = Math.max(1, Math.min(sourceLimit, 20));
+      sourceLimit = Math.max(1, Math.min(sourceLimit, 16));
       contextTokenBudget = Math.max(256, Math.min(contextTokenBudget, 100_000));
       maxHistoryMessages = Math.max(0, Math.min(maxHistoryMessages, 50));
       temperature = Math.max(0, Math.min(temperature, 2));

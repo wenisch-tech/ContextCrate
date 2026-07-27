@@ -8,6 +8,9 @@ ContextCrate retrieves source documents and chunks. It does not generate answers
 
 Responses include the selected mode, final score, and lexical/semantic component scores. `POST /api/v1/index/rebuild` recreates the derived v2 vector index from canonical documents and chunks, without crawling again.
 
+An optional [reranking](reranking.md) stage can rescore retrieved candidates using a cross-encoder.
+It runs after lexical, semantic, or RRF-hybrid retrieval and does not require rebuilding vectors.
+
 ## Local default
 
 The default provider is `local`. On first indexing or semantic query it downloads the pinned `Xenova/multilingual-e5-small` ONNX bundle into `data/models`. It is a multilingual, CPU-friendly model and produces 384-dimensional normalized vectors. The first download needs network access and disk space; later starts reuse the cache. CPU inference is appropriate for development and modest indexing workloads, but bulk rebuilds can take time.

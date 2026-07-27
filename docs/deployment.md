@@ -27,3 +27,10 @@ Provide connection settings through `env` and `secrets`. Queue-aware KEDA scalin
 ## Embedding model storage
 
 Persist `/app/data/models` so the default local model is downloaded only once. To run air-gapped, mount a compatible ONNX bundle at `/models` and set `CONTEXTCRATE_EMBEDDINGS_LOCAL_MODEL_PATH=/models`. Helm exposes the same choice through `embeddings.local.modelPathMount`. See [Embeddings](embeddings.md) for endpoint and rebuild configuration.
+
+## Reranking model storage
+
+Local rerankers use the same persistent model cache. Set `CONTEXTCRATE_RERANKING_LOCAL_CACHE_PATH`
+or mount an offline ONNX cross-encoder and set `CONTEXTCRATE_RERANKING_LOCAL_MODEL_PATH`. A remote
+reranker receives query and candidate text; configure its endpoint and secret through the
+`CONTEXTCRATE_RERANKING_COHERE_COMPATIBLE_*` variables. See [Reranking](reranking.md).

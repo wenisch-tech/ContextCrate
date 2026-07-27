@@ -2,6 +2,9 @@
 
 ContextCrate can answer questions from its indexed content by combining hybrid retrieval with an OpenAI-compatible chat-completions endpoint. Embeddings retrieve relevant chunks; the answer model writes the response. These are independent model choices.
 
+When enabled, [reranking](reranking.md) sorts a wider candidate set before ContextCrate selects
+the sources included in the answer prompt.
+
 Answer generation is disabled by default. Configure a compatible endpoint and enable it:
 
 ```bash

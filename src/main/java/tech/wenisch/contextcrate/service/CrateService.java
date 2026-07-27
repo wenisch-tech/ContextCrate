@@ -4,6 +4,7 @@ import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.*;
 import tech.wenisch.contextcrate.repository.*;
 
@@ -16,13 +17,14 @@ public class CrateService {
   private final AuditLogRepository audits;
   private final CrateAccessService access;
   private final JdbcTemplate jdbc;
+  private final ContextCrateProperties properties;
 
   public CrateService(
       CrateRepository crates, CrateMemberRepository members, AppUserRepository users,
       SystemSettingRepository settings, AuditLogRepository audits, CrateAccessService access,
-      JdbcTemplate jdbc) {
+      JdbcTemplate jdbc, ContextCrateProperties properties) {
     this.crates = crates; this.members = members; this.users = users; this.settings = settings;
-    this.audits = audits; this.access = access; this.jdbc = jdbc;
+    this.audits = audits; this.access = access; this.jdbc = jdbc; this.properties = properties;
   }
 
   public List<Crate> accessible() {
@@ -98,8 +100,8 @@ public class CrateService {
     jdbc.update("""
         insert into crate_rag_settings(crate_id, strict_grounding, allow_client_history,
           inline_citations, structured_sources, retrieval_mode, source_limit)
-        values (?, false, true, true, true, 'hybrid', 8)
-        """, crateId);
+        values (?, false, true, true, true, 'hybrid', ?)
+        """, crateId, properties.answering().sourceLimit());
     jdbc.update("""
         insert into crate_provider_settings(crate_id, embeddings_enabled, embeddings_provider,
           answering_enabled) values (?, true, 'local', false)

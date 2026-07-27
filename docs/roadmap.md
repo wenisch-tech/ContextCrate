@@ -4,7 +4,7 @@
 2. Add embedding generation and versioned Lucene/OpenSearch vector mappings, followed by hybrid score fusion. **Implemented:** configurable local ONNX and OpenAI-compatible providers, semantic retrieval, and RRF fusion.
 3. Capture query, impression, click, conversion, dwell, and explicit feedback events with privacy controls.
 4. Introduce offline judgments, reproducible evaluation sets, and NDCG/MRR/recall dashboards.
-5. Add pluggable rerankers, feature logging, model/version registries, shadow evaluation, and learning-to-rank rollout controls.
+5. Add feature logging, model/version registries, shadow evaluation, and learning-to-rank rollout controls. **Implemented:** pluggable local ONNX and Cohere-compatible rerankers.
 
 Answer generation is now available through a configured OpenAI-compatible streaming endpoint. Feedback and evaluation remain prerequisites for ranking optimization.
 
