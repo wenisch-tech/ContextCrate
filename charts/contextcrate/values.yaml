@@ -33,6 +33,7 @@ embeddings:
     model: ""
     apiKeySecret: ""
     dimensions: 1536
+    automaticLimitRecovery: true
 answering:
   enabled: false
   openaiCompatible:

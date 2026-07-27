@@ -29,6 +29,7 @@ CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL=text-embedding-model
 CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS=1536
 CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_API_KEY=stored-in-a-secret
 CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MAX_INPUT_CHARACTERS=8000
+CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_AUTOMATIC_LIMIT_RECOVERY=true
 ```
 
 ### Input limits and chunking
@@ -55,6 +56,25 @@ expose its tokenizer to ContextCrate. It is a safety cap, not an exact token con
 model with a 512-token limit, begin with 2,000 characters and reduce it if the endpoint still
 reports a context-window error. Set the ingestion chunk size at or below the same value; overlap
 is automatically reduced if necessary.
+
+### Automatic limit recovery
+
+**Automatic embedding limit recovery** is enabled by default for OpenAI-compatible endpoints.
+It is configured per crate in **Settings → Providers**, or globally with
+`CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_AUTOMATIC_LIMIT_RECOVERY=true`.
+
+When an endpoint returns an HTTP 400 that generically describes an input-token or context-window
+limit, ContextCrate reduces a conservative character ceiling, saves that learned value for the
+configured endpoint and model, and retries. This detection deliberately does not depend on a
+specific gateway or error class. During indexing it re-chunks the affected document and rebuilds
+its extraction results before retrying, so semantic coverage is not silently truncated. For an
+oversized search query, semantic embedding uses a word-boundary prefix at the learned limit while
+lexical matching continues to use the full query.
+
+The configured maximum remains the administrator-controlled upper bound; the effective maximum
+shown in Settings may be lower after recovery. A learned value is reset when the endpoint or model
+changes. Disable the toggle to retain strict behavior: no automatic retries, learned limits, or
+re-chunking. For a known endpoint limit, set **Maximum input characters** directly.
 
 ### Endpoint URL
 

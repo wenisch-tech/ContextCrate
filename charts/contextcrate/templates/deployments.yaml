@@ -33,6 +33,7 @@ spec:
             - { name: CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_BASE_URL, value: {{ $.Values.embeddings.openaiCompatible.baseUrl | quote }} }
             - { name: CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_MODEL, value: {{ $.Values.embeddings.openaiCompatible.model | quote }} }
             - { name: CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_DIMENSIONS, value: {{ $.Values.embeddings.openaiCompatible.dimensions | quote }} }
+            - { name: CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_AUTOMATIC_LIMIT_RECOVERY, value: {{ $.Values.embeddings.openaiCompatible.automaticLimitRecovery | quote }} }
             - { name: CONTEXTCRATE_ANSWERING_ENABLED, value: {{ $.Values.answering.enabled | quote }} }
             - { name: CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_BASE_URL, value: {{ $.Values.answering.openaiCompatible.baseUrl | quote }} }
             - { name: CONTEXTCRATE_ANSWERING_OPENAI_COMPATIBLE_MODEL, value: {{ $.Values.answering.openaiCompatible.model | quote }} }

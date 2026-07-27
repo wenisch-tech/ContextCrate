@@ -525,6 +525,7 @@ public class UiController {
       @RequestParam(required=false) String embeddingBaseUrl, @RequestParam(required=false) String embeddingRemoteModel,
       @RequestParam(required=false) String embeddingApiKey, @RequestParam int embeddingDimensions,
       @RequestParam int embeddingMaxInputCharacters,
+      @RequestParam(defaultValue="false") boolean embeddingAutomaticLimitRecovery,
       @RequestParam(defaultValue="false") boolean rerankingEnabled, @RequestParam String rerankingProvider,
       @RequestParam int rerankingCandidateLimit, @RequestParam(required=false) String rerankingModelId,
       @RequestParam(required=false) String rerankingRevision, @RequestParam(required=false) String rerankingDownloadUrl,
@@ -536,7 +537,7 @@ public class UiController {
       @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     var previous = providerSettings.effectiveEmbedding(crateId);
-    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
+    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
     if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString()))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";

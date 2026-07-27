@@ -82,12 +82,12 @@ public record ContextCrateProperties(
       Local local,
       OpenAiCompatible openaiCompatible) {
     static Embeddings defaults() {
-      return new Embeddings(true, "local", Local.defaults(), new OpenAiCompatible(null, null, null, null, 1536, 30, 8000));
+      return new Embeddings(true, "local", Local.defaults(), new OpenAiCompatible(null, null, null, null, 1536, 30, 8000, true));
     }
     public Embeddings {
       provider = defaulted(provider, "local");
       local = local == null ? Local.defaults() : local;
-      openaiCompatible = openaiCompatible == null ? new OpenAiCompatible(null, null, null, null, 1536, 30, 8000) : openaiCompatible;
+      openaiCompatible = openaiCompatible == null ? new OpenAiCompatible(null, null, null, null, 1536, 30, 8000, true) : openaiCompatible;
     }
     public record Local(String modelId, String revision, String downloadUrl, Path cachePath, Path modelPath, int downloadTimeoutSeconds) {
       static Local defaults() {
@@ -103,7 +103,8 @@ public record ContextCrateProperties(
         downloadTimeoutSeconds = Math.max(5, downloadTimeoutSeconds);
       }
     }
-    public record OpenAiCompatible(String baseUrl, String model, String apiKey, String headers, int dimensions, int timeoutSeconds, int maxInputCharacters) {
+    public record OpenAiCompatible(String baseUrl, String model, String apiKey, String headers, int dimensions, int timeoutSeconds, int maxInputCharacters, boolean automaticLimitRecovery) {
+      public OpenAiCompatible(String baseUrl, String model, String apiKey, String headers, int dimensions, int timeoutSeconds, int maxInputCharacters) { this(baseUrl, model, apiKey, headers, dimensions, timeoutSeconds, maxInputCharacters, true); }
       public OpenAiCompatible { dimensions = Math.max(1, dimensions); timeoutSeconds = Math.max(5, timeoutSeconds); maxInputCharacters = maxInputCharacters < 256 ? 8000 : maxInputCharacters; }
     }
   }

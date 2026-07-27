@@ -29,7 +29,7 @@ public class CrateSettingsApiController {
     var e=providers.effectiveEmbedding(crateId);var r=providers.effectiveReranking(crateId);var a=providers.effectiveAnswer(crateId);
     return new ProviderView(e.enabled(),e.provider(),e.localModelId(),e.localRevision(),
         e.localDownloadUrl(),e.localCachePath().toString(),e.localModelPath()==null?null:e.localModelPath().toString(),
-        e.openaiBaseUrl(),e.openaiModel(),e.openaiDimensions(),e.openaiMaxInputCharacters(),r.enabled(),r.provider(),r.candidateLimit(),r.localModelId(),r.localRevision(),r.localDownloadUrl(),r.localCachePath().toString(),r.localModelPath()==null?null:r.localModelPath().toString(),r.cohereBaseUrl(),r.cohereModel(),r.cohereMaxInputCharacters(),r.cohereTimeoutSeconds(),a.enabled(),a.baseUrl(),a.model());
+        e.openaiBaseUrl(),e.openaiModel(),e.openaiDimensions(),e.openaiMaxInputCharacters(),e.automaticLimitRecovery(),e.effectiveOpenaiMaxInputCharacters(),r.enabled(),r.provider(),r.candidateLimit(),r.localModelId(),r.localRevision(),r.localDownloadUrl(),r.localCachePath().toString(),r.localModelPath()==null?null:r.localModelPath().toString(),r.cohereBaseUrl(),r.cohereModel(),r.cohereMaxInputCharacters(),r.cohereTimeoutSeconds(),a.enabled(),a.baseUrl(),a.model());
   }
   @PutMapping("/providers") public ProviderView providers(@PathVariable UUID crateId,@RequestBody RuntimeProviderSettings.ProviderForm form){
     access.require(crateId,CrateMember.Role.OWNER);
@@ -42,6 +42,6 @@ public class CrateSettingsApiController {
       boolean structuredSources,String retrievalMode,int sourceLimit){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
-      String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,
+      String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,
       String answeringBaseUrl,String answeringModel){}
 }

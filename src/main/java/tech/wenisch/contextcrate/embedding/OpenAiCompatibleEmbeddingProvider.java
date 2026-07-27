@@ -24,7 +24,13 @@ public class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
   @Override public ModelDescriptor descriptor() { var config=settings.effectiveEmbedding();return new ModelDescriptor("openai-compatible", config.openaiModel(), config.openaiModel(), dimensions == 0 ? config.openaiDimensions() : dimensions, true, "", ""); }
   @Override public boolean available() { var config=settings.effectiveEmbedding();return config.enabled() && config.openaiBaseUrl() != null && !config.openaiBaseUrl().isBlank() && config.openaiModel() != null && !config.openaiModel().isBlank(); }
   @Override public List<float[]> embedDocuments(List<String> texts) throws Exception { return embed(texts); }
-  @Override public List<float[]> embedQueries(List<String> texts) throws Exception { return embed(texts); }
+  @Override public List<float[]> embedQueries(List<String> texts) throws Exception {
+    for (int attempt=0;;attempt++) try { return embed(texts); }
+    catch (EmbeddingInputTooLargeException limit) {
+      if (attempt >= 8) throw limit;
+      // The next call reads the persisted learned ceiling and limits at a word boundary.
+    }
+  }
 
   private List<float[]> embed(List<String> texts) throws Exception {
     var config=settings.effectiveEmbedding();
@@ -33,12 +39,20 @@ public class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
     var request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
         .header("Content-Type", "application/json");
     if (config.openaiApiKey() != null && !config.openaiApiKey().isBlank()) request.header("Authorization", "Bearer " + config.openaiApiKey());
-    List<String> inputs = texts.stream().map(text -> limit(text, config.openaiMaxInputCharacters())).toList();
+    List<String> inputs = texts.stream().map(text -> limit(text, config.effectiveOpenaiMaxInputCharacters())).toList();
     String payload = mapper.writeValueAsString(Map.of("model", config.openaiModel(), "input", inputs, "encoding_format", "float"));
     var response = client.send(request.POST(HttpRequest.BodyPublishers.ofString(payload)).build(), HttpResponse.BodyHandlers.ofString());
     if (response.statusCode() / 100 != 2) {
+      if (config.automaticLimitRecovery() && isInputLimitError(response.statusCode(), response.body())) {
+        int next = Math.max(256, config.effectiveOpenaiMaxInputCharacters() / 2);
+        if (next < config.effectiveOpenaiMaxInputCharacters()) {
+          settings.learnEmbeddingInputLimit(tech.wenisch.contextcrate.config.CrateContext.current(), next,
+              config.openaiBaseUrl(), config.openaiModel());
+          throw new EmbeddingInputTooLargeException(next);
+        }
+      }
       String detail = response.body().replaceAll("[\\r\\n\\t]+", " ").trim();
-      if (detail.length() > 1000) detail = detail.substring(0, 1000) + "…";
+      if (detail.length() > 300) detail = detail.substring(0, 300) + "…";
       throw new IllegalStateException("Embedding endpoint returned HTTP " + response.statusCode()
           + (detail.isBlank() ? "" : ": " + detail));
     }
@@ -50,10 +64,21 @@ public class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
     if (vectors.stream().anyMatch(v -> v.length != dimensions)) throw new IllegalStateException("Embedding endpoint returned inconsistent dimensions");
     return vectors;
   }
+  static boolean isInputLimitError(int status, String body) {
+    if (status != 400 || body == null) return false;
+    String value = body.toLowerCase(Locale.ROOT);
+    boolean limit = value.contains("context window") || value.contains("context length")
+        || value.contains("input token") || value.contains("too many tokens")
+        || value.contains("input too long");
+    return limit && (value.contains("maximum") || value.contains("exceed") || value.contains("limit")
+        || value.contains("requested"));
+  }
   static float[] normalize(float[] v) { double sum=0; for(float x:v) sum+=x*x; double n=Math.sqrt(sum); if(n==0) throw new IllegalStateException("Embedding vector is zero"); for(int i=0;i<v.length;i++) v[i]/=(float)n; return v; }
   private static String limit(String input, int maxCharacters) {
     String value = input == null ? "" : input;
     if (value.codePointCount(0, value.length()) <= maxCharacters) return value;
-    return value.substring(0, value.offsetByCodePoints(0, maxCharacters));
+    int end=value.offsetByCodePoints(0, maxCharacters);
+    int boundary=Math.max(value.lastIndexOf(' ',end),value.lastIndexOf('\n',end));
+    return value.substring(0,boundary > end / 2 ? boundary : end);
   }
 }

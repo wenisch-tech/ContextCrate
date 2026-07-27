@@ -52,7 +52,11 @@ Spring properties map to uppercase underscore environment variables. Distributed
 
 ## Embeddings
 
-Embeddings default to the local ONNX provider. See [Embeddings](embeddings.md) for local cache/offline model configuration, OpenAI-compatible endpoints, and retrieval-mode settings.
+Embeddings default to the local ONNX provider. For OpenAI-compatible endpoints,
+`CONTEXTCRATE_EMBEDDINGS_OPENAI_COMPATIBLE_AUTOMATIC_LIMIT_RECOVERY` defaults to `true` and
+lets each crate automatically recover from generic context-limit errors. The crate Settings page
+can override it. See [Embeddings](embeddings.md) for local cache/offline model configuration,
+OpenAI-compatible endpoints, and retrieval-mode settings.
 
 ## Answer generation
 
