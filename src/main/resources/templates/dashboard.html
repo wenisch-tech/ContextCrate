@@ -118,8 +118,12 @@
   const crateId=document.getElementById('dashboard').dataset.crateId;
   const form=document.getElementById('answer-form'), status=document.getElementById('answer-status'), text=document.getElementById('answer-text'), sources=document.getElementById('answer-sources'), cancel=document.getElementById('cancel-answer'); let controller, sourceList=[], markdown='';
   const safeUrl=value=>{try{const url=new URL(value,window.location.origin);return ['http:','https:'].includes(url.protocol)?url.href:null}catch{return null}};
+  const sourceLink=value=>{
+    const git=value?.match(/^git\+(.+)@[0-9a-f]{40}\/.+$/i);
+    return safeUrl(git?git[1]:value);
+  };
   const appendInline=(parent,value)=>{
-    const token=/(`[^`]*`|!?\[[^\]]+\]\([^\s)]+\)|\[\d+\]|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+    const token=/(`[^`]*`|!?\[[^\]]+\]\([^\s)]+\)|\[(?:SOURCE\s+)?\d+\]|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
     let last=0;
     const appendToken=part=>{
       if(part.startsWith('`')){const code=document.createElement('code');code.textContent=part.slice(1,-1);parent.append(code);return}
@@ -130,8 +134,8 @@
         if(!href){parent.append(document.createTextNode(link[2]));return}
         const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener';a.textContent=link[2];parent.append(a);return
       }
-      const citation=part.match(/^\[(\d+)\]$/);
-      if(citation){const known=sourceList.some(s=>s.citation===Number(citation[1]));if(known){const a=document.createElement('a');a.href='#citation-'+citation[1];a.textContent=part;parent.append(a)}else parent.append(document.createTextNode(part));return}
+      const citation=part.match(/^\[(?:SOURCE\s+)?(\d+)\]$/);
+      if(citation){const known=sourceList.some(s=>s.citation===Number(citation[1]));if(known){const a=document.createElement('a');a.href='#citation-'+citation[1];a.textContent='['+citation[1]+']';parent.append(a)}else parent.append(document.createTextNode(part));return}
       const emphasized=document.createElement(part.startsWith('**')||part.startsWith('__')?'strong':'em');emphasized.textContent=part.slice(part.startsWith('**')||part.startsWith('__')?2:1,part.startsWith('**')||part.startsWith('__')?-2:-1);parent.append(emphasized);
     };
     for(const match of value.matchAll(token)){parent.append(document.createTextNode(value.slice(last,match.index)));appendToken(match[0]);last=match.index+match[0].length}parent.append(document.createTextNode(value.slice(last)));
@@ -142,6 +146,7 @@
       const line=lines[i];
       if(!line.trim()){i++;continue}
       if(line.startsWith('```')){const code=[];while(++i<lines.length&&!lines[i].startsWith('```'))code.push(lines[i]);if(i<lines.length)i++;const pre=document.createElement('pre'), node=document.createElement('code');node.textContent=code.join('\n');pre.append(node);text.append(pre);continue}
+      if(/^`[a-zA-Z0-9_+-]*$/.test(line)){const code=[];while(++i<lines.length&&lines[i]!=='`')code.push(lines[i]);if(i<lines.length)i++;const pre=document.createElement('pre'), node=document.createElement('code');node.textContent=code.join('\n');pre.append(node);text.append(pre);continue}
       const heading=line.match(/^(#{1,6})\s+(.+)$/);
       if(heading){const node=document.createElement('h'+heading[1].length);appendInline(node,heading[2]);text.append(node);i++;continue}
       const list=line.match(/^\s*([-*+]|\d+\.)\s+(.+)$/);
@@ -151,7 +156,7 @@
       const paragraph=[];while(i<lines.length&&lines[i].trim()&&!lines[i].startsWith('```')&&!/^(#{1,6})\s+/.test(lines[i])&&!/^\s*(?:[-*+]|\d+\.)\s+/.test(lines[i])&&!/^>\s?/.test(lines[i]))paragraph.push(lines[i++]);const node=document.createElement('p');paragraph.forEach((part,index)=>{if(index)node.append(document.createElement('br'));appendInline(node,part)});text.append(node);
     }
   };
-  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li');li.id='citation-'+s.citation;const a=document.createElement('a'),href=safeUrl(s.sourceUri);if(href){a.href=href;a.target='_blank';a.rel='noopener'}a.textContent=s.title||s.sourceUri;li.append(a,document.createTextNode(' — '+s.snippet));list.append(li)});sources.append(list);renderMarkdown()};
+  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li'),name=document.createElement('div'),link=document.createElement('a'),details=document.createElement('div'),href=sourceLink(s.sourceUri);li.id='citation-'+s.citation;name.className='fw-semibold';name.textContent=s.title||s.sourceUri;link.className='small d-block text-break';link.textContent=s.sourceUri;if(href){link.href=href;link.target='_blank';link.rel='noopener'}else link.removeAttribute('href');details.className='small text-secondary mt-1';details.textContent=s.snippet;li.append(name,link,details);list.append(li)});sources.append(list);renderMarkdown()};
   cancel.addEventListener('click',()=>controller?.abort());
   form.addEventListener('submit',async event=>{event.preventDefault();controller?.abort();controller=new AbortController();markdown='';sourceList=[];status.textContent='Finding sources…';text.replaceChildren();sources.replaceChildren();cancel.classList.remove('d-none');try{const response=await fetch('/api/v1/crates/'+crateId+'/answers',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:document.getElementById('answer-question').value}),signal:controller.signal});if(!response.ok)throw new Error(response.status===503?'Answer generation is not configured.':'Unable to generate an answer.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';status.textContent='Generating answer…';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop();for(const eventText of events){let name='',data='';eventText.split('\n').forEach(line=>{if(line.startsWith('event:'))name=line.slice(6).trim();if(line.startsWith('data:'))data+=line.slice(5).trim()});if(!data)continue;const payload=JSON.parse(data);if(name==='sources')renderSources(payload);if(name==='delta'){markdown+=payload.text;renderMarkdown()}if(name==='complete'){status.textContent='Complete.'}if(name==='error')throw new Error(payload.error)}}}catch(error){if(error.name==='AbortError')status.textContent='Cancelled.';else status.textContent=error.message}finally{cancel.classList.add('d-none')}});
 })();

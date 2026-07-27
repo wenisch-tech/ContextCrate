@@ -18,6 +18,12 @@ class DashboardTemplateTest {
     assertThat(html)
         .contains("th:data-crate-id=\"${crate.id}\"")
         .contains("const crateId=document.getElementById('dashboard').dataset.crateId;")
+        .contains("const sourceLink=value=>")
+        .contains("name.textContent=s.title||s.sourceUri")
+        .contains("link.textContent=s.sourceUri")
+        .contains("/^`[a-zA-Z0-9_+-]*$/.test(line)")
+        .contains("\\[(?:SOURCE\\s+)?\\d+\\]")
+        .contains("a.textContent='['+citation[1]+']'")
         .contains("const renderMarkdown=()=>")
         .contains("<script th:inline=\"none\">")
         .doesNotContain("<script th:inline=\"javascript\">");

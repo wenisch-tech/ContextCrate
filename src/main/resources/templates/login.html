@@ -1,1 +1,23 @@
-<!doctype html><html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · ContextCrate</title><link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css"><link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css"><link rel="stylesheet" href="/css/contextcrate.css"></head><body class="login-body"><main class="login-card card shadow-lg"><div class="card-body p-5"><div class="brand-mark brand-large mx-auto mb-3"><i class="bi bi-radar"></i></div><h1 class="h3 text-center">Welcome to ContextCrate</h1><p class="text-secondary text-center mb-4">Crawl, normalize, and index the web you care about.</p><div th:if="${param.error}" class="alert alert-danger">The email or password is incorrect.</div><div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div><form method="post" action="/login"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="mb-3"><label class="form-label" for="username">Email</label><input id="username" class="form-control form-control-lg" name="username" type="email" autofocus required></div><div class="mb-4"><label class="form-label" for="password">Password</label><input id="password" class="form-control form-control-lg" name="password" type="password" required></div><button class="btn btn-primary btn-lg w-100">Sign in</button></form><p class="small text-secondary text-center mt-4 mb-0">Default: admin@contextcrate.local / admin</p></div></main></body></html>
+<!doctype html>
+<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in · ContextCrate</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/contextcrate.css">
+  <style>.login-logo{width:96px;height:96px;object-fit:contain}</style>
+</head>
+<body class="login-body"><main class="login-card card shadow-lg"><div class="card-body p-5">
+  <img class="login-logo d-block mx-auto mb-3" src="/img/contextcrate-logo-clean.png" alt="ContextCrate logo">
+  <h1 class="h3 text-center">Welcome to ContextCrate</h1>
+  <p class="text-secondary text-center mb-4">Crawl, normalize, and index the web you care about.</p>
+  <div th:if="${param.error}" class="alert alert-danger">The email or password is incorrect.</div>
+  <div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div>
+  <form method="post" action="/login"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <div class="mb-3"><label class="form-label" for="username">Email</label><input id="username" class="form-control form-control-lg" name="username" type="email" autofocus required></div>
+    <div class="mb-4"><label class="form-label" for="password">Password</label><input id="password" class="form-control form-control-lg" name="password" type="password" required></div>
+    <button class="btn btn-primary btn-lg w-100">Sign in</button>
+  </form>
+  <p class="small text-secondary text-center mt-4 mb-0">Default: admin@contextcrate.local / admin</p>
+</div></main></body></html>
