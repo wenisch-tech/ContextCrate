@@ -23,7 +23,7 @@ public class DocumentIndexRecoveryService {
 
   @Transactional
   public int enqueueMissing(UUID crateId) {
-    var missing = documents.findByCrateIdAndIndexedFalse(crateId);
+    var missing = documents.findByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId);
     for (var document : missing) {
       // Completed work is intentionally retained for auditability, so a recovery request needs a
       // fresh idempotency key rather than reusing the original document-processing key.

@@ -149,6 +149,7 @@ public class CratePortableService {
     Map<UUID, UUID> sourceIds = new HashMap<>(), jobIds = new HashMap<>(), runIds = new HashMap<>(),
         itemIds = new HashMap<>(), acquisitionIds = new HashMap<>(), documentIds = new HashMap<>(),
         chunkIds = new HashMap<>(), ruleIds = new HashMap<>();
+    Map<String, Integer> importedVersions = new HashMap<>();
 
     if (bundle.manifest().schemaVersion() == 1) {
       importLegacySources(data, crateId, sourceIds, jobIds);
@@ -210,7 +211,15 @@ public class CratePortableService {
           nullable(node, "title"), nullable(node, "language"), nullable(node, "description"),
           nullable(node, "author"), text(node, "body"), text(node, "contentHash"),
           text(node, "metadataJson"));
-      value.assignCrate(crateId); documents.save(value);
+      IngestionRun run = runs.findById(runIds.get(UUID.fromString(text(node, "runId")))).orElseThrow();
+      String identityUri = nullable(node, "identityUri") == null ? text(node, uriField)
+          : nullable(node, "identityUri");
+      int version = node.has("versionNumber") ? node.path("versionNumber").asInt()
+          : importedVersions.merge(run.getSourceId() + ":" + identityUri, 1, Integer::sum);
+      value.assignCrate(crateId);
+      value.version(run.getSourceId(), identityUri, version);
+      if (node.has("currentVersion")) value.currentVersion(node.path("currentVersion").asBoolean());
+      documents.save(value);
     }
     for (JsonNode node : data.path("chunks")) {
       UUID id = UUID.randomUUID(); chunkIds.put(uuid(node), id);

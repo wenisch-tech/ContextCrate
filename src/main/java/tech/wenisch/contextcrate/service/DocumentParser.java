@@ -96,7 +96,6 @@ public class DocumentParser {
       return;
     }
     String sourceUri = canonical(page, acquisition);
-    if (documents.findByRunIdAndSourceUri(run.getId(), sourceUri).isPresent()) return;
     String metadata = mapper.writeValueAsString(Map.of(
         "openGraph", extractOpenGraph(page),
         "headings", page.select("h1,h2,h3").eachText(),
@@ -135,7 +134,6 @@ public class DocumentParser {
         "format", markdown ? "markdown" : "text",
         "headings", sections.stream().map(Section::heading).filter(Objects::nonNull).toList()));
     String sourceUri = acquisition.getFinalLocator();
-    if (documents.findByRunIdAndSourceUri(run.getId(), sourceUri).isPresent()) return;
     persist(run, acquisition, sourceUri, title, null, null, null, body, metadata, sections,
         config.output());
   }
@@ -143,11 +141,20 @@ public class DocumentParser {
   private void persist(IngestionRun run, AcquisitionRecord acquisition, String sourceUri,
       String title, String language, String description, String author, String body,
       String metadata, List<Section> sections, CrawlConfiguration.Output output) {
+    String hash = Hashing.sha256(body);
+    String identityUri = ingestion.connector(run) == ConnectorType.GIT
+        ? acquisition.getRequestedLocator() : sourceUri;
+    var current = documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        run.getCrateId(), run.getSourceId(), identityUri);
+    if (current.filter(document -> document.getContentHash().equals(hash)).isPresent()) return;
     UUID documentId = stable("document:" + run.getId() + ":" + sourceUri);
     NormalizedDocument value = new NormalizedDocument(documentId, run.getId(),
         acquisition.getId(), sourceUri, title, language, description, author, body,
-        Hashing.sha256(body), metadata);
+        hash, metadata);
     value.assignCrate(run.getCrateId());
+    value.version(run.getSourceId(), identityUri,
+        current.map(document -> document.getVersionNumber() + 1).orElse(1));
+    current.ifPresent(document -> { document.supersede(); documents.save(document); });
     NormalizedDocument document = documents.save(value);
     int chunkSize = effectiveChunkSize(run, output.chunkSize());
     int chunkOverlap = Math.min(output.chunkOverlap(), Math.max(0, chunkSize - 1));

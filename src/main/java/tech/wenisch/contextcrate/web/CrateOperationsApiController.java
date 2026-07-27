@@ -25,7 +25,14 @@ public class CrateOperationsApiController {
   }
   @GetMapping("/documents") public List<NormalizedDocument> documents(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.VIEWER);
-    return documents.findTop100ByCrateIdOrderByCreatedAtDesc(crateId);
+    return documents.findTop100ByCrateIdAndCurrentVersionTrueOrderByCreatedAtDesc(crateId);
+  }
+  @GetMapping("/documents/{id}/versions") public List<NormalizedDocument> versions(
+      @PathVariable UUID crateId,@PathVariable UUID id){
+    access.require(crateId,CrateMember.Role.VIEWER);
+    var document=documents.findByIdAndCrateId(id,crateId).orElseThrow();
+    return documents.findByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        crateId,document.getSourceId(),document.getIdentityUri());
   }
   @GetMapping("/documents/{id}/chunks") public List<DocumentChunk> chunks(@PathVariable UUID crateId,@PathVariable UUID id){
     access.require(crateId,CrateMember.Role.VIEWER);

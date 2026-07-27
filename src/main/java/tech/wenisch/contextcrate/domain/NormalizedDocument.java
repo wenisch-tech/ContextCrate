@@ -17,11 +17,23 @@ public class NormalizedDocument {
   @Column(name = "run_id", nullable = false)
   private UUID runId;
 
+  @Column(name = "source_id", nullable = false)
+  private UUID sourceId;
+
   @Column(name = "acquisition_id", nullable = false)
   private UUID acquisitionId;
 
   @Column(name = "source_uri", nullable = false, length = 4096)
   private String sourceUri;
+
+  @Column(name = "identity_uri", nullable = false, length = 4096)
+  private String identityUri;
+
+  @Column(name = "version_number", nullable = false)
+  private int versionNumber;
+
+  @Column(name = "current_version", nullable = false)
+  private boolean currentVersion;
 
   @Column(length = 1000)
   private String title;
@@ -68,6 +80,9 @@ public class NormalizedDocument {
     this.runId = runId;
     this.acquisitionId = acquisitionId;
     this.sourceUri = sourceUri;
+    this.identityUri = sourceUri;
+    this.versionNumber = 1;
+    this.currentVersion = true;
     this.title = title;
     this.language = language;
     this.description = description;
@@ -94,6 +109,22 @@ public class NormalizedDocument {
   public UUID getRunId() {
     return runId;
   }
+
+  public UUID getSourceId() { return sourceId; }
+  public String getIdentityUri() { return identityUri; }
+  public int getVersionNumber() { return versionNumber; }
+  public boolean isCurrentVersion() { return currentVersion; }
+
+  public void version(UUID sourceId, String identityUri, int versionNumber) {
+    this.sourceId = java.util.Objects.requireNonNull(sourceId);
+    this.identityUri = java.util.Objects.requireNonNull(identityUri);
+    this.versionNumber = versionNumber;
+    this.currentVersion = true;
+  }
+
+  public void supersede() { currentVersion = false; }
+
+  public void currentVersion(boolean value) { currentVersion = value; }
 
   public UUID getAcquisitionId() {
     return acquisitionId;

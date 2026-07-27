@@ -20,7 +20,8 @@ class DocumentIndexRecoveryServiceTest {
     NormalizedDocument document = new NormalizedDocument(UUID.randomUUID(), runId, acquisitionId,
         "https://example.test/doc", "Document", null, null, null, "Body", "hash", "{}");
     document.assignCrate(crateId);
-    when(documents.findByCrateIdAndIndexedFalse(crateId)).thenReturn(List.of(document));
+    document.version(UUID.randomUUID(), "https://example.test/doc", 1);
+    when(documents.findByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId)).thenReturn(List.of(document));
 
     int queued = new DocumentIndexRecoveryService(documents, queue).enqueueMissing(crateId);
 

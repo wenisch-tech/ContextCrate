@@ -26,6 +26,9 @@ public class DocumentIndexer {
     var document = documents.findById(payload.entityId()).orElseThrow();
     if (payload.crateId() != null && !payload.crateId().equals(document.getCrateId()))
       throw new IllegalArgumentException("Pipeline message crosses crate boundary");
+    for (var previous : documents.findByCrateIdAndSourceIdAndIdentityUriAndCurrentVersionFalse(
+        document.getCrateId(), document.getSourceId(), document.getIdentityUri()))
+      index.delete(document.getCrateId(), previous.getId());
     index.upsert(document, chunks.findByDocumentIdOrderByOrdinal(document.getId()));
     for (var generation : generations.findByCrateIdAndStatus(
         document.getCrateId(), tech.wenisch.contextcrate.domain.CrateIndexGeneration.Status.BUILDING))

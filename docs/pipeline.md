@@ -40,3 +40,18 @@ Extraction is derived work over normalized `DocumentChunk.content`. Enabled extr
 Extraction results are rebuildable. Rebuilding a run or document deletes the scoped derived matches and enqueues fresh extraction work with a new work idempotency key, while automatic extraction uses stable document-level idempotency. Rule deletion disables the rule so historical result rows keep their rule reference.
 
 Search is query-side retrieval over the same Lucene/OpenSearch records created by indexing. Lexical mode uses BM25 scoring across title, heading, URL text, and normalized text fields; semantic mode embeds the query and uses nearest-neighbour vector search; hybrid mode fuses both ranked lists with RRF. Optional run and kind filters apply to every mode. Search does not create crawl or extraction work; it reads the latest committed index. Rebuild the derived vector index from canonical records with `POST /api/v1/index/rebuild` after changing embedding models.
+
+## Document versions
+
+Running an ingestion job again does not duplicate unchanged documents. ContextCrate identifies a
+document by its source and canonical URL (or, for Git, its repository-relative path). Changed
+normalized content creates the next immutable version; unchanged content creates no version.
+
+The Documents list, document count, index rebuilds, and normal search use only the current version.
+Select a version number in the Documents screen, or call
+`GET /api/v1/crates/{crateId}/documents/{id}/versions`, to view the history. Older versions retain
+their original ingestion run and are excluded from default retrieval.
+
+When upgrading to this behavior, the database migration retains only the newest pre-existing record
+for each source/URL pair. Rebuild the index once after deployment so any previously indexed
+duplicates are removed from the search backend.

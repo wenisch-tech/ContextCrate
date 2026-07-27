@@ -111,7 +111,7 @@ public class UiController {
         "queueDepth",
         Arrays.stream(WorkStage.values())
             .collect(java.util.stream.Collectors.toMap(Enum::name, queue::depth)));
-    model.addAttribute("documentCount", documents.findByCrateId(crateId).size());
+    model.addAttribute("documentCount", documents.findByCrateIdAndCurrentVersionTrue(crateId).size());
         model.addAttribute("searchQuery", q);
         model.addAttribute(
           "searchResults",
@@ -414,7 +414,7 @@ public class UiController {
 
   @GetMapping("/documents")
   String docs(@PathVariable UUID crateId,Model model) {
-    var values = documents.findTop100ByCrateIdOrderByCreatedAtDesc(crateId);
+    var values = documents.findTop100ByCrateIdAndCurrentVersionTrueOrderByCreatedAtDesc(crateId);
     var counts = values.isEmpty() ? java.util.Map.<UUID, Long>of()
         : documentChunks.countByDocumentIdIn(values.stream().map(NormalizedDocument::getId).toList())
             .stream().collect(java.util.stream.Collectors.toMap(
@@ -422,8 +422,17 @@ public class UiController {
                 DocumentChunkRepository.ChunkCount::getChunkCount));
     model.addAttribute("documents", values);
     model.addAttribute("chunkCounts", counts);
-    model.addAttribute("unindexedCount", documents.findByCrateIdAndIndexedFalse(crateId).size());
+    model.addAttribute("unindexedCount", documents.findByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId).size());
     return "documents";
+  }
+
+  @GetMapping("/documents/{id}/versions")
+  String documentVersions(@PathVariable UUID crateId, @PathVariable UUID id, Model model) {
+    var document = documents.findByIdAndCrateId(id, crateId).orElseThrow();
+    model.addAttribute("document", document);
+    model.addAttribute("versions", documents.findByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        crateId, document.getSourceId(), document.getIdentityUri()));
+    return "document-versions";
   }
 
   @PostMapping("/documents/retry-unindexed")

@@ -49,14 +49,14 @@ public class IndexRebuildService {
         embedding.openaiDimensions()));
     long count=0;
     try(var ignored=CrateContext.use(crateId)){
-      for(var document:documents.findByCrateId(crateId)){
+      for(var document:documents.findByCrateIdAndCurrentVersionTrue(crateId)){
         index.upsertGeneration(crateId,generation,document,
             chunks.findByDocumentIdOrderByOrdinal(document.getId()));count++;
       }
       index.commitGeneration(crateId,generation);
       long finalCount=count;
       transactions.executeWithoutResult(status->{
-        for(var document:documents.findByCrateId(crateId)){
+        for(var document:documents.findByCrateIdAndCurrentVersionTrue(crateId)){
           document.indexed();documents.save(document);
         }
         for(var active:generations.findByCrateIdAndStatus(crateId,CrateIndexGeneration.Status.ACTIVE)){

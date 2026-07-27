@@ -55,7 +55,8 @@ class DocumentParserTest {
             new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"))));
     when(artifacts.open("artifact.md")).thenReturn(new ByteArrayInputStream(
         markdown.getBytes(StandardCharsets.UTF_8)));
-    when(documents.findByRunIdAndSourceUri(eq(runId), anyString())).thenReturn(Optional.empty());
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        any(), any(), anyString())).thenReturn(Optional.empty());
     when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     when(providers.effectiveEmbedding(crateId)).thenReturn(new RuntimeProviderSettings.Embedding(
         true, "local", "model", "revision", "url", java.nio.file.Path.of("models"), null,
@@ -72,5 +73,56 @@ class DocumentParserTest {
     verify(chunks).saveAll(created.capture());
     assertThat(created.getValue()).extracting(DocumentChunk::getHeading)
         .contains("Product docs", "Setup");
+  }
+
+  @Test
+  void changedGitContentCreatesNextVersionButUnchangedContentDoesNot() throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    DocumentParser parser = new DocumentParser(acquisitions, runs, documents, chunks, items,
+        artifacts, ingestion, new UrlPolicy(true), queue, extraction, mapper, providers);
+    UUID crateId = UUID.randomUUID(), runId = UUID.randomUUID(), acquisitionId = UUID.randomUUID();
+    UUID sourceId = UUID.randomUUID();
+    IngestionRun run = new IngestionRun(runId, crateId, sourceId, UUID.randomUUID(), "{}", "{}");
+    AcquisitionRecord acquisition = new AcquisitionRecord(acquisitionId, runId, UUID.randomUUID(),
+        "docs/readme.md");
+    acquisition.assignCrate(crateId);
+    acquisition.success("git+https://example.com/repo.git@abc/docs/readme.md", 200,
+        "text/markdown", "UTF-8", "artifact.md", "sha", 100, 1);
+    String original = "# Product\n\nOriginal document content that is long enough to normalize.";
+    String changed = "# Product\n\nChanged document content that is long enough to normalize.";
+    when(acquisitions.findById(acquisitionId)).thenReturn(Optional.of(acquisition));
+    when(runs.findById(runId)).thenReturn(Optional.of(run));
+    when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
+    when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
+        new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000,
+            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"))));
+    when(artifacts.open("artifact.md")).thenReturn(
+        new ByteArrayInputStream(original.getBytes(StandardCharsets.UTF_8)),
+        new ByteArrayInputStream(original.getBytes(StandardCharsets.UTF_8)),
+        new ByteArrayInputStream(changed.getBytes(StandardCharsets.UTF_8)));
+    when(providers.effectiveEmbedding(crateId)).thenReturn(new RuntimeProviderSettings.Embedding(
+        true, "local", "model", "revision", "url", java.nio.file.Path.of("models"), null,
+        null, null, null, 384, 8000));
+    when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        crateId, sourceId, "docs/readme.md")).thenReturn(Optional.empty());
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    ArgumentCaptor<NormalizedDocument> captured = ArgumentCaptor.forClass(NormalizedDocument.class);
+    verify(documents).save(captured.capture());
+    NormalizedDocument first = captured.getValue();
+    assertThat(first.getVersionNumber()).isEqualTo(1);
+
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        crateId, sourceId, "docs/readme.md")).thenReturn(Optional.of(first));
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    verify(documents, times(1)).save(any());
+
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    verify(documents, times(3)).save(captured.capture());
+    NormalizedDocument second = captured.getValue();
+    assertThat(second.getVersionNumber()).isEqualTo(2);
+    assertThat(second.getIdentityUri()).isEqualTo("docs/readme.md");
+    assertThat(first.isCurrentVersion()).isFalse();
   }
 }
