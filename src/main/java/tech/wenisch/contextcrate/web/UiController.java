@@ -45,6 +45,7 @@ public class UiController {
   private final IndexRebuildService rebuild;
   private final DocumentIndexRecoveryService indexRecovery;
   private final PipelineWorkItemRepository pipelineWork;
+  private final DocumentDiffService documentDiffs;
 
   public UiController(
       SourceService sources,
@@ -64,7 +65,7 @@ public class UiController {
       AcquisitionRecordRepository acquisitionRecords,
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
-      PipelineWorkItemRepository pipelineWork) {
+      PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs) {
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -86,6 +87,7 @@ public class UiController {
     this.rebuild = rebuild;
     this.indexRecovery = indexRecovery;
     this.pipelineWork = pipelineWork;
+    this.documentDiffs = documentDiffs;
   }
 
   @ModelAttribute
@@ -413,17 +415,44 @@ public class UiController {
   }
 
   @GetMapping("/documents")
-  String docs(@PathVariable UUID crateId,Model model) {
-    var values = documents.findTop100ByCrateIdAndCurrentVersionTrueOrderByCreatedAtDesc(crateId);
-    var counts = values.isEmpty() ? java.util.Map.<UUID, Long>of()
-        : documentChunks.countByDocumentIdIn(values.stream().map(NormalizedDocument::getId).toList())
-            .stream().collect(java.util.stream.Collectors.toMap(
-                DocumentChunkRepository.ChunkCount::getDocumentId,
-                DocumentChunkRepository.ChunkCount::getChunkCount));
-    model.addAttribute("documents", values);
-    model.addAttribute("chunkCounts", counts);
+  String docs(@PathVariable UUID crateId, @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "created") String sort,
+      @RequestParam(defaultValue = "desc") String direction,
+      @RequestParam(defaultValue = "0") int page, Model model) {
+    var requestedSort = DocumentSort.from(sort);
+    var requestedDirection = "asc".equalsIgnoreCase(direction)
+        ? org.springframework.data.domain.Sort.Direction.ASC
+        : org.springframework.data.domain.Sort.Direction.DESC;
+    var values = documents.findCurrentPage(crateId, q, requestedSort, requestedDirection,
+        PageRequest.of(Math.max(0, page), 50));
+    model.addAttribute("documentPage", values);
+    model.addAttribute("query", q);
+    model.addAttribute("sort", requestedSort.name().toLowerCase(Locale.ROOT));
+    model.addAttribute("direction", requestedDirection.name().toLowerCase(Locale.ROOT));
+    model.addAttribute("nextDirections", java.util.Map.of(
+        "title", nextDirection(requestedSort, requestedDirection, DocumentSort.TITLE),
+        "uri", nextDirection(requestedSort, requestedDirection, DocumentSort.URI),
+        "chunks", nextDirection(requestedSort, requestedDirection, DocumentSort.CHUNKS),
+        "indexed", nextDirection(requestedSort, requestedDirection, DocumentSort.INDEXED)));
     model.addAttribute("unindexedCount", documents.findByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId).size());
     return "documents";
+  }
+
+  @GetMapping("/documents/{id}")
+  String documentDetails(@PathVariable UUID crateId, @PathVariable UUID id, Model model) {
+    var document = documents.findByIdAndCrateId(id, crateId).orElseThrow();
+    var versions = documents.findByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        crateId, document.getSourceId(), document.getIdentityUri());
+    var previous = new HashMap<UUID, UUID>();
+    for (int position = 0; position + 1 < versions.size(); position++)
+      previous.put(versions.get(position).getId(), versions.get(position + 1).getId());
+    model.addAttribute("document", document);
+    model.addAttribute("source", sources.require(crateId, document.getSourceId()));
+    model.addAttribute("run", ingestion.requireRun(crateId, document.getRunId()));
+    model.addAttribute("versions", versions);
+    model.addAttribute("previousVersions", previous);
+    model.addAttribute("chunks", documentChunks.findByDocumentIdAndCrateIdOrderByOrdinal(id, crateId));
+    return "document-details";
   }
 
   @GetMapping("/documents/{id}/versions")
@@ -435,14 +464,42 @@ public class UiController {
     return "document-versions";
   }
 
+  @GetMapping("/documents/{id}/versions/{previousId}/diff")
+  String documentDiff(@PathVariable UUID crateId, @PathVariable UUID id,
+      @PathVariable UUID previousId, Model model) {
+    var current = documents.findByIdAndCrateId(id, crateId).orElseThrow();
+    var previous = documents.findByIdAndCrateId(previousId, crateId).orElseThrow();
+    if (!current.getSourceId().equals(previous.getSourceId())
+        || !current.getIdentityUri().equals(previous.getIdentityUri())
+        || current.getVersionNumber() != previous.getVersionNumber() + 1)
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.NOT_FOUND);
+    model.addAttribute("document", current);
+    model.addAttribute("previous", previous);
+    model.addAttribute("diff", documentDiffs.unified(previous, current));
+    return "document-diff";
+  }
+
   @PostMapping("/documents/retry-unindexed")
-  String retryUnindexedDocuments(@PathVariable UUID crateId, RedirectAttributes redirect) {
+  String retryUnindexedDocuments(@PathVariable UUID crateId,
+      @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "created") String sort,
+      @RequestParam(defaultValue = "desc") String direction,
+      @RequestParam(defaultValue = "0") int page, RedirectAttributes redirect) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
     int queued = indexRecovery.enqueueMissing(crateId);
     redirect.addFlashAttribute("indexRecoveryMessage", queued == 0
         ? "No unindexed documents were found."
         : "Queued " + queued + " document" + (queued == 1 ? "" : "s") + " for indexing recovery.");
+    redirect.addAttribute("q", q);
+    redirect.addAttribute("sort", sort);
+    redirect.addAttribute("direction", direction);
+    redirect.addAttribute("page", Math.max(0, page));
     return "redirect:/crates/" + crateId + "/documents";
+  }
+
+  private static String nextDirection(DocumentSort active, org.springframework.data.domain.Sort.Direction direction,
+      DocumentSort target) {
+    return active == target && direction.isAscending() ? "desc" : "asc";
   }
 
   @GetMapping("/extractions")

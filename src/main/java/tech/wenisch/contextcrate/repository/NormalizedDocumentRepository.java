@@ -6,7 +6,8 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 
-public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDocument, UUID> {
+public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDocument, UUID>,
+    NormalizedDocumentRepositoryCustom {
   Optional<NormalizedDocument> findByRunIdAndSourceUri(UUID runId, String sourceUri);
 
   Optional<NormalizedDocument> findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(

@@ -58,6 +58,12 @@ public class NormalizedDocument {
   @Column(nullable = false)
   private boolean indexed;
 
+  @Column(name = "indexed_at")
+  private Instant indexedAt;
+
+  @Column(name = "indexed_at_estimated", nullable = false)
+  private boolean indexedAtEstimated;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -166,11 +172,16 @@ public class NormalizedDocument {
     return indexed;
   }
 
+  public Instant getIndexedAt() { return indexedAt; }
+  public boolean isIndexedAtEstimated() { return indexedAtEstimated; }
+
   public Instant getCreatedAt() {
     return createdAt;
   }
 
   public void indexed() {
     indexed = true;
+    indexedAt = Instant.now();
+    indexedAtEstimated = false;
   }
 }
