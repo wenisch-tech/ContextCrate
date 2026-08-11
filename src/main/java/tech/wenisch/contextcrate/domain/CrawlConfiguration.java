@@ -102,14 +102,14 @@ public record CrawlConfiguration(
           removeSelectors == null
               ? List.of("script", "style", "nav", "footer", "aside")
               : List.copyOf(removeSelectors);
-      chunkSize = chunkSize < 200 ? 2000 : chunkSize;
+      chunkSize = chunkSize < 200 ? 1000 : chunkSize;
       chunkOverlap = Math.max(0, Math.min(chunkOverlap, chunkSize / 2));
       logicalIndex = logicalIndex == null || logicalIndex.isBlank() ? "default" : logicalIndex;
     }
 
     public static Output defaults() {
       return new Output(
-          30, "", List.of("script", "style", "nav", "footer", "aside"), 2000, 200, "default");
+          30, "", List.of("script", "style", "nav", "footer", "aside"), 1000, 200, "default");
     }
   }
 

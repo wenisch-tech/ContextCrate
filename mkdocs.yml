@@ -13,6 +13,7 @@ nav:
   - Authorization: authorization.md
   - Architecture: architecture.md
   - Configuration: configuration.md
+  - Chunking: chunking.md
   - Embeddings: embeddings.md
   - Reranking: reranking.md
   - Answers: answers.md

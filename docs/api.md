@@ -94,7 +94,7 @@ Attach any number of jobs at
       "excludePatterns": ["docs/archive/**"],
       "maxFiles": 10000,
       "maxFileBytes": 1048576,
-      "output": {"chunkSize": 2000, "chunkOverlap": 200}
+      "output": {"chunkSize": 1000, "chunkOverlap": 200}
     }
   }
 }

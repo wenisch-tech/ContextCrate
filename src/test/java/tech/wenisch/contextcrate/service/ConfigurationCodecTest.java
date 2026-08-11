@@ -10,6 +10,18 @@ class ConfigurationCodecTest {
   private final ConfigurationCodec codec = new ConfigurationCodec(new ObjectMapper());
 
   @Test
+  void missingOutputUsesDefaultChunking() {
+    CrawlConfiguration config =
+        codec.read(
+            """
+            {"scope":{"seedUrl":"https://example.com"}}
+            """);
+
+    assertThat(config.output().chunkSize()).isEqualTo(1000);
+    assertThat(config.output().chunkOverlap()).isEqualTo(200);
+  }
+
+  @Test
   void oldConfigurationWithoutAuthenticationDefaultsToNone() {
     CrawlConfiguration config =
         codec.read(
