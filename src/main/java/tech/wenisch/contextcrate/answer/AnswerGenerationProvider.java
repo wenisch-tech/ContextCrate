@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 public interface AnswerGenerationProvider {
   boolean available();
   String model();
+  String complete(List<Message> messages) throws Exception;
   void stream(List<Message> messages, Consumer<String> delta) throws Exception;
   record Message(String role, String content) {}
 }

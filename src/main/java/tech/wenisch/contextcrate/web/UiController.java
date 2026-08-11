@@ -567,10 +567,11 @@ public class UiController {
       @RequestParam(defaultValue = "false") boolean allowClientHistory,
       @RequestParam(defaultValue = "false") boolean inlineCitations,
       @RequestParam(defaultValue = "false") boolean structuredSources,
+      @RequestParam(defaultValue = "false") boolean gradingEnabled,
       @RequestParam String retrievalMode,
       @RequestParam int sourceLimit) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    ragSettings.update(crateId,strictGrounding, allowClientHistory, inlineCitations, structuredSources, retrievalMode, sourceLimit);
+    ragSettings.update(crateId,strictGrounding, allowClientHistory, inlineCitations, structuredSources, gradingEnabled, retrievalMode, sourceLimit);
     return "redirect:/crates/"+crateId+"/settings?saved";
   }
 

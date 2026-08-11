@@ -20,7 +20,7 @@ import tech.wenisch.contextcrate.storage.*;
 
 @Service
 public class CratePortableService {
-  private static final int SCHEMA = 3;
+  private static final int SCHEMA = 4;
   private final ObjectMapper mapper;
   private final CrateService crates;
   private final CrateAccessService access;
@@ -313,7 +313,7 @@ public class CratePortableService {
     JsonNode r = data.path("rag");
     rag.update(crateId, r.path("strictGrounding").asBoolean(),
         r.path("allowClientHistory").asBoolean(), r.path("inlineCitations").asBoolean(),
-        r.path("structuredSources").asBoolean(), text(r, "retrievalMode"),
+        r.path("structuredSources").asBoolean(), !r.has("gradingEnabled") || r.path("gradingEnabled").asBoolean(), text(r, "retrievalMode"),
         r.path("sourceLimit").asInt());
     JsonNode p = data.path("providers");
     providers.update(crateId, new RuntimeProviderSettings.ProviderForm(
@@ -337,7 +337,7 @@ public class CratePortableService {
       }
     }
     Manifest manifest = mapper.readValue(required(entries, "manifest.json"), Manifest.class);
-    if (manifest.schemaVersion() != 1 && manifest.schemaVersion() != 2 && manifest.schemaVersion() != SCHEMA)
+    if (manifest.schemaVersion() != 1 && manifest.schemaVersion() != 2 && manifest.schemaVersion() != 3 && manifest.schemaVersion() != SCHEMA)
       throw new IOException("Unsupported crate export schema");
     for (var checksum : manifest.checksums().entrySet())
       if (!Hashing.sha256(required(entries, checksum.getKey())).equals(checksum.getValue()))

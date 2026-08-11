@@ -17,6 +17,8 @@ nav:
   - Embeddings: embeddings.md
   - Reranking: reranking.md
   - Answers: answers.md
+  - Features:
+    - Grading: features/grading.md
   - Pipeline: pipeline.md
   - Security: security.md
   - Deployment: deployment.md

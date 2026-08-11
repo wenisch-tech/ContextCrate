@@ -22,7 +22,7 @@ public class CrateSettingsApiController {
   @PutMapping("/rag") public RagSettings rag(@PathVariable UUID crateId,@RequestBody RagRequest r){
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     return rag.update(crateId,r.strictGrounding(),r.allowClientHistory(),r.inlineCitations(),
-        r.structuredSources(),r.retrievalMode(),r.sourceLimit());
+        r.structuredSources(),r.gradingEnabled()==null?rag.current(crateId).isGradingEnabled():r.gradingEnabled(),r.retrievalMode(),r.sourceLimit());
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
     access.requireMutable(crateId,CrateMember.Role.OWNER);
@@ -39,7 +39,7 @@ public class CrateSettingsApiController {
     return providers(crateId);
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
-      boolean structuredSources,String retrievalMode,int sourceLimit){}
+      boolean structuredSources,Boolean gradingEnabled,String retrievalMode,int sourceLimit){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,
