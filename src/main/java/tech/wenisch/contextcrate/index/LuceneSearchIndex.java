@@ -14,7 +14,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
-import tech.wenisch.contextcrate.domain.DocumentChunk;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 import tech.wenisch.contextcrate.embedding.EmbeddingProvider;
 import tech.wenisch.contextcrate.reranking.RerankingProvider;
@@ -56,22 +55,21 @@ public class LuceneSearchIndex implements SearchIndex {
         new IndexWriterConfig(analyzer).setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND));
     writers.put(key(crateId,generation), created); return created;
   }
-  @Override public synchronized void upsert(NormalizedDocument source, List<DocumentChunk> chunks) throws IOException, InterruptedException {
+  @Override public synchronized void upsert(NormalizedDocument source, List<ChunkRetrievalRecord> chunks) throws IOException, InterruptedException {
     upsertGeneration(source.getCrateId(),generation(source.getCrateId()),source,chunks);
   }
-  @Override public synchronized void upsertGeneration(UUID crateId,int generation,NormalizedDocument source,List<DocumentChunk> chunks)throws IOException,InterruptedException{
-    if (!crateId.equals(source.getCrateId())
-        || chunks.stream().anyMatch(chunk -> !crateId.equals(chunk.getCrateId())))
+  @Override public synchronized void upsertGeneration(UUID crateId,int generation,NormalizedDocument source,List<ChunkRetrievalRecord> chunks)throws IOException,InterruptedException{
+    if (!crateId.equals(source.getCrateId()))
       throw new IllegalArgumentException("Index input crosses crate boundary");
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){
       upsertScoped(crateId,generation,source,chunks);
     }
   }
-  private void upsertScoped(UUID crateId,int generation,NormalizedDocument source,List<DocumentChunk> chunks)throws IOException,InterruptedException{
+  private void upsertScoped(UUID crateId,int generation,NormalizedDocument source,List<ChunkRetrievalRecord> chunks)throws IOException,InterruptedException{
     IndexWriter writer=writer(crateId,generation); List<org.apache.lucene.document.Document> docs=new ArrayList<>();
     try {
       docs.add(document(source, embedding(source.getBody())));
-      for(var c:chunks) docs.add(chunk(source,c,embedding(c.getContent())));
+      for(var c:chunks) docs.add(chunk(source,c,embedding(c.retrievalText())));
     } catch(Exception e) {
       throw new IOException("Could not create document embeddings: " + errorDetail(e), e);
     }
@@ -90,7 +88,7 @@ public class LuceneSearchIndex implements SearchIndex {
     return detail.isEmpty() ? error.getClass().getSimpleName() : detail.toString();
   }
   private static org.apache.lucene.document.Document document(NormalizedDocument d, float[] vector) { var doc=new org.apache.lucene.document.Document(); common(doc,d); doc.add(new StringField("kind","document",Field.Store.YES)); doc.add(new StoredField("body",d.getBody())); doc.add(new TextField("text",d.getBody(),Field.Store.NO)); vector(doc,vector); return doc; }
-  private static org.apache.lucene.document.Document chunk(NormalizedDocument p, DocumentChunk c, float[] vector) { var doc=new org.apache.lucene.document.Document(); common(doc,p); doc.add(new StringField("kind","chunk",Field.Store.YES)); doc.add(new StringField("id",c.getId().toString(),Field.Store.YES)); doc.add(new IntPoint("ordinal",c.getOrdinal())); doc.add(new StoredField("ordinal_stored",c.getOrdinal())); if(c.getHeading()!=null)doc.add(new TextField("heading",c.getHeading(),Field.Store.YES)); doc.add(new TextField("text",c.getContent(),Field.Store.YES)); vector(doc,vector); return doc; }
+  private static org.apache.lucene.document.Document chunk(NormalizedDocument p,ChunkRetrievalRecord c,float[] vector){var doc=new org.apache.lucene.document.Document();common(doc,p);doc.add(new StringField("kind","chunk",Field.Store.YES));doc.add(new StringField("id",c.chunkId().toString(),Field.Store.YES));doc.add(new StringField("record_id",c.recordId().toString(),Field.Store.YES));doc.add(new StringField("proposition",Boolean.toString(c.proposition()),Field.Store.YES));doc.add(new IntPoint("ordinal",c.ordinal()));doc.add(new StoredField("ordinal_stored",c.ordinal()));if(c.heading()!=null)doc.add(new TextField("heading",c.heading(),Field.Store.YES));doc.add(new TextField("text",c.retrievalText(),Field.Store.YES));doc.add(new StoredField("source_text",c.sourceContent()));vector(doc,vector);return doc;}
   private static void vector(org.apache.lucene.document.Document doc,float[] vector) { if(vector!=null) doc.add(new KnnFloatVectorField("embedding",vector,VectorSimilarityFunction.COSINE)); }
   private static void common(org.apache.lucene.document.Document doc,NormalizedDocument d) { doc.add(new StringField("parent_id",d.getId().toString(),Field.Store.YES)); doc.add(new StringField("run_id",d.getRunId().toString(),Field.Store.YES)); doc.add(new StringField("url",d.getSourceUri(),Field.Store.YES)); doc.add(new TextField("url_text",d.getSourceUri(),Field.Store.NO)); if(d.getTitle()!=null)doc.add(new TextField("title",d.getTitle(),Field.Store.YES)); if(d.getLanguage()!=null)doc.add(new StringField("language",d.getLanguage(),Field.Store.YES)); doc.add(new StringField("content_hash",d.getContentHash(),Field.Store.YES)); }
   @Override public synchronized void delete(UUID crateId,UUID id)throws IOException { var writer=writer(crateId,generation(crateId));writer.deleteDocuments(new Term("parent_id",id.toString()));writer.commit(); }
@@ -113,9 +111,9 @@ public class LuceneSearchIndex implements SearchIndex {
   private Query textQuery(SearchRequest r)throws Exception { Query text=new MultiFieldQueryParser(new String[]{"title","heading","text","url_text"},analyzer).parse(MultiFieldQueryParser.escape(r.query())); var b=new BooleanQuery.Builder().add(text,BooleanClause.Occur.MUST); addFilters(b,r); return b.build(); }
   private Query filters(SearchRequest r) { var b=new BooleanQuery.Builder(); addFilters(b,r); return b.build(); }
   private static void addFilters(BooleanQuery.Builder b,SearchRequest r){if(r.kind()!=null)b.add(new TermQuery(new Term("kind",r.kind())),BooleanClause.Occur.FILTER);if(r.runId()!=null)b.add(new TermQuery(new Term("run_id",r.runId().toString())),BooleanClause.Occur.FILTER);}
-  private List<SearchHit> hits(IndexSearcher s,TopDocs found,String query,boolean lexical)throws IOException {var out=new ArrayList<SearchHit>();var stored=s.storedFields();for(var score:found.scoreDocs){var doc=stored.document(score.doc);out.add(hit(doc,score.score,query,lexical));}return out;}
-  private static SearchHit hit(org.apache.lucene.document.Document d,float score,String q,boolean lexical){String kind=d.get("kind");UUID docId=UUID.fromString(d.get("parent_id"));UUID id=UUID.fromString(kind.equals("chunk")?d.get("id"):d.get("parent_id"));String text=kind.equals("chunk")?d.get("text"):d.get("body");Integer ordinal=kind.equals("chunk")?d.getField("ordinal_stored").numericValue().intValue():null;return new SearchHit(id,docId,UUID.fromString(d.get("run_id")),kind,d.get("title"),d.get("url"),ordinal,snippet(text,q),score,lexical?score:null,lexical?null:score,null,text);}
-  private List<SearchHit> fuse(List<SearchHit>a,List<SearchHit>b,int limit){Map<UUID,SearchHit> all=new LinkedHashMap<>();Map<UUID,Float> scores=new HashMap<>();for(int i=0;i<a.size();i++){var h=a.get(i);all.put(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}for(int i=0;i<b.size();i++){var h=b.get(i);all.putIfAbsent(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}return all.values().stream().map(h->new SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),scores.get(h.id()),find(a,h.id(),true),find(b,h.id(),false),null,h.content())).sorted(Comparator.comparing(SearchHit::score).reversed().thenComparing(h->h.id().toString())).limit(limit).toList();}
+  private List<SearchHit> hits(IndexSearcher s,TopDocs found,String query,boolean lexical)throws IOException{var out=new LinkedHashMap<UUID,SearchHit>();var stored=s.storedFields();for(var score:found.scoreDocs){var hit=hit(stored.document(score.doc),score.score,query,lexical);out.putIfAbsent(hit.id(),hit);}return new ArrayList<>(out.values());}
+  private static SearchHit hit(org.apache.lucene.document.Document d,float score,String q,boolean lexical){String kind=d.get("kind");UUID docId=UUID.fromString(d.get("parent_id"));UUID id=UUID.fromString(kind.equals("chunk")?d.get("id"):d.get("parent_id"));String retrieval=kind.equals("chunk")?d.get("text"):d.get("body");String source=kind.equals("chunk")?d.get("source_text"):retrieval;if(source==null)source=retrieval;Integer ordinal=kind.equals("chunk")?d.getField("ordinal_stored").numericValue().intValue():null;return new SearchHit(id,docId,UUID.fromString(d.get("run_id")),kind,d.get("title"),d.get("url"),ordinal,snippet(retrieval,q),score,lexical?score:null,lexical?null:score,null,source,retrieval);}
+  private List<SearchHit> fuse(List<SearchHit>a,List<SearchHit>b,int limit){Map<UUID,SearchHit> all=new LinkedHashMap<>();Map<UUID,Float> scores=new HashMap<>();for(int i=0;i<a.size();i++){var h=a.get(i);all.put(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}for(int i=0;i<b.size();i++){var h=b.get(i);all.putIfAbsent(h.id(),h);scores.merge(h.id(),1f/(retrieval.rrfConstant()+i+1),Float::sum);}return all.values().stream().map(h->new SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),scores.get(h.id()),find(a,h.id(),true),find(b,h.id(),false),null,h.content(),h.retrievalContent())).sorted(Comparator.comparing(SearchHit::score).reversed().thenComparing(h->h.id().toString())).limit(limit).toList();}
   private static Float find(List<SearchHit>x,UUID id,boolean lexical){return x.stream().filter(h->h.id().equals(id)).map(h->lexical?h.lexicalScore():h.semanticScore()).findFirst().orElse(null);} private static List<SearchHit> limit(List<SearchHit>x,int n){return x.stream().limit(n).toList();}
   @Override public synchronized void commit(UUID crateId)throws IOException{writer(crateId,generation(crateId)).commit();}
   @Override public synchronized void commitGeneration(UUID crateId,int generation)throws IOException{writer(crateId,generation).commit();}

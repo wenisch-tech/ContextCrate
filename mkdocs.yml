@@ -18,6 +18,7 @@ nav:
   - Reranking: reranking.md
   - Answers: answers.md
   - Features:
+    - Retrieval: features/retrieval.md
     - Grading: features/grading.md
     - Answer verification: features/answer-verification.md
   - Pipeline: pipeline.md

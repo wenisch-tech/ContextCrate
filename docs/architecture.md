@@ -1,5 +1,7 @@
 # Architecture
 
+Chunk indexing is crate-configurable. Standard retrieval sends chunks directly to the search backend. Proposition retrieval first uses the answer model to generate and grade facts, persists the evaluation, and indexes accepted propositions while retaining source-chunk identity. See [Retrieval](features/retrieval.md).
+
 ContextCrate is a Spring Boot application that can run all stages in one process or distribute
 them across control-plane, website-source, Git-source, browser, parser, extractor, and indexer
 roles.

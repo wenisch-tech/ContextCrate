@@ -44,6 +44,8 @@ curl -H "X-API-KEY: $KEY" \
 
 Provider responses never contain stored API keys. Submitting a blank key preserves the current secret. Changing embedding configuration schedules a versioned rebuild.
 
+RAG settings include `retrievalStrategy` (`standard` or `proposition`) and `propositionFailurePolicy` (`fail-indexing`, `skip-chunk`, or `embed-source-chunk`). Changing either schedules a versioned rebuild. Inspect persisted results with `GET /api/v1/crates/{crateId}/documents/{documentId}/chunks/{chunkId}/propositions`.
+
 ## Keys and portability
 
 - `GET/POST /api/v1/me/api-keys`

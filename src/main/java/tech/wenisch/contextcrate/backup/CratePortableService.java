@@ -20,7 +20,7 @@ import tech.wenisch.contextcrate.storage.*;
 
 @Service
 public class CratePortableService {
-  private static final int SCHEMA = 5;
+  private static final int SCHEMA = 6;
   private final ObjectMapper mapper;
   private final CrateService crates;
   private final CrateAccessService access;
@@ -39,6 +39,7 @@ public class CratePortableService {
   private final RagSettingsService rag;
   private final RuntimeProviderSettings providers;
   private final PipelineQueue queue;
+  private final PropositionEvaluationRepository propositionEvaluations;private final ChunkPropositionRepository propositions;
 
   public CratePortableService(ObjectMapper mapper, CrateService crates, CrateAccessService access,
       SourceRepository sources, IngestionJobRepository jobs, IngestionRunRepository runs,
@@ -47,12 +48,14 @@ public class CratePortableService {
       ExtractionRuleRepository rules, ExtractionResultRepository results,
       ArtifactStore artifacts, SourceConfigurationCodec sourceCodec,
       IngestionConfigurationCodec jobCodec, RagSettingsService rag,
-      RuntimeProviderSettings providers, PipelineQueue queue) {
+      RuntimeProviderSettings providers, PipelineQueue queue,
+      PropositionEvaluationRepository propositionEvaluations,ChunkPropositionRepository propositions) {
     this.mapper = mapper; this.crates = crates; this.access = access; this.sources = sources;
     this.jobs = jobs; this.runs = runs; this.items = items; this.acquisitions = acquisitions;
     this.documents = documents; this.chunks = chunks; this.rules = rules; this.results = results;
     this.artifacts = artifacts; this.sourceCodec = sourceCodec; this.jobCodec = jobCodec;
     this.rag = rag; this.providers = providers; this.queue = queue;
+    this.propositionEvaluations=propositionEvaluations;this.propositions=propositions;
   }
 
   public void exportTo(UUID crateId, Path target, boolean includeArtifacts) throws Exception {
@@ -78,6 +81,8 @@ public class CratePortableService {
     data.set("chunks", mapper.valueToTree(chunks.findByCrateId(crateId)));
     data.set("rules", mapper.valueToTree(rules.findByCrateIdOrderByCreatedAtDesc(crateId)));
     data.set("results", mapper.valueToTree(results.findByCrateId(crateId)));
+    data.set("propositionEvaluations",mapper.valueToTree(propositionEvaluations.findByCrateId(crateId)));
+    data.set("propositions",mapper.valueToTree(propositions.findByCrateId(crateId)));
     data.set("rag", mapper.valueToTree(rag.current(crateId)));
     var embedding = providers.effectiveEmbedding(crateId);
     var reranking = providers.effectiveReranking(crateId);
@@ -148,7 +153,7 @@ public class CratePortableService {
     UUID crateId = crate.getId();
     Map<UUID, UUID> sourceIds = new HashMap<>(), jobIds = new HashMap<>(), runIds = new HashMap<>(),
         itemIds = new HashMap<>(), acquisitionIds = new HashMap<>(), documentIds = new HashMap<>(),
-        chunkIds = new HashMap<>(), ruleIds = new HashMap<>();
+        chunkIds = new HashMap<>(), ruleIds = new HashMap<>(),evaluationIds=new HashMap<>();
     Map<String, Integer> importedVersions = new HashMap<>();
 
     if (bundle.manifest().schemaVersion() == 1) {
@@ -229,6 +234,8 @@ public class CratePortableService {
           text(node, "contentHash"));
       value.assignCrate(crateId); chunks.save(value);
     }
+    for(JsonNode node:data.path("propositionEvaluations")){UUID id=UUID.randomUUID();evaluationIds.put(uuid(node),id);propositionEvaluations.save(new PropositionEvaluation(id,crateId,chunkIds.get(UUID.fromString(text(node,"chunkId"))),text(node,"contentHash"),text(node,"fingerprint"),nullable(node,"model"),text(node,"status"),nullable(node,"errorMessage")));}
+    for(JsonNode node:data.path("propositions")){UUID evaluationId=evaluationIds.get(UUID.fromString(text(node,"evaluationId"))),chunkId=chunkIds.get(UUID.fromString(text(node,"chunkId")));if(evaluationId!=null&&chunkId!=null)propositions.save(new ChunkProposition(UUID.randomUUID(),evaluationId,crateId,chunkId,node.path("ordinal").asInt(),text(node,"proposition"),node.path("fidelityScore").asInt(),node.path("contextScore").asInt(),node.path("completenessScore").asInt(),node.path("focusScore").asInt()));}
     for (JsonNode node : data.path("rules")) {
       UUID id = UUID.randomUUID(); ruleIds.put(uuid(node), id);
       ExtractionRule value = new ExtractionRule(id, text(node, "name"),
@@ -311,10 +318,6 @@ public class CratePortableService {
 
   private void restoreSettings(UUID crateId, JsonNode data) {
     JsonNode r = data.path("rag");
-    rag.update(crateId, r.path("strictGrounding").asBoolean(),
-        r.path("allowClientHistory").asBoolean(), r.path("inlineCitations").asBoolean(),
-        r.path("structuredSources").asBoolean(), !r.has("gradingEnabled") || r.path("gradingEnabled").asBoolean(), !r.has("answerVerificationEnabled") || r.path("answerVerificationEnabled").asBoolean(), textOr(r,"answerVerificationFailureAction","revise-once"), text(r, "retrievalMode"),
-        r.path("sourceLimit").asInt());
     JsonNode p = data.path("providers");
     providers.update(crateId, new RuntimeProviderSettings.ProviderForm(
         p.path("embeddingsEnabled").asBoolean(), text(p, "embeddingProvider"),
@@ -323,6 +326,7 @@ public class CratePortableService {
         nullable(p, "openaiBaseUrl"), nullable(p, "openaiModel"), null,
         p.path("openaiDimensions").asInt(1536), p.path("openaiMaxInputCharacters").asInt(8000), !p.has("openaiAutomaticLimitRecovery") || p.path("openaiAutomaticLimitRecovery").asBoolean(), p.path("rerankingEnabled").asBoolean(false), textOr(p,"rerankingProvider","local"), p.path("rerankingCandidateLimit").asInt(30), nullable(p,"rerankingLocalModelId"), nullable(p,"rerankingLocalRevision"), nullable(p,"rerankingLocalDownloadUrl"), nullable(p,"rerankingLocalCachePath"), nullable(p,"rerankingLocalModelPath"), nullable(p,"rerankingCohereBaseUrl"), nullable(p,"rerankingCohereModel"), null, p.path("rerankingCohereMaxInputCharacters").asInt(4000), p.path("rerankingCohereTimeoutSeconds").asInt(30), p.path("answeringEnabled").asBoolean(),
         nullable(p, "answeringBaseUrl"), nullable(p, "answeringModel"), null));
+    rag.update(crateId,r.path("strictGrounding").asBoolean(),r.path("allowClientHistory").asBoolean(),r.path("inlineCitations").asBoolean(),r.path("structuredSources").asBoolean(),!r.has("gradingEnabled")||r.path("gradingEnabled").asBoolean(),!r.has("answerVerificationEnabled")||r.path("answerVerificationEnabled").asBoolean(),textOr(r,"answerVerificationFailureAction","revise-once"),text(r,"retrievalMode"),textOr(r,"retrievalStrategy","standard"),textOr(r,"propositionFailurePolicy","fail-indexing"),r.path("sourceLimit").asInt());
   }
 
   private Bundle readBundle(Path path) throws Exception {
@@ -337,7 +341,7 @@ public class CratePortableService {
       }
     }
     Manifest manifest = mapper.readValue(required(entries, "manifest.json"), Manifest.class);
-    if (manifest.schemaVersion() != 1 && manifest.schemaVersion() != 2 && manifest.schemaVersion() != 3 && manifest.schemaVersion() != 4 && manifest.schemaVersion() != SCHEMA)
+    if (manifest.schemaVersion() != 1 && manifest.schemaVersion() != 2 && manifest.schemaVersion() != 3 && manifest.schemaVersion() != 4 && manifest.schemaVersion() != 5 && manifest.schemaVersion() != SCHEMA)
       throw new IOException("Unsupported crate export schema");
     for (var checksum : manifest.checksums().entrySet())
       if (!Hashing.sha256(required(entries, checksum.getKey())).equals(checksum.getValue()))

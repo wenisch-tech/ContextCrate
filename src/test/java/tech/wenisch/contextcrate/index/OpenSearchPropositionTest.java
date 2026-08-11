@@ -1,0 +1,17 @@
+package tech.wenisch.contextcrate.index;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
+import java.net.*;import java.nio.charset.StandardCharsets;import java.util.*;import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Test;
+import tech.wenisch.contextcrate.config.ContextCrateProperties;
+import tech.wenisch.contextcrate.domain.*;
+import tech.wenisch.contextcrate.embedding.DisabledEmbeddingProvider;
+import tech.wenisch.contextcrate.reranking.DisabledRerankingProvider;
+import tech.wenisch.contextcrate.repository.CrateRepository;
+import tech.wenisch.contextcrate.storage.Hashing;
+class OpenSearchPropositionTest {
+  @Test void writesPropositionRecordsAndDeduplicatesThemToSourceChunk()throws Exception{UUID crateId=UUID.randomUUID(),chunkId=UUID.randomUUID();AtomicReference<String> bulk=new AtomicReference<>();HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.createContext("/",exchange->{String request=new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8);String response="{}";if(exchange.getRequestURI().getPath().equals("/_bulk"))bulk.set(request);else if(exchange.getRequestURI().getPath().endsWith("/_search"))response="{\"hits\":{\"hits\":["+hit(crateId,chunkId,"Ada Lovelace published notes in 1843.",2)+","+hit(crateId,chunkId,"Ada Lovelace documented the Analytical Engine.",1)+"]}}";byte[] bytes=response.getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();});server.start();try{CrateRepository crates=mock(CrateRepository.class);when(crates.findById(crateId)).thenReturn(Optional.of(new Crate(crateId,"Test",null,null)));var p=new ContextCrateProperties("standalone","all",new ContextCrateProperties.Queue("local"),new ContextCrateProperties.Database("h2"),null,new ContextCrateProperties.Index("opensearch",null,"http://127.0.0.1:"+server.getAddress().getPort(),"test"),null,null);var d=new NormalizedDocument(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"https://example.test", "Title",null,null,null,"Document body",Hashing.sha256("Document body"),"{}");d.assignCrate(crateId);var index=new OpenSearchSearchIndex(p,new ObjectMapper(),new DisabledEmbeddingProvider(),new DisabledRerankingProvider(),crates);index.upsert(d,List.of(new ChunkRetrievalRecord(UUID.randomUUID(),chunkId,0,null,"Ada Lovelace published notes in 1843.","Original chunk",Hashing.sha256("Original chunk"),true)));assertThat(bulk.get()).contains("Ada Lovelace published notes in 1843.","Original chunk","record_id");var results=index.search(new SearchIndex.SearchRequest(crateId,"Ada",10,null,"chunk","lexical"));assertThat(results.hits()).singleElement().satisfies(h->{assertThat(h.id()).isEqualTo(chunkId);assertThat(h.content()).isEqualTo("Original chunk");assertThat(h.retrievalContent()).contains("published notes");});}finally{server.stop(0);}}
+  private static String hit(UUID crateId,UUID chunkId,String text,int score){return "{\"_id\":\""+UUID.randomUUID()+"\",\"_score\":"+score+",\"_source\":{\"kind\":\"chunk\",\"parent_id\":\""+UUID.randomUUID()+"\",\"run_id\":\""+UUID.randomUUID()+"\",\"chunk_id\":\""+chunkId+"\",\"url\":\"https://example.test\",\"title\":\"Title\",\"ordinal\":0,\"text\":\""+text+"\",\"source_text\":\"Original chunk\"}}";}
+}

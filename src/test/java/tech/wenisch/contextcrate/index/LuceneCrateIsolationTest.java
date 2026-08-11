@@ -36,6 +36,10 @@ class LuceneCrateIsolationTest {
     }
   }
 
+  @Test void propositionMatchesReturnOriginalChunkAndDeduplicate()throws Exception{
+    UUID crateId=UUID.randomUUID();CrateRepository crates=mock(CrateRepository.class);when(crates.findById(crateId)).thenReturn(Optional.of(new Crate(crateId,"Propositions",null,null)));var properties=new ContextCrateProperties("standalone","all",new ContextCrateProperties.Queue("local"),new ContextCrateProperties.Database("h2"),null,new ContextCrateProperties.Index("lucene",temporary,null,"contextcrate"),null,null);var document=document(crateId,"The source contains complete background information.");UUID chunkId=UUID.randomUUID();try(var index=new LuceneSearchIndex(properties,new DisabledEmbeddingProvider(),crates)){index.upsert(document,List.of(new ChunkRetrievalRecord(UUID.randomUUID(),chunkId,0,null,"Ada Lovelace published notes in 1843.","Original source chunk for the answer.","hash",true),new ChunkRetrievalRecord(UUID.randomUUID(),chunkId,0,null,"Ada Lovelace documented the Analytical Engine.","Original source chunk for the answer.","hash",true)));var found=index.search(new SearchIndex.SearchRequest(crateId,"Ada Lovelace",10,null,"chunk","lexical"));assertThat(found.hits()).singleElement().satisfies(hit->{assertThat(hit.id()).isEqualTo(chunkId);assertThat(hit.content()).isEqualTo("Original source chunk for the answer.");assertThat(hit.snippet()).contains("Ada Lovelace");});}
+  }
+
   private static NormalizedDocument document(UUID crateId,String body){
     var value=new NormalizedDocument(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),
         "https://example.test/"+crateId,body.substring(0,5),null,null,null,body,

@@ -14,6 +14,7 @@ import tech.wenisch.contextcrate.config.*;
 import tech.wenisch.contextcrate.domain.*;
 import tech.wenisch.contextcrate.index.SearchIndex;
 import tech.wenisch.contextcrate.repository.*;
+import tech.wenisch.contextcrate.answer.RagSettingsService;
 
 @Service
 public class IndexRebuildService {
@@ -21,12 +22,16 @@ public class IndexRebuildService {
   private final SearchIndex index;private final CrateRepository crates;
   private final CrateIndexGenerationRepository generations;private final RuntimeProviderSettings providers;
   private final TransactionTemplate transactions;
+  private final RetrievalPreparationService retrieval;
+  private final RagSettingsService rag;
   private final ConcurrentHashMap<UUID,ReentrantLock> locks=new ConcurrentHashMap<>();
   public IndexRebuildService(NormalizedDocumentRepository documents,DocumentChunkRepository chunks,
       SearchIndex index,CrateRepository crates,CrateIndexGenerationRepository generations,
-      RuntimeProviderSettings providers,PlatformTransactionManager transactionManager){
+      RuntimeProviderSettings providers,PlatformTransactionManager transactionManager,RetrievalPreparationService retrieval,RagSettingsService rag){
     this.documents=documents;this.chunks=chunks;this.index=index;this.crates=crates;
     this.generations=generations;this.providers=providers;
+    this.retrieval=retrieval;
+    this.rag=rag;
     this.transactions=new TransactionTemplate(transactionManager);
   }
 
@@ -44,14 +49,15 @@ public class IndexRebuildService {
     int generation=generations.findTopByCrateIdOrderByGenerationDesc(crateId)
         .map(g->g.getGeneration()+1).orElse(1);
     var embedding=providers.effectiveEmbedding(crateId);
+    var ragSettings=rag.current(crateId);var answer=providers.effectiveAnswer(crateId);
     var record=generations.save(new CrateIndexGeneration(crateId,generation,
-        fingerprint(embedding),embedding.provider()+":"+embedding.localModelId()+":"+embedding.openaiModel(),
+        fingerprint(embedding.toString()+":"+ragSettings.getRetrievalStrategy()+":"+ragSettings.getPropositionFailurePolicy()+":"+("proposition".equals(ragSettings.getRetrievalStrategy())?answer.baseUrl()+":"+answer.model():"")),embedding.provider()+":"+embedding.localModelId()+":"+embedding.openaiModel(),
         embedding.openaiDimensions()));
     long count=0;
     try(var ignored=CrateContext.use(crateId)){
       for(var document:documents.findByCrateIdAndCurrentVersionTrue(crateId)){
         index.upsertGeneration(crateId,generation,document,
-            chunks.findByDocumentIdOrderByOrdinal(document.getId()));count++;
+            retrieval.prepare(crateId,chunks.findByDocumentIdOrderByOrdinal(document.getId())));count++;
       }
       index.commitGeneration(crateId,generation);
       long finalCount=count;

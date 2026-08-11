@@ -16,15 +16,18 @@ public class DocumentIndexer {
   private final SearchIndex index;
   private final CrateIndexGenerationRepository generations;
   private final ExtractionService extraction;
+  private final RetrievalPreparationService retrieval;
 
   public DocumentIndexer(
       NormalizedDocumentRepository documents, DocumentChunkRepository chunks, SearchIndex index,
-      CrateIndexGenerationRepository generations, ExtractionService extraction) {
+      CrateIndexGenerationRepository generations, ExtractionService extraction,
+      RetrievalPreparationService retrieval) {
     this.documents = documents;
     this.chunks = chunks;
     this.index = index;
     this.generations = generations;
     this.extraction = extraction;
+    this.retrieval = retrieval;
   }
 
   @Transactional
@@ -37,10 +40,11 @@ public class DocumentIndexer {
       index.delete(document.getCrateId(), previous.getId());
     for (int attempt=0;;attempt++) try {
       var current=chunks.findByDocumentIdOrderByOrdinal(document.getId());
-      index.upsert(document, current);
+      var records=retrieval.prepare(document.getCrateId(),current);
+      index.upsert(document, records);
       for (var generation : generations.findByCrateIdAndStatus(
           document.getCrateId(), tech.wenisch.contextcrate.domain.CrateIndexGeneration.Status.BUILDING))
-        index.upsertGeneration(document.getCrateId(), generation.getGeneration(), document, current);
+        index.upsertGeneration(document.getCrateId(), generation.getGeneration(), document, records);
       break;
     } catch (Exception error) {
       EmbeddingInputTooLargeException limit=findLimit(error);

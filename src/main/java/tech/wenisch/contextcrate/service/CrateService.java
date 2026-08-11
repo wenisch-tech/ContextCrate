@@ -99,8 +99,9 @@ public class CrateService {
   private void initializeConfiguration(UUID crateId) {
     jdbc.update("""
         insert into crate_rag_settings(crate_id, strict_grounding, allow_client_history,
-          inline_citations, structured_sources, retrieval_mode, source_limit)
-        values (?, false, true, true, true, 'hybrid', ?)
+          inline_citations, structured_sources, retrieval_mode, retrieval_strategy,
+          proposition_failure_policy, source_limit)
+        values (?, false, true, true, true, 'hybrid', 'standard', 'fail-indexing', ?)
         """, crateId, properties.answering().sourceLimit());
     jdbc.update("""
         insert into crate_provider_settings(crate_id, embeddings_enabled, embeddings_provider,

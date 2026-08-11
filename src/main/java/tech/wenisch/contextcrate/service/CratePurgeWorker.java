@@ -35,7 +35,7 @@ public class CratePurgeWorker {
     for(String table:new String[]{"extraction_result","document_chunk","normalized_document",
         "acquisition_record","source_item","pipeline_work_item","ingestion_run","ingestion_job","source",
         "extraction_rule","audit_log","api_key","admin_elevation","crate_index_generation",
-        "crate_rag_settings","crate_provider_settings","crate_member"})
+        "chunk_proposition","proposition_evaluation","crate_rag_settings","crate_provider_settings","crate_member"})
       jdbc.update("delete from "+table+" where crate_id = ?",crateId);
     jdbc.update("delete from crate where id = ?",crateId);
   }

@@ -24,10 +24,13 @@ public class OpenAiCompatibleAnswerProvider implements AnswerGenerationProvider 
   }
   @Override public String model() { return settings.effectiveAnswer().model(); }
   @Override public String complete(List<Message> messages) throws Exception {
+    return complete(messages, settings.effectiveAnswer().temperature());
+  }
+  @Override public String complete(List<Message> messages,double temperature) throws Exception {
     if (!available()) throw new IllegalStateException("Answer generation is not configured");
     var c=settings.effectiveAnswer();
     var response=client.send(request(c).POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(
-        Map.of("model",c.model(),"stream",false,"temperature",c.temperature(),"max_tokens",c.maxOutputTokens(),"messages",messages)))).build(),HttpResponse.BodyHandlers.ofString());
+        Map.of("model",c.model(),"stream",false,"temperature",temperature,"max_tokens",c.maxOutputTokens(),"messages",messages)))).build(),HttpResponse.BodyHandlers.ofString());
     if(response.statusCode()/100!=2)throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());
     var content=mapper.readTree(response.body()).path("choices").path(0).path("message").path("content");
     if(content.isMissingNode()||content.isNull())throw new IllegalStateException("Answer provider returned no completion content");

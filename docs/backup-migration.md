@@ -1,5 +1,7 @@
 # Crate export, import, and recovery
 
+Exports include proposition evaluations, accepted and rejected propositions, scores, and retrieval settings. Older schemas import as standard retrieval with `fail-indexing`. Imported evaluations are reused only while their source/model/prompt fingerprint remains current.
+
 Crate exports are portable ZIP bundles containing `manifest.json`, `data.json`, optional artifacts, and SHA-256 checksums for every payload entry.
 
 ```bash

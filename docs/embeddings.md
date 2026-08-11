@@ -1,5 +1,7 @@
 # Embeddings and hybrid retrieval
 
+With [proposition retrieval](features/retrieval.md), chunk vectors are created from accepted propositions instead of source-chunk text. Query and document-level embeddings are unchanged, and answer context still contains the original chunk.
+
 ContextCrate retrieves source documents and chunks. It does not generate answers yet: a future LLM receives the retrieved chunks and the user's question. The embedding model used for retrieval and that future LLM are independent choices.
 
 ## Retrieval modes

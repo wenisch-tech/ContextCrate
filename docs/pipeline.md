@@ -1,5 +1,7 @@
 # Pipeline behavior
 
+During the index stage, crates using proposition retrieval add generation and grading before embedding. Matching persisted evaluations are reused. Failures follow the crate's proposition failure policy; `fail-indexing` uses the existing retry and dead-letter behavior. Generation rebuilds keep the old index active until the replacement succeeds.
+
 ## Source items
 
 Every discovered locator is converted to a source URI before insertion. A `(run_id, source_uri)`

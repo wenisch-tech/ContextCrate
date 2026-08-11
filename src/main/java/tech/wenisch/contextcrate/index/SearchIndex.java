@@ -3,17 +3,16 @@ package tech.wenisch.contextcrate.index;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import tech.wenisch.contextcrate.domain.DocumentChunk;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 
 public interface SearchIndex extends AutoCloseable {
   void initialize(UUID crateId) throws IOException, InterruptedException;
 
-  void upsert(NormalizedDocument document, List<DocumentChunk> chunks)
+  void upsert(NormalizedDocument document, List<ChunkRetrievalRecord> chunks)
       throws IOException, InterruptedException;
 
   void upsertGeneration(UUID crateId, int generation, NormalizedDocument document,
-      List<DocumentChunk> chunks) throws IOException, InterruptedException;
+      List<ChunkRetrievalRecord> chunks) throws IOException, InterruptedException;
 
   SearchResults search(SearchRequest request) throws IOException, InterruptedException;
 
@@ -59,15 +58,17 @@ public interface SearchIndex extends AutoCloseable {
       Float lexicalScore,
       Float semanticScore,
       Float rerankScore,
-      @com.fasterxml.jackson.annotation.JsonIgnore String content) {
+      @com.fasterxml.jackson.annotation.JsonIgnore String content,
+      @com.fasterxml.jackson.annotation.JsonIgnore String retrievalContent) {
     public SearchHit(UUID id, UUID documentId, UUID runId, String kind, String title, String sourceUri,
         Integer chunkOrdinal, String snippet, float score) {
-      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, null, null, null, null);
+      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, null, null, null, null, null);
     }
     public SearchHit(UUID id, UUID documentId, UUID runId, String kind, String title, String sourceUri,
         Integer chunkOrdinal, String snippet, float score, Float lexicalScore, Float semanticScore) {
-      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, lexicalScore, semanticScore, null, null);
+      this(id, documentId, runId, kind, title, sourceUri, chunkOrdinal, snippet, score, lexicalScore, semanticScore, null, null, null);
     }
+    public SearchHit(UUID id,UUID documentId,UUID runId,String kind,String title,String sourceUri,Integer chunkOrdinal,String snippet,float score,Float lexicalScore,Float semanticScore,Float rerankScore,String content){this(id,documentId,runId,kind,title,sourceUri,chunkOrdinal,snippet,score,lexicalScore,semanticScore,rerankScore,content,content);}
   }
 
   record SearchResults(String query, String mode, List<SearchHit> hits) {

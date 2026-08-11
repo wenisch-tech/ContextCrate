@@ -46,6 +46,7 @@ public class UiController {
   private final DocumentIndexRecoveryService indexRecovery;
   private final PipelineWorkItemRepository pipelineWork;
   private final DocumentDiffService documentDiffs;
+  private final ChunkPropositionRepository chunkPropositions;
 
   public UiController(
       SourceService sources,
@@ -65,7 +66,8 @@ public class UiController {
       AcquisitionRecordRepository acquisitionRecords,
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
-      PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs) {
+      PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs,
+      ChunkPropositionRepository chunkPropositions) {
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -88,6 +90,7 @@ public class UiController {
     this.indexRecovery = indexRecovery;
     this.pipelineWork = pipelineWork;
     this.documentDiffs = documentDiffs;
+    this.chunkPropositions = chunkPropositions;
   }
 
   @ModelAttribute
@@ -451,7 +454,7 @@ public class UiController {
     model.addAttribute("run", ingestion.requireRun(crateId, document.getRunId()));
     model.addAttribute("versions", versions);
     model.addAttribute("previousVersions", previous);
-    model.addAttribute("chunks", documentChunks.findByDocumentIdAndCrateIdOrderByOrdinal(id, crateId));
+    var chunks=documentChunks.findByDocumentIdAndCrateIdOrderByOrdinal(id,crateId);model.addAttribute("chunks",chunks);var propositionMap=new LinkedHashMap<UUID,List<ChunkProposition>>();for(var chunk:chunks)propositionMap.put(chunk.getId(),chunkPropositions.findByChunkIdOrderByOrdinal(chunk.getId()));model.addAttribute("chunkPropositions",propositionMap);
     return "document-details";
   }
 
@@ -571,10 +574,12 @@ public class UiController {
       @RequestParam(defaultValue = "false") boolean answerVerificationEnabled,
       @RequestParam(defaultValue = "revise-once") String answerVerificationFailureAction,
       @RequestParam String retrievalMode,
+      @RequestParam(defaultValue="standard") String retrievalStrategy,
+      @RequestParam(defaultValue="fail-indexing") String propositionFailurePolicy,
       @RequestParam int sourceLimit) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    ragSettings.update(crateId,strictGrounding, allowClientHistory, inlineCitations, structuredSources, gradingEnabled, answerVerificationEnabled, answerVerificationFailureAction, retrievalMode, sourceLimit);
-    return "redirect:/crates/"+crateId+"/settings?saved";
+    var previous=ragSettings.current(crateId);boolean changed=!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);if(changed)rebuild.rebuildAsync(crateId);
+    return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 
   @PostMapping("/settings/providers")
@@ -596,9 +601,9 @@ public class UiController {
       @RequestParam(defaultValue="false") boolean answeringEnabled, @RequestParam(required=false) String answeringBaseUrl,
       @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous = providerSettings.effectiveEmbedding(crateId);
+    var previous = providerSettings.effectiveEmbedding(crateId);var previousAnswer=providerSettings.effectiveAnswer(crateId);
     providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
-    if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString()))
+    if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";
   }

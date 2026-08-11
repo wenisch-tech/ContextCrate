@@ -16,12 +16,15 @@ public class CrateOperationsApiController {
   private final SearchIndex index;private final IndexRebuildService rebuild;
   private final DocumentIndexRecoveryService indexRecovery;
   private final CrateIndexGenerationRepository generations;
+  private final PropositionEvaluationRepository propositionEvaluations;private final ChunkPropositionRepository propositions;
   public CrateOperationsApiController(CrateAccessService access,NormalizedDocumentRepository documents,
       DocumentChunkRepository chunks,AuditLogRepository audits,SearchIndex index,
       IndexRebuildService rebuild,DocumentIndexRecoveryService indexRecovery,
-      CrateIndexGenerationRepository generations){
+      CrateIndexGenerationRepository generations,PropositionEvaluationRepository propositionEvaluations,
+      ChunkPropositionRepository propositions){
     this.access=access;this.documents=documents;this.chunks=chunks;this.audits=audits;
     this.index=index;this.rebuild=rebuild;this.indexRecovery=indexRecovery;this.generations=generations;
+    this.propositionEvaluations=propositionEvaluations;this.propositions=propositions;
   }
   @GetMapping("/documents") public List<NormalizedDocument> documents(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.VIEWER);
@@ -39,6 +42,7 @@ public class CrateOperationsApiController {
     documents.findByIdAndCrateId(id,crateId).orElseThrow();
     return chunks.findByDocumentIdAndCrateIdOrderByOrdinal(id,crateId);
   }
+  @GetMapping("/documents/{documentId}/chunks/{chunkId}/propositions") public Map<String,Object> propositions(@PathVariable UUID crateId,@PathVariable UUID documentId,@PathVariable UUID chunkId){access.require(crateId,CrateMember.Role.VIEWER);documents.findByIdAndCrateId(documentId,crateId).orElseThrow();var chunk=chunks.findByIdAndCrateId(chunkId,crateId).filter(c->c.getDocumentId().equals(documentId)).orElseThrow();Map<String,Object> result=new LinkedHashMap<>();result.put("chunkId",chunk.getId());result.put("evaluation",propositionEvaluations.findByChunkId(chunkId).orElse(null));result.put("propositions",propositions.findByChunkIdOrderByOrdinal(chunkId));return result;}
   @GetMapping("/index") public Map<String,Object> index(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.VIEWER);
     return Map.of("health",index.health(crateId),"generations",generations.findByCrateIdOrderByGenerationDesc(crateId));
