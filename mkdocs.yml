@@ -19,6 +19,7 @@ nav:
   - Answers: answers.md
   - Features:
     - Grading: features/grading.md
+    - Answer verification: features/answer-verification.md
   - Pipeline: pipeline.md
   - Security: security.md
   - Deployment: deployment.md

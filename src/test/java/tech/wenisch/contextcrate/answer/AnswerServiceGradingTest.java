@@ -83,7 +83,10 @@ class AnswerServiceGradingTest {
     when(repository.findById(crateId)).thenReturn(java.util.Optional.empty());
     when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-    assertThat(new RagSettingsService(repository, properties).current(crateId).isGradingEnabled()).isTrue();
+    var value = new RagSettingsService(repository, properties).current(crateId);
+    assertThat(value.isGradingEnabled()).isTrue();
+    assertThat(value.isAnswerVerificationEnabled()).isTrue();
+    assertThat(value.getAnswerVerificationFailureAction()).isEqualTo("revise-once");
   }
 
   private void setup(boolean grading, boolean strict) throws Exception {
@@ -93,7 +96,7 @@ class AnswerServiceGradingTest {
         "Other", "https://example.test/other", 1, "other chunk", .5f);
     when(index.search(any())).thenReturn(new SearchIndex.SearchResults("question", "hybrid", List.of(first, second)));
     when(chunks.findByIdAndCrateId(any(), eq(crateId))).thenReturn(java.util.Optional.empty());
-    when(settings.current(crateId)).thenReturn(new RagSettings(crateId, strict, true, true, true, grading, "hybrid", 8));
+    when(settings.current(crateId)).thenReturn(new RagSettings(crateId, strict, true, true, true, grading, true, "revise-once", "hybrid", 8));
   }
 
   private AnswerService service() {
