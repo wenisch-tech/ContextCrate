@@ -1,5 +1,7 @@
 # Deployment
 
+ContextCrate is intended for Kubernetes in production. Start with the [installation overview](installation/README.md) for the supported Docker, Compose, JAR, and Kubernetes paths. This page covers topology and deployment constraints after installation.
+
 ## Standalone
 
 Run the JAR or `compose.yml`. Persist `/app/data`, set a strong admin password, and back up the volume. Standalone is appropriate for one instance and moderate crawls.

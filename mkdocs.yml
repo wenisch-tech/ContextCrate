@@ -23,7 +23,13 @@ nav:
     - Answer verification: features/answer-verification.md
   - Pipeline: pipeline.md
   - Security: security.md
-  - Deployment: deployment.md
+  - Installation:
+    - Overview: installation/README.md
+    - Docker: installation/docker.md
+    - Docker Compose: installation/compose.md
+    - Kubernetes: installation/kubernetes.md
+    - JAR: installation/jar.md
+  - Deployment Notes: deployment.md
   - Backup & migration: backup-migration.md
   - Upgrade from Harvex: upgrade-from-harvex.md
   - API: api.md

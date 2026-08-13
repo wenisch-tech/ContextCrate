@@ -1,43 +1,55 @@
-# ContextCrate
+<div align="center">
 
-ContextCrate is a self-hosted ingestion, extraction, retrieval, and cited-answer platform. Its top-level entity is a **crate**: an independently configured and authorized context workspace containing sources, ingestion jobs, documents, extraction rules, provider settings, artifacts, and its own vector-index namespace.
+  <h1>ContextCrate</h1>
+  <img src="docs/img/contextcrate-banner.png" alt="ContextCrate" />
+
+  <p><strong>Turn your sources into trusted context.</strong></p>
+  <p>Open-source, self-hosted RAG for hybrid retrieval and verifiable AI answers.</p>
+
+</div>
+
+ContextCrate is an open-source, self-hosted retrieval-augmented generation platform. It ingests websites and Git repositories, builds searchable context, and delivers grounded answers with citations you can inspect. Its top-level entity is a **crate**: an independently configured and authorized context workspace containing sources, ingestion jobs, documents, extraction rules, provider settings, artifacts, and its own vector-index namespace.
+
+ContextCrate keeps that context on infrastructure you control, combines lexical and semantic retrieval, and makes answer evidence traceable back to the original source. 
+
 
 ## Capabilities
 
-- Multiple crates with Owner, Editor, and Viewer memberships.
-- Installation administration separated from crate content access, with audited 30-minute elevation.
-- Website sources with HTTP and Playwright crawling, SSRF controls, robots policy, authentication, retries, leases, and dead letters.
-- Git sources with public or token-authenticated HTTPS acquisition of Markdown and text snapshots.
-- Filesystem or S3 artifacts namespaced by crate.
-- Normalized documents, deterministic chunks, extraction rules, and rebuildable results.
-- Local ONNX or OpenAI-compatible embeddings configured per crate.
-- Lucene or OpenSearch lexical, semantic, and RRF-hybrid retrieval.
-- Versioned crate index generations with background rebuild and atomic activation.
-- OpenAI-compatible cited answer streaming with crate-specific RAG policy.
-- Personal API keys and crate-specific Viewer/Editor service keys.
-- Archive, restore, retryable purge, and checksummed crate export/import.
-- Standalone H2/Lucene mode and distributed PostgreSQL/RabbitMQ/S3/OpenSearch roles.
-
-## Quick start
-
-Requires JDK 25.
-
-```bash
-./mvnw verify
-./mvnw spring-boot:run
-```
-
-Open <http://localhost:8080> and sign in with `admin@contextcrate.local` / `admin`. Set `CONTEXTCRATE_ADMIN_PASSWORD` before exposing the service.
-
-```bash
-docker run --rm -p 8080:8080 -v contextcrate-data:/app/data \
-  -e CONTEXTCRATE_ADMIN_PASSWORD=change-me \
-  ghcr.io/wenisch-tech/contextcrate:latest
-```
-
-The first authenticated user owns the automatically migrated Legacy crate. New users see crate onboarding according to the global creation policy.
+- **Crawl websites reliably** with HTTP or Playwright rendering, robots-policy enforcement, login support, retries, and crawler safety controls.
+- **Ingest Git repositories** over public or token-authenticated HTTPS, selecting branches, tags, paths, and Markdown or text content.
+- **Organize knowledge into crates** with isolated sources, indexes, settings, members, and service keys for each team or use case.
+- **Search with hybrid retrieval** by combining BM25 keyword search and semantic vectors with reciprocal-rank fusion, filters, and optional cross-encoder reranking.
+- **Generate grounded answers** through OpenAI-compatible models, with streaming responses, stable source lists, and inline citations that lead back to the indexed evidence.
+- **Improve answer quality** with retrieved-chunk grading, proposition retrieval, and configurable answer verification that can revise, block, or warn about unsupported claims.
+- **Choose your AI providers** with local ONNX models or OpenAI-compatible embedding, reranking, and answer endpoints configured per crate.
+- **Manage data safely** with document versions, background index rebuilds, archive/restore, checksummed crate export/import, and audit-aware access controls.
+- **Automate through the UI or API** using personal API keys and crate-specific Viewer or Editor service keys.
+- **Deploy from laptop to cluster** with standalone Docker or Compose for compact installs and Kubernetes with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch for production scale.
 
 ## Architecture
+
+The **control plane** exposes the crate-qualified UI and API, applies membership authorization, and owns configuration plus normalized documents in the relational database. **Workers** acquire website and Git sources, optionally render pages in a browser, normalize content, extract metadata, and build the search index. A crate-aware queue coordinates that work; raw source bodies live in artifact storage, while Lucene or OpenSearch serves lexical, semantic, and hybrid retrieval.
+
+```mermaid
+flowchart LR
+  U[Users and API clients] --> C["Control plane<br/>UI, API, authorization"]
+  C --> D[("Configuration and<br/>normalized documents")]
+  C --> Q[Crate-aware queue]
+  Q --> W["Source, browser, parser,<br/>extractor, and indexer workers"]
+  W --> A[(Artifact storage)]
+  W --> I[(Lucene or OpenSearch)]
+  C --> I
+```
+
+**Standalone** runs the control plane, workers, queue, H2 database, filesystem artifacts, and Lucene in one JVM. It is designed for local use and compact single-instance deployments. 
+
+**Distributed** runs the control plane and worker roles separately, with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch; each workload can then scale independently. 
+
+Kubernetes is the intended production deployment. See the [architecture documentation](docs/architecture.md) and [Kubernetes installation guide](docs/installation/kubernetes.md) for the complete design.
+
+## Pipeline example
+
+An ingestion run begins when a crate submits a website or Git source to the queue. Fetch workers acquire the selected pages or repository files and retain the raw result in crate-scoped artifact storage. Parser workers then normalize that content into documents and deterministic chunks. Extraction creates optional derived metadata, while the indexer builds a new search generation from the normalized records. Once the generation is complete, ContextCrate can serve lexical, semantic, or hybrid search and use the selected evidence to stream cited answers.
 
 ```mermaid
 flowchart LR
@@ -50,30 +62,42 @@ flowchart LR
   I --> S[Search and cited answers]
 ```
 
-Every content row, queue message, artifact key, and search operation carries crate identity. Lucene uses `data/index/crates/{crateId}/{generation}`; OpenSearch uses `{prefix}-crate-{crateId}-{generation}`.
+Raw artifacts remain separate from normalized documents so parsing and indexing can be rebuilt without re-crawling the original source. Every content row, queue message, artifact key, and search operation carries crate identity. Lucene uses `data/index/crates/{crateId}/{generation}`; OpenSearch uses `{prefix}-crate-{crateId}-{generation}`. See the [pipeline documentation](docs/pipeline.md) for work lifecycle, connector behavior, retries, and indexing details.
 
-## API
 
-Swagger UI is available at `/api`.
+## Quick start
 
-```text
-GET/POST /api/v1/crates
-GET/POST /api/v1/crates/{crateId}/sources
-GET/POST /api/v1/crates/{crateId}/sources/{sourceId}/ingestion-jobs
-GET      /api/v1/crates/{crateId}/runs
-GET      /api/v1/crates/{crateId}/documents
-GET      /api/v1/crates/{crateId}/search
-POST     /api/v1/crates/{crateId}/answers
-GET/PUT  /api/v1/crates/{crateId}/settings/{rag|providers}
-POST     /api/v1/crates/{crateId}/index/rebuild
-POST     /api/v1/crates/{crateId}/exports
-POST     /api/v1/crate-imports
+ContextCrate is intended for Kubernetes in production. The Helm-based Kubernetes installation is documented in the [installation guides](docs/installation/kubernetes.md). Docker and Docker Compose are useful for local development, evaluation, and smaller standalone deployments.
+
+### Docker
+
+Run a standalone instance with a persistent named volume:
+
+```bash
+docker run --rm -p 8080:8080 -v contextcrate-data:/app/data -e CONTEXTCRATE_ADMIN_PASSWORD=change-me ghcr.io/wenisch-tech/contextcrate:latest
 ```
 
-The former unscoped content API was intentionally removed.
+### Docker Compose
+
+Run the standalone Compose setup from a source checkout:
+
+```bash
+CONTEXTCRATE_ADMIN_PASSWORD=change-me docker compose up --build
+```
+
+Open <http://localhost:8080> and sign in with `admin@contextcrate.local` and the password you set. The named volume preserves application data and downloaded local models between restarts.
+
+For the distributed evaluation stack, use `CONTEXTCRATE_ADMIN_PASSWORD=change-me docker compose -f compose.distributed.yml up`. It includes PostgreSQL, RabbitMQ, MinIO, and OpenSearch for experimentation; use Kubernetes with independently operated backing services for production.
+
+The first authenticated user owns the automatically migrated Legacy crate. New users see crate onboarding according to the global creation policy. For a production deployment, configure a persistent data volume and set `CONTEXTCRATE_ADMIN_PASSWORD` before exposing the service.
 
 ## Documentation
 
+- [Installation overview](docs/installation/README.md)
+- [Docker installation](docs/installation/docker.md)
+- [Docker Compose installation](docs/installation/compose.md)
+- [Kubernetes installation](docs/installation/kubernetes.md)
+- [JAR installation](docs/installation/jar.md)
 - [Crates and lifecycle](docs/crates.md)
 - [Authorization](docs/authorization.md)
 - [Architecture](docs/architecture.md)
