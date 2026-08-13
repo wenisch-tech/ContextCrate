@@ -3,4 +3,4 @@
 data
 docs
 target/*
-!target/harvex-*.jar
+!target/contextcrate-*.jar
