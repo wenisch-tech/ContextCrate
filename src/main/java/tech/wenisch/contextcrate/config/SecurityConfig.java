@@ -3,6 +3,7 @@ package tech.wenisch.contextcrate.config;
 import java.util.UUID;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -38,9 +39,10 @@ public class SecurityConfig {
 
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http, ApiKeyAuthenticationFilter apiKeys,
-      AppUserRepository users)
+      AppUserRepository users, KeycloakOidcUserService oidcUsers,
+      @Value("${contextcrate.security.oidc.enabled:false}") boolean oidcEnabled)
       throws Exception {
-    return http.authorizeHttpRequests(
+    HttpSecurity security = http.authorizeHttpRequests(
             a ->
                 a.requestMatchers("/webjars/**", "/css/**", "/actuator/health/**")
                     .permitAll()
@@ -54,8 +56,10 @@ public class SecurityConfig {
         }).permitAll())
         .logout(l -> l.logoutSuccessUrl("/login?logout"))
         .httpBasic(c -> {})
-        .csrf(c -> c.ignoringRequestMatchers("/api/v1/**"))
-        .build();
+        .csrf(c -> c.ignoringRequestMatchers("/api/v1/**"));
+    if (oidcEnabled)
+      security.oauth2Login(o -> o.loginPage("/login").userInfoEndpoint(u -> u.oidcUserService(oidcUsers)));
+    return security.build();
   }
 
   @Bean

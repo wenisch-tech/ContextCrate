@@ -33,7 +33,9 @@ nav:
   - Backup & migration: backup-migration.md
   - Upgrade from Harvex: upgrade-from-harvex.md
   - API: api.md
-  - Operations: operations.md
+  - Operations:
+    - Overview: operations.md
+    - OIDC with Keycloak: operations/oidc.md
   - Tutorials: tutorials.md
   - Roadmap: roadmap.md
   - Troubleshooting: troubleshooting.md

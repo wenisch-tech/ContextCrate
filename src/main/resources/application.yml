@@ -112,6 +112,8 @@ contextcrate:
   security:
     initial-admin-email: ${CONTEXTCRATE_ADMIN_EMAIL:admin@contextcrate.local}
     initial-admin-password: ${CONTEXTCRATE_ADMIN_PASSWORD:admin}
+    oidc:
+      enabled: ${CONTEXTCRATE_SECURITY_OIDC_ENABLED:false}
 server:
   error:
     include-message: always

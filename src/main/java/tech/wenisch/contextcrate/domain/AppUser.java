@@ -87,4 +87,9 @@ public class AppUser {
   public void enabled(boolean value) {
     enabled = value;
   }
+
+  /** Updates the installation role asserted by the configured identity provider. */
+  public void role(String value) {
+    role = value;
+  }
 }
