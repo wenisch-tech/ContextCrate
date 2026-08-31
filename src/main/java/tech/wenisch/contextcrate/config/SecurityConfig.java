@@ -8,8 +8,12 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import tech.wenisch.contextcrate.domain.AppUser;
 import tech.wenisch.contextcrate.repository.AppUserRepository;
 import tech.wenisch.contextcrate.repository.CrateMemberRepository;
@@ -56,10 +60,41 @@ public class SecurityConfig {
         }).permitAll())
         .logout(l -> l.logoutSuccessUrl("/login?logout"))
         .httpBasic(c -> {})
+        .exceptionHandling(
+            e ->
+                e.defaultAuthenticationEntryPointFor(
+                        apiAuthenticationEntryPoint(),
+                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/**"))
+                    .defaultAccessDeniedHandlerFor(
+                        apiAccessDeniedHandler(),
+                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/**")))
         .csrf(c -> c.ignoringRequestMatchers("/api/v1/**"));
     if (oidcEnabled)
       security.oauth2Login(o -> o.loginPage("/login").userInfoEndpoint(u -> u.oidcUserService(oidcUsers)));
     return security.build();
+  }
+
+  /**
+   * Answers unauthenticated API requests with 401 instead of the form-login redirect. Without this
+   * an API or MCP client receives a 302 to an HTML sign-in page and cannot tell that its credential
+   * was missing or rejected.
+   */
+  private static AuthenticationEntryPoint apiAuthenticationEntryPoint() {
+    return (request, response, exception) -> {
+      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+      response.setHeader("WWW-Authenticate", "Bearer realm=\"ContextCrate\"");
+      response.setContentType("application/json;charset=UTF-8");
+      response.getWriter().write("{\"error\":\"Authentication required\"}");
+    };
+  }
+
+  /** Answers an authorization failure on the API with 403 and JSON rather than an HTML page. */
+  private static AccessDeniedHandler apiAccessDeniedHandler() {
+    return (request, response, exception) -> {
+      response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+      response.setContentType("application/json;charset=UTF-8");
+      response.getWriter().write("{\"error\":\"Access denied\"}");
+    };
   }
 
   @Bean
