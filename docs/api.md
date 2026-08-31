@@ -58,7 +58,23 @@ RAG settings include `retrievalStrategy` (`standard` or `proposition`) and `prop
 
 ## Administration
 
-Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructure health, dead letters, and temporary elevations. They do not expose crate documents or search without elevation.
+Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructure health, dead letters, and temporary elevations. They do not expose crate documents or search without elevation. The same operations are available in the UI at `/admin` — see [Administration](operations/administration.md).
+
+- `GET/POST /api/v1/admin/users`
+- `PUT /api/v1/admin/users/{id}/creation-entitlement` — `{"allowed": true}`
+- `PUT /api/v1/admin/users/{id}/enabled` — `{"enabled": false}`
+- `PUT /api/v1/admin/users/{id}/role` — `{"role": "ADMIN"}`
+- `POST /api/v1/admin/users/{id}/password-reset` — `{"temporaryPassword": "..."}`
+- `PUT /api/v1/admin/settings/crate-creation` — `{"mode": "ENTITLED_USERS"}`
+- `GET /api/v1/admin/crates` — every crate with document, source, and member counts
+- `GET /api/v1/admin/elevations` — the caller's active elevations
+- `POST /api/v1/admin/crates/{crateId}/elevations` — `{"reason": "..."}`
+- `DELETE /api/v1/admin/elevations/{id}`
+- `GET /api/v1/admin/system`
+- `GET /api/v1/admin/queue/dead-letters`
+- `POST /api/v1/admin/queue/dead-letters/{id}/requeue`
+
+User payloads never include the password hash. Two changes are always rejected: disabling or demoting your own account, and disabling or demoting the last enabled administrator.
 
 Errors use the standard API exception envelope and never redirect a REST client to another crate. The previous unscoped `/api/v1/jobs`, `/search`, `/answers`, and `/backups` contracts were removed.
 

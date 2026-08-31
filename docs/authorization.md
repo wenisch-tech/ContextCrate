@@ -36,6 +36,8 @@ sequenceDiagram
 
 The UI displays a persistent elevation banner. Elevation ends explicitly or after 30 minutes. It never changes the crate membership table.
 
+Elevations are started and ended from the administration panel at `/admin` — see [Administration](operations/administration.md), which also documents the rules that stop an administrator from locking themselves, or the installation, out.
+
 ## API keys
 
 Personal keys belong to a user and follow that user's changing memberships. Crate service keys belong to one crate and receive fixed Viewer or Editor authority; service keys cannot be Owners.

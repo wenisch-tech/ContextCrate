@@ -9,4 +9,7 @@ public interface AdminElevationRepository extends JpaRepository<AdminElevation, 
   List<AdminElevation> findByAdminUserIdAndCrateIdAndEndedAtIsNullAndExpiresAtAfter(
       UUID adminUserId, UUID crateId, Instant now);
   List<AdminElevation> findByEndedAtIsNullAndExpiresAtBefore(Instant now);
+
+  List<AdminElevation> findByAdminUserIdAndEndedAtIsNullAndExpiresAtAfterOrderByStartedAtDesc(
+      UUID adminUserId, Instant now);
 }

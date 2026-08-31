@@ -67,7 +67,9 @@ public class CrateService {
   public Crate create(String name, String description) {
     AppUser user = access.currentUser();
     if (!canCreate()) throw new org.springframework.security.access.AccessDeniedException("Crate creation is restricted");
-    Crate crate = crates.save(new Crate(UUID.randomUUID(), name, description, user.getId()));
+    // Flushed rather than saved: initializeConfiguration writes through JdbcTemplate, which does
+    // not trigger a Hibernate flush, so the crate row must already exist for its foreign keys.
+    Crate crate = crates.saveAndFlush(new Crate(UUID.randomUUID(), name, description, user.getId()));
     members.save(new CrateMember(crate.getId(), user.getId(), CrateMember.Role.OWNER, user.getId()));
     initializeConfiguration(crate.getId());
     audits.save(new AuditLog(crate.getId(), user.getEmail(), "CRATE_CREATED", crate.getId().toString(), name));

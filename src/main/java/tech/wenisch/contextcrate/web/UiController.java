@@ -98,6 +98,7 @@ public class UiController {
     model.addAttribute("crate", crates.require(crateId, CrateMember.Role.VIEWER));
     model.addAttribute("crates", crates.accessible());
     model.addAttribute("adminElevation", access.activeElevation(crateId).orElse(null));
+    model.addAttribute("isAdmin", access.isAdmin());
   }
 
   @GetMapping({"", "/"})
