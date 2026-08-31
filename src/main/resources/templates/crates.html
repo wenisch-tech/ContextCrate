@@ -3,24 +3,60 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Crates · ContextCrate</title>
   <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/contextcrate.css"></head>
-<body><main class="container py-5">
-  <div class="mb-5"><p class="eyebrow">CONTEXTCRATE</p><h1>Your crates</h1>
-    <p class="text-secondary">A crate is an isolated context workspace containing sources, jobs, documents, extraction rules, members, and AI settings.</p></div>
-  <div class="row g-4">
-    <div class="col-lg-7"><div class="card panel p-4">
-      <h2 class="h5">Available crates</h2>
-      <div th:if="${crates.empty}" class="text-secondary py-4">You do not belong to a crate yet. Create your first crate or ask an administrator to add you.</div>
-      <a th:each="crate:${crates}" th:href="@{/crates/{id}(id=${crate.id})}" class="list-group-item list-group-item-action bg-transparent py-3">
-        <div class="fw-semibold" th:text="${crate.name}"></div><small class="text-secondary" th:text="${crate.description ?: crate.status}"></small>
-      </a>
-    </div></div>
-    <div class="col-lg-5"><form th:if="${canCreateCrate}" class="card panel p-4" method="post" action="/crates">
-      <h2 class="h5">Create your first crate</h2>
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-      <label class="form-label mt-3">Name</label><input class="form-control" name="name" required maxlength="200">
-      <label class="form-label mt-3">Description</label><textarea class="form-control" name="description"></textarea>
-      <button class="btn btn-primary mt-4">Create crate</button>
-    </form><div th:unless="${canCreateCrate}" class="card panel p-4"><h2 class="h5">Crate creation is restricted</h2><p class="text-secondary mb-0">Contact an administrator to request a crate or a creation entitlement.</p></div></div>
+<body><nav th:replace="~{fragments :: nav}"></nav><main class="container py-5">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div><p class="eyebrow">CONTEXTCRATE</p><h1 class="mb-2">Your crates</h1>
+      <p class="text-secondary mb-0">A crate is an isolated context workspace containing sources, jobs, documents, extraction rules, members, and AI settings.</p></div>
+    <button th:if="${canCreateCrate}" class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#create-crate"><i class="bi bi-plus-lg me-1"></i>New crate</button>
   </div>
-</main></body></html>
+
+  <a th:if="${isAdmin}" class="card panel admin-tile mb-4" href="/admin">
+    <i class="bi bi-shield-lock"></i>
+    <span><strong class="d-block">Administration</strong><span class="text-secondary small">Users, crate creation policy, all crates, and system operations.</span></span>
+    <span class="ms-auto text-secondary"><i class="bi bi-chevron-right"></i></span>
+  </a>
+
+  <div th:if="${!canCreateCrate}" class="card panel p-3 mb-4 d-flex flex-row align-items-center gap-3">
+    <i class="bi bi-info-circle text-secondary"></i>
+    <div><strong>Crate creation is restricted</strong><div class="text-secondary small">Contact an administrator to request a crate or a creation entitlement.</div></div>
+  </div>
+
+  <div th:if="${cards.empty}" class="card panel"><p class="empty-state mb-0">You do not belong to a crate yet. Create your first crate or ask an administrator to add you.</p></div>
+
+  <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+    <div class="col" th:each="card:${cards}">
+      <div class="card panel crate-card p-4 h-100 position-relative d-flex flex-column gap-3">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <h2 class="fw-semibold" th:text="${card.crate.name}"></h2>
+          <span class="badge" th:classappend="${card.crate.status.name() == 'ACTIVE'} ? 'text-bg-success' : (${card.crate.status.name() == 'PURGE_FAILED'} ? 'text-bg-danger' : (${card.crate.status.name() == 'ARCHIVED'} ? 'text-bg-secondary' : 'text-bg-warning'))" th:text="${card.crate.status}"></span>
+        </div>
+        <p class="crate-card__description mb-0" th:text="${card.crate.description ?: 'No description yet.'}"></p>
+        <div class="crate-stats">
+          <div class="crate-stat"><strong th:text="${card.documents}"></strong><span>DOCUMENTS</span></div>
+          <div class="crate-stat"><strong th:text="${card.sources}"></strong><span>SOURCES</span></div>
+          <div class="crate-stat"><strong th:text="${card.members}"></strong><span>MEMBERS</span></div>
+        </div>
+        <div class="crate-card__footer mt-auto">
+          <span class="status-pill" th:if="${card.role != null}" th:text="${card.role}"></span>
+          <span th:unless="${card.role != null}" class="status-pill">NO MEMBERSHIP</span>
+          <span th:title="'Created ' + ${card.createdOn()}">Updated <span th:text="${card.updatedOn()}"></span></span>
+        </div>
+        <a class="stretched-link" th:href="@{/crates/{id}(id=${card.crate.id})}" th:aria-label="'Open ' + ${card.crate.name}"></a>
+      </div>
+    </div>
+  </div>
+
+  <div th:if="${canCreateCrate}" class="modal fade" id="create-crate" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><form class="modal-content panel" method="post" action="/crates">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <div class="modal-header border-0"><h2 class="h5 modal-title">Create a crate</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <label class="form-label" for="crate-name">Name</label><input class="form-control" id="crate-name" name="name" required maxlength="200">
+        <label class="form-label mt-3" for="crate-description">Description</label><textarea class="form-control" id="crate-description" name="description" rows="3" maxlength="2000"></textarea>
+      </div>
+      <div class="modal-footer border-0"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Create crate</button></div>
+    </form></div>
+  </div>
+</main><script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script></body></html>
