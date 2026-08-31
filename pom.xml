@@ -24,6 +24,9 @@
         <djl.version>0.36.0</djl.version>
         <jgit.version>7.7.1.202607240634-r</jgit.version>
         <mockito.version>5.23.0</mockito.version>
+        <!-- Overrides spring-boot-dependencies' rabbit-amqp-client.version (5.30.0) to clear
+             CVE-2026-63337/63335/63336/69219/69220 in the transitive com.rabbitmq:amqp-client. -->
+        <rabbit-amqp-client.version>5.35.0</rabbit-amqp-client.version>
     </properties>
     <dependencyManagement>
         <dependencies>
