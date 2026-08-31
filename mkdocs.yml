@@ -33,6 +33,8 @@ nav:
   - Backup & migration: backup-migration.md
   - Upgrade from Harvex: upgrade-from-harvex.md
   - API: api.md
+  - Integrations:
+    - MCP server: integrations/mcp.md
   - Operations:
     - Overview: operations.md
     - Administration: operations/administration.md

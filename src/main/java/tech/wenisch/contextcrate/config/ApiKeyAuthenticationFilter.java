@@ -25,7 +25,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    String token = request.getHeader("X-API-KEY");
+    String token = token(request);
     if (token != null && SecurityContextHolder.getContext().getAuthentication() == null)
       keys.findByKeyHashAndRevokedFalse(Hashing.sha256(token))
           .ifPresent(
@@ -44,5 +44,22 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                                       key.getKeyType() == tech.wenisch.contextcrate.domain.ApiKey.KeyType.PERSONAL
                                           ? "ROLE_USER" : "ROLE_CRATE_KEY")))));
     chain.doFilter(request, response);
+  }
+
+  /**
+   * Reads the API key from {@code X-API-KEY}, falling back to a {@code Bearer} authorization header.
+   * MCP clients send the bearer form. {@code Basic} credentials are deliberately left alone so that
+   * the HTTP-Basic authentication configured alongside this filter keeps working.
+   */
+  private static String token(HttpServletRequest request) {
+    String header = request.getHeader("X-API-KEY");
+    if (header != null && !header.isBlank()) return header.trim();
+    String authorization = request.getHeader("Authorization");
+    if (authorization == null) return null;
+    String prefix = "Bearer ";
+    if (authorization.length() <= prefix.length()
+        || !authorization.regionMatches(true, 0, prefix, 0, prefix.length())) return null;
+    String bearer = authorization.substring(prefix.length()).trim();
+    return bearer.isEmpty() ? null : bearer;
   }
 }

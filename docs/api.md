@@ -1,6 +1,8 @@
 # REST API
 
-Swagger UI is served at `/api`; OpenAPI JSON is at `/v3/api-docs`. Content APIs use an explicit crate path. Authenticate with a session, HTTP Basic, or `X-API-KEY`.
+Swagger UI is served at `/api`; OpenAPI JSON is at `/v3/api-docs`. Content APIs use an explicit crate path. Authenticate with a session, HTTP Basic, `X-API-KEY`, or `Authorization: Bearer <token>` — the bearer form carries the same `cc_` API key and exists because most MCP clients send it.
+
+Under `/api/v1/**` an unauthenticated request is answered with `401` and a `WWW-Authenticate` header, and an authenticated request for something the credential may not reach with `403`. Both return JSON. Browser pages still receive the form-login redirect.
 
 ## Crates and members
 
@@ -73,6 +75,15 @@ Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructu
 - `GET /api/v1/admin/system`
 - `GET /api/v1/admin/queue/dead-letters`
 - `POST /api/v1/admin/queue/dead-letters/{id}/requeue`
+
+## MCP
+
+ContextCrate exposes a Model Context Protocol server so AI clients can retrieve from a crate:
+
+- `POST /api/v1/crates/{crateId}/mcp` — crate fixed by the path
+- `POST /api/v1/mcp` — crate chosen per call
+
+Stateless Streamable HTTP: one JSON response per POST, `405` on `GET`/`DELETE`, no session id. See [MCP server](integrations/mcp.md) for the tools and client configuration.
 
 User payloads never include the password hash. Two changes are always rejected: disabling or demoting your own account, and disabling or demoting the last enabled administrator.
 
