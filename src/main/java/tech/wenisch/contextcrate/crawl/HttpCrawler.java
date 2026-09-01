@@ -175,6 +175,7 @@ public class HttpCrawler {
               .launch(new BrowserType.LaunchOptions().setHeadless(true));
       try {
         Browser.NewContextOptions options = new Browser.NewContextOptions();
+        options.setIgnoreHTTPSErrors(config.reliability().trustAllCertificates());
         String stored = browserStorage.get(run.getId());
         if (stored != null) options.setStorageState(stored);
         if (config.loginConfiguration().authMethod() == AuthMethod.OAUTH2) {
@@ -215,6 +216,7 @@ public class HttpCrawler {
           authentication.clear(run.getId());
           options =
               new Browser.NewContextOptions()
+                  .setIgnoreHTTPSErrors(config.reliability().trustAllCertificates())
                   .setExtraHTTPHeaders(
                       Map.of(
                           "Authorization",

@@ -7,22 +7,54 @@ on:
     branches: ['**']
 permissions: { contents: read, checks: write, pull-requests: write, packages: read }
 jobs:
+  # Bumps and pushes the next semver git tag (same approach as wenisch-tech/Kairos): the tag
+  # action itself reads the last tag reachable from main and creates the next one atomically,
+  # so version numbers stay sequential regardless of how much CI activity happens on other
+  # branches/PRs in between. PR/branch runs use dry_run so no tag is created for them.
+  versioning:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    outputs:
+      tag: ${{ steps.tag_version.outputs.new_tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ github.token }}
+          release_branches: main
+          default_bump: patch
+          dry_run: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
+      - id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag_version.outputs.new_tag }}"
+          if [ -z "$tag" ]; then tag="v0.1.0"; fi
+          version="${tag#v}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            version="${version}-pr.${{ github.event.number }}.${{ github.run_number }}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
   test:
     uses: ./.github/workflows/_test.yml
   docker:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-    needs: test
+    needs: [test, versioning]
     permissions: { contents: read, packages: write, pull-requests: write, id-token: write, attestations: write }
     uses: ./.github/workflows/_docker.yml
     with:
-      version: 0.1.${{ github.run_number }}
+      version: ${{ needs.versioning.outputs.version }}
       push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     secrets: inherit
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, docker]
+    needs: [test, versioning, docker]
     permissions: { contents: write, packages: read, id-token: write }
     uses: ./.github/workflows/_release.yml
     with:
-      version: 0.1.${{ github.run_number }}
+      version: ${{ needs.versioning.outputs.version }}
+      tag: ${{ needs.versioning.outputs.tag }}
     secrets: inherit
