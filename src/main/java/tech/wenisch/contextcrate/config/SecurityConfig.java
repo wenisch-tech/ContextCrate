@@ -1,6 +1,7 @@
 package tech.wenisch.contextcrate.config;
 
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +10,8 @@ import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
@@ -44,6 +47,7 @@ public class SecurityConfig {
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http, ApiKeyAuthenticationFilter apiKeys,
       AppUserRepository users, KeycloakOidcUserService oidcUsers,
+      ObjectProvider<InsecureOidcHttpClients> insecureOidc,
       @Value("${contextcrate.security.oidc.enabled:false}") boolean oidcEnabled)
       throws Exception {
     HttpSecurity security = http.authorizeHttpRequests(
@@ -70,7 +74,17 @@ public class SecurityConfig {
                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/**")))
         .csrf(c -> c.ignoringRequestMatchers("/api/v1/**"));
     if (oidcEnabled)
-      security.oauth2Login(o -> o.loginPage("/login").userInfoEndpoint(u -> u.oidcUserService(oidcUsers)));
+      security.oauth2Login(o -> {
+        o.loginPage("/login").userInfoEndpoint(u -> u.oidcUserService(oidcUsers));
+        insecureOidc.ifAvailable(insecure -> {
+          var userInfoService = new DefaultOAuth2UserService();
+          userInfoService.setRestOperations(insecure.restOperations());
+          oidcUsers.setOauth2UserService(userInfoService);
+          var tokenResponseClient = new RestClientAuthorizationCodeTokenResponseClient();
+          tokenResponseClient.setRestClient(insecure.restClient());
+          o.tokenEndpoint(t -> t.accessTokenResponseClient(tokenResponseClient));
+        });
+      });
     return security.build();
   }
 
