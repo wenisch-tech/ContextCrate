@@ -137,6 +137,10 @@ public class PipelineWorkItem {
     return lastError;
   }
 
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
   public void claim(Instant until) {
     status = WorkStatus.PROCESSING;
     leaseUntil = until;
