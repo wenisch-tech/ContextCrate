@@ -83,7 +83,7 @@ ContextCrate exposes a Model Context Protocol server so AI clients can retrieve 
 - `POST /api/v1/crates/{crateId}/mcp` — crate fixed by the path
 - `POST /api/v1/mcp` — crate chosen per call
 
-Stateless Streamable HTTP: one JSON response per POST, `405` on `GET`/`DELETE`, no session id. See [MCP server](integrations/mcp.md) for the tools and client configuration.
+Streamable HTTP through the official MCP SDK transport: `POST` for messages, `GET` for the server-to-client stream, `DELETE` to end a session, and an `Mcp-Session-Id` issued by `initialize`. Clients must send `Accept: application/json, text/event-stream`. See [MCP server](integrations/mcp.md) for the tools and client configuration.
 
 User payloads never include the password hash. Two changes are always rejected: disabling or demoting your own account, and disabling or demoting the last enabled administrator.
 
