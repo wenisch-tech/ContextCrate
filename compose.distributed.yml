@@ -62,7 +62,7 @@ services:
     ports: ["9001:9001"]
     volumes: ["minio:/data"]
   opensearch:
-    image: opensearchproject/opensearch:3.2.0
+    image: opensearchproject/opensearch:3.8.0
     environment: { discovery.type: single-node, DISABLE_SECURITY_PLUGIN: "true", OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m" }
     volumes: ["opensearch:/usr/share/opensearch/data"]
 volumes: { postgres: {}, rabbitmq: {}, minio: {}, opensearch: {} }
