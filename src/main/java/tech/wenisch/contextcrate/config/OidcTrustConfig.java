@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -30,6 +30,7 @@ import tech.wenisch.contextcrate.util.InsecureSsl;
 @ConditionalOnProperty(
     name = {"contextcrate.security.oidc.enabled", "contextcrate.security.oidc.trust-all-certificates"},
     havingValue = "true")
+@EnableConfigurationProperties(ContextCrateOAuth2ClientProperties.class)
 public class OidcTrustConfig {
 
   @Bean
@@ -44,7 +45,7 @@ public class OidcTrustConfig {
   @Bean
   @SuppressWarnings("unchecked")
   ClientRegistrationRepository clientRegistrationRepository(
-      OAuth2ClientProperties properties, InsecureOidcHttpClients insecure) {
+      ContextCrateOAuth2ClientProperties properties, InsecureOidcHttpClients insecure) {
     List<ClientRegistration> registrations = new ArrayList<>();
     properties
         .getRegistration()
@@ -52,7 +53,8 @@ public class OidcTrustConfig {
             (id, registration) -> {
               String providerId =
                   registration.getProvider() != null ? registration.getProvider() : id;
-              OAuth2ClientProperties.Provider provider = properties.getProvider().get(providerId);
+              ContextCrateOAuth2ClientProperties.Provider provider =
+                  properties.getProvider().get(providerId);
               if (provider == null || provider.getIssuerUri() == null)
                 throw new IllegalStateException(
                     "contextcrate.security.oidc.trust-all-certificates requires an issuer-uri for"
