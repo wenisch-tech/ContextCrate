@@ -1,21 +1,13 @@
 package tech.wenisch.contextcrate.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import tech.wenisch.contextcrate.answer.AnswerService;
-import tech.wenisch.contextcrate.domain.Crate;
 
 class McpToolCatalogTest {
-  private final AnswerService answers = mock(AnswerService.class);
-  private final McpToolCatalog catalog = new McpToolCatalog(answers);
-
-  private final Crate crate = new Crate(UUID.randomUUID(), "Product docs",
-      "Public product manuals and release notes", UUID.randomUUID());
+  private final McpToolCatalog catalog = new McpToolCatalog();
 
   private static List<String> names(List<Map<String, Object>> tools) {
     return tools.stream().map(tool -> String.valueOf(tool.get("name"))).toList();
@@ -26,82 +18,68 @@ class McpToolCatalogTest {
   }
 
   @SuppressWarnings("unchecked")
+  private static Map<String, Object> schema(Map<String, Object> tool) {
+    return (Map<String, Object>) tool.get("inputSchema");
+  }
+
+  @SuppressWarnings("unchecked")
   private static Map<String, Object> properties(Map<String, Object> tool) {
-    return (Map<String, Object>) ((Map<String, Object>) tool.get("inputSchema")).get("properties");
+    return (Map<String, Object>) schema(tool).get("properties");
   }
 
   @Test
-  void askCrateIsHiddenWhenAnsweringIsNotConfigured() {
-    when(answers.available(crate.getId())).thenReturn(false);
-
-    assertThat(names(catalog.tools(crate)))
-        .contains("search_crate", "fetch_document", "list_documents", "list_sources")
-        .doesNotContain("ask_crate");
+  void allSixToolsAreAdvertised() {
+    assertThat(names(catalog.tools())).containsExactlyInAnyOrder(
+        "search_crate", "ask_crate", "fetch_document", "list_documents", "list_sources", "list_crates");
   }
 
   @Test
-  void askCrateAppearsOnceAnsweringIsConfigured() {
-    when(answers.available(crate.getId())).thenReturn(true);
-
-    assertThat(names(catalog.tools(crate))).contains("ask_crate");
+  void everyToolDeclaresAValidObjectSchema() {
+    for (Map<String, Object> tool : catalog.tools()) {
+      assertThat(schema(tool)).as(String.valueOf(tool.get("name"))).containsEntry("type", "object");
+      assertThat(schema(tool)).containsKey("properties");
+      assertThat(String.valueOf(tool.get("description"))).isNotBlank();
+    }
   }
 
   @Test
-  void theCrateArgumentExistsOnlyOnTheGlobalEndpoint() {
-    when(answers.available(crate.getId())).thenReturn(true);
-
-    assertThat(properties(byName(catalog.tools(crate), "search_crate"))).doesNotContainKey("crate");
-    assertThat(properties(byName(catalog.tools(null), "search_crate"))).containsKey("crate");
+  void theCrateArgumentIsOfferedOnEveryCrateScopedTool() {
+    // The tool list is server-wide, so the argument has to exist even on the crate-bound endpoint;
+    // there the path wins because McpCrateResolver prefers it.
+    for (String name : List.of("search_crate", "ask_crate", "fetch_document", "list_documents", "list_sources"))
+      assertThat(properties(byName(catalog.tools(), name))).as(name).containsKey("crate");
+    assertThat(properties(byName(catalog.tools(), "list_crates"))).isEmpty();
   }
 
   @Test
-  void listCratesExistsOnlyOnTheGlobalEndpoint() {
-    when(answers.available(crate.getId())).thenReturn(true);
-
-    assertThat(names(catalog.tools(null))).contains("list_crates");
-    assertThat(names(catalog.tools(crate))).doesNotContain("list_crates");
-  }
-
-  @Test
-  void theSearchDescriptionCarriesTheCrateIdentitySoTheModelKnowsWhenToUseIt() {
-    when(answers.available(crate.getId())).thenReturn(true);
-
-    String description = String.valueOf(byName(catalog.tools(crate), "search_crate").get("description"));
-
-    assertThat(description)
-        .contains("Product docs")
-        .contains("Public product manuals and release notes");
+  void requiredArgumentsAreDeclared() {
+    assertThat(schema(byName(catalog.tools(), "search_crate"))).containsEntry("required", List.of("query"));
+    assertThat(schema(byName(catalog.tools(), "ask_crate"))).containsEntry("required", List.of("question"));
+    assertThat(schema(byName(catalog.tools(), "fetch_document")))
+        .containsEntry("required", List.of("documentId"));
   }
 
   @Test
   void theSearchDescriptionAdmitsItIsNotExhaustive() {
-    when(answers.available(crate.getId())).thenReturn(true);
-
-    assertThat(String.valueOf(byName(catalog.tools(crate), "search_crate").get("description")))
+    assertThat(String.valueOf(byName(catalog.tools(), "search_crate").get("description")))
         .contains("NOT exhaustive")
         .contains("list_documents");
   }
 
   @Test
-  void theInstructionsExplainWhichToolAnswersWhichKindOfQuestion() {
-    String instructions = catalog.instructions(crate);
-
-    assertThat(instructions)
-        .contains("Product docs")
-        .contains("not an exhaustive list")
-        .contains("list_documents")
-        .contains("list_sources");
+  void askCrateWarnsThatItMayBeUnconfigured() {
+    // Availability is per crate and the catalogue is not, so the tool is always advertised and
+    // reports the problem at call time instead of vanishing from the list.
+    assertThat(String.valueOf(byName(catalog.tools(), "ask_crate").get("description")))
+        .contains("not configured");
   }
 
   @Test
-  void everyToolDeclaresAValidObjectSchema() {
-    when(answers.available(crate.getId())).thenReturn(true);
-
-    for (Map<String, Object> tool : catalog.tools(null)) {
-      @SuppressWarnings("unchecked")
-      Map<String, Object> schema = (Map<String, Object>) tool.get("inputSchema");
-      assertThat(schema).as(String.valueOf(tool.get("name"))).containsEntry("type", "object");
-      assertThat(schema).containsKey("properties");
-    }
+  void theInstructionsExplainWhichToolAnswersWhichKindOfQuestion() {
+    assertThat(catalog.instructions())
+        .contains("not an exhaustive list")
+        .contains("list_documents")
+        .contains("list_sources")
+        .contains("list_crates");
   }
 }

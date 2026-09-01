@@ -47,6 +47,20 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
   }
 
   /**
+   * Also authenticate on async dispatches.
+   *
+   * <p>{@link OncePerRequestFilter} skips them by default, which is fine for a plain request but
+   * breaks anything streaming: an SSE response is re-dispatched through the filter chain on another
+   * thread, and without this the security context is empty there, {@code AuthorizationFilter}
+   * denies the dispatch, and the client sees the stream die mid-message. The MCP endpoint streams,
+   * so it needs this.
+   */
+  @Override
+  protected boolean shouldNotFilterAsyncDispatch() {
+    return false;
+  }
+
+  /**
    * Reads the API key from {@code X-API-KEY}, falling back to a {@code Bearer} authorization header.
    * MCP clients send the bearer form. {@code Basic} credentials are deliberately left alone so that
    * the HTTP-Basic authentication configured alongside this filter keeps working.

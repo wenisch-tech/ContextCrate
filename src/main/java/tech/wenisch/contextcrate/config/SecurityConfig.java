@@ -46,6 +46,7 @@ public class SecurityConfig {
 
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http, ApiKeyAuthenticationFilter apiKeys,
+      tech.wenisch.contextcrate.mcp.McpCrateAccessFilter mcpCrateAccess,
       AppUserRepository users, KeycloakOidcUserService oidcUsers,
       ObjectProvider<InsecureOidcHttpClients> insecureOidc,
       @Value("${contextcrate.security.oidc.enabled:false}") boolean oidcEnabled)
@@ -57,6 +58,9 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(apiKeys, UsernamePasswordAuthenticationFilter.class)
+        // Inside the chain so a denial becomes the API's 403 rather than a server error.
+        .addFilterAfter(mcpCrateAccess,
+            org.springframework.security.web.access.intercept.AuthorizationFilter.class)
         .formLogin(f -> f.loginPage("/login").successHandler((request,response,authentication)->{
           boolean required=users.findByEmailIgnoreCase(authentication.getName())
               .map(AppUser::isPasswordChangeRequired).orElse(false);

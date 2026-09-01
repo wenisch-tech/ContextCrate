@@ -8,12 +8,23 @@ it found. LiteLLM and Open WebUI both support the Streamable HTTP transport nati
 
 | Endpoint | Crate | Use for |
 | --- | --- | --- |
-| `POST /api/v1/crates/{crateId}/mcp` | fixed by the path | One crate per client entry. Pairs with a crate-scoped API key. |
-| `POST /api/v1/mcp` | chosen per call | One entry for several crates. Needs a personal key, or a crate-scoped key that pins the crate. |
+| `/api/v1/crates/{crateId}/mcp` | fixed by the path | One crate per client entry. Pairs with a crate-scoped API key. |
+| `/api/v1/mcp` | chosen per call | One entry for several crates. Needs a personal key, or a crate-scoped key that pins the crate. |
 
-The server is stateless. Every request is answered with a single JSON object; `GET` and `DELETE`
-return `405`, and no `Mcp-Session-Id` is issued. Protocol revisions `2025-11-25`, `2025-06-18` and
-`2025-03-26` are accepted.
+Both endpoints speak **Streamable HTTP** through the official MCP SDK transport: `POST` for
+messages, `GET` for the server-to-client stream, and `DELETE` to end a session. `initialize` returns
+an `Mcp-Session-Id` which the client must send on every subsequent request. Responses come back as
+`application/json` or `text/event-stream` depending on the exchange, so send
+
+```
+Accept: application/json, text/event-stream
+```
+
+as the specification requires. Protocol revisions `2024-11-05`, `2025-03-26`, `2025-06-18` and
+`2025-11-25` are all accepted.
+
+Connecting to a crate the credential cannot read fails immediately with `403`, before the handshake
+completes.
 
 ## Authentication
 
@@ -41,15 +52,18 @@ for a crate the key cannot reach gets `403`.
 | Tool | Purpose |
 | --- | --- |
 | `search_crate` | Retrieve passages matching a query, in full, with title, source URI and score. |
-| `ask_crate` | Ask ContextCrate's own RAG pipeline for a grounded, cited answer. Advertised only when answer generation is configured for the crate. |
+| `ask_crate` | Ask ContextCrate's own RAG pipeline for a grounded, cited answer. Reports an error when answer generation is not configured for the crate. |
 | `fetch_document` | Read one document's full text, windowed via `maxCharacters` and `offset`. |
 | `list_documents` | Page through the catalogue and report the true total. |
 | `list_sources` | The websites and Git repositories the crate was ingested from. |
-| `list_crates` | Which crates the credential can reach. Global endpoint only. |
+| `list_crates` | Which crates the credential can reach. |
 
-Tool descriptions are built per request and carry the crate's own name and description, so the model
-can tell which knowledge base it is talking to. On the crate-scoped endpoint there is no `crate`
-argument; on the global endpoint every tool accepts one (a UUID or the exact name).
+Every tool takes an optional `crate` argument (a UUID or the exact name). On the crate-scoped
+endpoint the path wins and the argument is ignored; on the global endpoint the crate is taken from
+the argument, or from a crate-scoped key, or — if exactly one crate is reachable — from that.
+
+The tool list belongs to the server rather than to a single request, so the descriptions are
+generic and do not name the crate. Call `list_crates` to see what a credential can reach.
 
 `search_crate` returns the **complete chunk text**, not the short snippet the REST search endpoint
 exposes. Results are capped at 25 passages and a total of roughly 40 000 characters.
@@ -97,5 +111,20 @@ users — that images are not ingested.
 unaffected, but a browser page calling the endpoint directly from JavaScript is blocked. Put an
 authenticating reverse proxy in front of a publicly reachable deployment.
 
-An `Origin` header is rejected with `403` unless it is listed in `contextcrate.mcp.allowed-origins`
-(a comma-separated list, empty by default), as the specification requires against DNS rebinding.
+`contextcrate.mcp.allowed-origins` (a comma-separated list) guards against DNS rebinding. When it
+is **empty — the default — the `Origin` header is not checked**, which is what server-to-server
+clients need, since they send no `Origin` at all. Set it to enforce an exact match and reject
+anything else with `403`.
+
+## Checking a deployment
+
+The reference client is the official inspector:
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+Choose transport "Streamable HTTP", point it at
+`https://contextcrate.example.com/api/v1/crates/<crateId>/mcp`, and add an
+`Authorization: Bearer cc_…` header. It should connect, list the tools by itself, and run
+`search_crate` from the tool runner.

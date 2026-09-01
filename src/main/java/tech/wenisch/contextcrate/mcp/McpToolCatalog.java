@@ -5,55 +5,45 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
-import tech.wenisch.contextcrate.answer.AnswerService;
-import tech.wenisch.contextcrate.domain.Crate;
 
 /**
- * Builds the advertised tool list for one request.
+ * The advertised tool list.
  *
- * <p>Descriptions are assembled per call rather than declared statically: whether a model retrieves
- * at the right moment depends almost entirely on what the description says, so the crate's own name
- * and description are written into it. The catalogue also states plainly that retrieval is ranked by
- * relevance and is not exhaustive — otherwise a model treats eight hits as the whole corpus.
+ * <p>The Model Context Protocol server keeps one tool list for the whole server rather than one per
+ * request, so the descriptions here cannot name the crate they will run against. What they must
+ * still do is steer the model to the right tool: that {@code search_crate} is ranked by relevance
+ * and is <em>not</em> exhaustive, and that {@code list_documents} is the one that can answer what a
+ * knowledge base actually contains.
+ *
+ * <p>The {@code crate} argument is offered on every tool. On the crate-scoped endpoint the path wins
+ * regardless, because {@link McpCrateResolver#resolve} prefers the path over the argument.
  */
 @Component
 public class McpToolCatalog {
-  private final AnswerService answers;
-
-  public McpToolCatalog(AnswerService answers) {
-    this.answers = answers;
-  }
-
-  /**
-   * @param crate the bound crate, or null on the global endpoint where it is chosen per call
-   */
-  public List<Map<String, Object>> tools(Crate crate) {
-    boolean global = crate == null;
+  /** Tool definitions as plain maps; {@link McpToolAdapter} turns them into protocol objects. */
+  public List<Map<String, Object>> tools() {
     List<Map<String, Object>> tools = new ArrayList<>();
-    tools.add(searchTool(crate, global));
-    if (global || answers.available(crate.getId())) tools.add(askTool(crate, global));
-    tools.add(fetchTool(crate, global));
-    tools.add(listDocumentsTool(crate, global));
-    tools.add(listSourcesTool(crate, global));
-    if (global) tools.add(listCratesTool());
+    tools.add(searchTool());
+    tools.add(askTool());
+    tools.add(fetchTool());
+    tools.add(listDocumentsTool());
+    tools.add(listSourcesTool());
+    tools.add(listCratesTool());
     return tools;
   }
 
   /** One-paragraph orientation returned from {@code initialize}. */
-  public String instructions(Crate crate) {
-    String subject = crate == null
-        ? "the knowledge bases (crates) this credential can reach"
-        : "the \"" + crate.getName() + "\" knowledge base";
-    return "ContextCrate exposes "
-        + subject
-        + " for retrieval. Use search_crate for questions about the content; it returns verbatim "
-        + "passages ranked by relevance, not an exhaustive list, so treat its results as evidence "
-        + "rather than as the complete contents. Use list_documents when asked what the knowledge "
-        + "base contains — it is paginated and reports the true total. Use list_sources when asked "
-        + "where the content comes from. Cite passages by their [n] markers.";
+  public String instructions() {
+    return "ContextCrate exposes knowledge bases (crates) for retrieval. Use search_crate for "
+        + "questions about the content; it returns verbatim passages ranked by relevance, not an "
+        + "exhaustive list, so treat its results as evidence rather than as the complete contents. "
+        + "Use list_documents when asked what a knowledge base contains — it is paginated and "
+        + "reports the true total. Use list_sources when asked where the content comes from. When "
+        + "this endpoint is bound to a single crate the crate argument is ignored; otherwise call "
+        + "list_crates first to choose one. Cite passages by their [n] markers.";
   }
 
-  private Map<String, Object> searchTool(Crate crate, boolean global) {
+  private Map<String, Object> searchTool() {
     Map<String, Object> properties = new LinkedHashMap<>();
     properties.put("query", property("string", "What to look for. Natural language or keywords."));
     properties.put("limit", property("integer",
@@ -61,34 +51,33 @@ public class McpToolCatalog {
             + ", maximum " + McpTools.SEARCH_MAX_LIMIT + "."));
     properties.put("mode", property("string",
         "Retrieval mode: lexical, semantic, or hybrid. Defaults to the crate's configured mode."));
-    addCrate(properties, global);
+    addCrate(properties);
     return tool(
         "search_crate",
-        "Search " + describe(crate, global)
-            + " and return the matching passages in full, with title, source URI and score. "
-            + "Results are ranked by relevance and are NOT exhaustive — to find out what the "
-            + "knowledge base contains, use list_documents instead.",
+        "Search a ContextCrate knowledge base and return the matching passages in full, with title, "
+            + "source URI and score. Results are ranked by relevance and are NOT exhaustive — to "
+            + "find out what the knowledge base contains, use list_documents instead.",
         properties,
         List.of("query"));
   }
 
-  private Map<String, Object> askTool(Crate crate, boolean global) {
+  private Map<String, Object> askTool() {
     Map<String, Object> properties = new LinkedHashMap<>();
     properties.put("question", property("string", "The question to answer. At most 8000 characters."));
     properties.put("maxSources", property("integer",
         "Upper bound on retrieved sources. Capped by the crate's configured source limit."));
-    addCrate(properties, global);
+    addCrate(properties);
     return tool(
         "ask_crate",
-        "Ask " + describe(crate, global)
-            + " a question and get an answer generated by ContextCrate's own retrieval-augmented "
-            + "pipeline, grounded in the crate and returned with numbered citations. Prefer "
-            + "search_crate when you want the raw passages to reason over yourself.",
+        "Ask a ContextCrate knowledge base a question and get an answer generated by its own "
+            + "retrieval-augmented pipeline, grounded in the crate and returned with numbered "
+            + "citations. Prefer search_crate when you want the raw passages to reason over "
+            + "yourself. Reports an error when answer generation is not configured for the crate.",
         properties,
         List.of("question"));
   }
 
-  private Map<String, Object> fetchTool(Crate crate, boolean global) {
+  private Map<String, Object> fetchTool() {
     Map<String, Object> properties = new LinkedHashMap<>();
     properties.put("documentId", property("string",
         "The document UUID, as returned by search_crate or list_documents."));
@@ -96,41 +85,41 @@ public class McpToolCatalog {
         "How much of the body to return. Default " + McpTools.DOCUMENT_DEFAULT_CHARACTERS
             + ", maximum " + McpTools.DOCUMENT_MAX_CHARACTERS + "."));
     properties.put("offset", property("integer", "Where to start in the body, for reading on."));
-    addCrate(properties, global);
+    addCrate(properties);
     return tool(
         "fetch_document",
-        "Retrieve the full text of one document from " + describe(crate, global)
-            + ". Use after search_crate when a passage needs its surrounding context.",
+        "Retrieve the full text of one document from a ContextCrate knowledge base. Use after "
+            + "search_crate when a passage needs its surrounding context.",
         properties,
         List.of("documentId"));
   }
 
-  private Map<String, Object> listDocumentsTool(Crate crate, boolean global) {
+  private Map<String, Object> listDocumentsTool() {
     Map<String, Object> properties = new LinkedHashMap<>();
     properties.put("query", property("string", "Optional filter on document title or source URI."));
     properties.put("limit", property("integer",
         "How many to return. Default " + McpTools.LIST_DEFAULT_LIMIT
             + ", maximum " + McpTools.LIST_MAX_LIMIT + "."));
     properties.put("offset", property("integer", "Where to start, for paging through everything."));
-    addCrate(properties, global);
+    addCrate(properties);
     return tool(
         "list_documents",
-        "List the documents in " + describe(crate, global)
-            + " with their titles, source URIs and chunk counts, and report the total number held. "
-            + "This is the reliable way to answer what the knowledge base contains or how large it "
-            + "is; unlike search_crate it is complete and can be paged through.",
+        "List the documents in a ContextCrate knowledge base with their titles, source URIs and "
+            + "chunk counts, and report the total number held. This is the reliable way to answer "
+            + "what a knowledge base contains or how large it is; unlike search_crate it is "
+            + "complete and can be paged through.",
         properties,
         List.of());
   }
 
-  private Map<String, Object> listSourcesTool(Crate crate, boolean global) {
+  private Map<String, Object> listSourcesTool() {
     Map<String, Object> properties = new LinkedHashMap<>();
-    addCrate(properties, global);
+    addCrate(properties);
     return tool(
         "list_sources",
-        "List the configured sources that feed " + describe(crate, global)
-            + " — the websites and Git repositories it was ingested from, with their connector type "
-            + "and whether they are enabled. Use for questions about provenance.",
+        "List the configured sources that feed a ContextCrate knowledge base — the websites and Git "
+            + "repositories it was ingested from, with their connector type and whether they are "
+            + "enabled. Use for questions about provenance.",
         properties,
         List.of());
   }
@@ -144,19 +133,10 @@ public class McpToolCatalog {
         List.of());
   }
 
-  /** The {@code crate} argument exists only on the global endpoint; elsewhere it is already fixed. */
-  private static void addCrate(Map<String, Object> properties, boolean global) {
-    if (global)
-      properties.put("crate", property("string",
-          "Which crate to use: its UUID or its exact name. Call list_crates if unsure."));
-  }
-
-  private static String describe(Crate crate, boolean global) {
-    if (global) return "a knowledge base";
-    String described = "the \"" + crate.getName() + "\" knowledge base";
-    return crate.getDescription() == null || crate.getDescription().isBlank()
-        ? described
-        : described + " (contents: " + crate.getDescription() + ")";
+  private static void addCrate(Map<String, Object> properties) {
+    properties.put("crate", property("string",
+        "Which crate to use: its UUID or its exact name. Ignored when the endpoint is already bound "
+            + "to one crate. Call list_crates if unsure."));
   }
 
   private static Map<String, Object> property(String type, String description) {
