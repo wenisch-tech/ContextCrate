@@ -184,7 +184,7 @@ public class IngestionService {
       return IngestionConfiguration.git(new IngestionConfiguration.Git(replacement.ref(),
           replacement.username(), old.token(), replacement.includePatterns(),
           replacement.excludePatterns(), replacement.maxFiles(), replacement.maxFileBytes(),
-          replacement.output()));
+          replacement.output(), replacement.trustAllCertificates()));
     }
     if (type != ConnectorType.HTTPS || existing.webCrawler() == null
         || submitted == null || submitted.webCrawler() == null) return submitted;

@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -22,6 +23,7 @@ import tech.wenisch.contextcrate.queue.*;
 import tech.wenisch.contextcrate.repository.*;
 import tech.wenisch.contextcrate.service.*;
 import tech.wenisch.contextcrate.storage.ArtifactStore;
+import tech.wenisch.contextcrate.util.InsecureSsl;
 
 @Service
 public class GitSourceRetriever {
@@ -70,7 +72,8 @@ public class GitSourceRetriever {
             config.username() == null || config.username().isBlank() ? "git" : config.username(),
             config.token()));
       }
-      try (Git git = clone.call()) {
+      try (var ignored = GitTlsContext.use(config.trustAllCertificates());
+          Git git = clone.call()) {
         if (!config.ref().isBlank()) checkout(git, config.ref());
         ObjectId head = git.getRepository().resolve("HEAD");
         if (head == null) throw new IllegalStateException("Git repository has no HEAD revision");
@@ -243,13 +246,25 @@ public class GitSourceRetriever {
     @Override
     public HttpConnection create(URL url) throws IOException {
       policy.assertSafe(url.toString());
-      return delegate.create(url);
+      return relaxTls(delegate.create(url));
     }
 
     @Override
     public HttpConnection create(URL url, Proxy proxy) throws IOException {
       policy.assertSafe(url.toString());
-      return delegate.create(url, proxy);
+      return relaxTls(delegate.create(url, proxy));
+    }
+
+    /** Opt-in only: applies to this thread's git operation when its job requested it. */
+    private static HttpConnection relaxTls(HttpConnection connection) throws IOException {
+      if (!GitTlsContext.trustAll()) return connection;
+      try {
+        connection.configure(null, InsecureSsl.trustAllManagers(), new SecureRandom());
+        connection.setHostnameVerifier((hostname, session) -> true);
+      } catch (java.security.GeneralSecurityException e) {
+        throw new IOException("Failed to relax TLS validation for git clone", e);
+      }
+      return connection;
     }
   }
 }

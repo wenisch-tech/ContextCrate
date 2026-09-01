@@ -13,24 +13,29 @@ public final class InsecureSsl {
   /** Opt-in only: callers explicitly accept the MITM risk for self-signed/internal CAs. */
   public static SSLContext trustAllContext() {
     try {
-      TrustManager trustAll =
-          new X509TrustManager() {
-            @Override
-            public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-
-            @Override
-            public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-
-            @Override
-            public X509Certificate[] getAcceptedIssuers() {
-              return new X509Certificate[0];
-            }
-          };
       SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, new TrustManager[] {trustAll}, new SecureRandom());
+      context.init(null, trustAllManagers(), new SecureRandom());
       return context;
     } catch (Exception e) {
       throw new IllegalStateException("Failed to build a trust-all SSL context", e);
     }
+  }
+
+  /** Opt-in only: callers explicitly accept the MITM risk for self-signed/internal CAs. */
+  public static TrustManager[] trustAllManagers() {
+    return new TrustManager[] {
+      new X509TrustManager() {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+          return new X509Certificate[0];
+        }
+      }
+    };
   }
 }

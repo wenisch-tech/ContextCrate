@@ -21,7 +21,7 @@ public record IngestionConfiguration(
     if (webCrawler != null) return IngestionConfiguration.web(webCrawler.withoutSecrets());
     return new IngestionConfiguration(null, git == null ? null : new Git(git.ref(), git.username(),
         null, git.includePatterns(), git.excludePatterns(), git.maxFiles(), git.maxFileBytes(),
-        git.output()));
+        git.output(), git.trustAllCertificates()));
   }
 
   public record Git(
@@ -32,7 +32,8 @@ public record IngestionConfiguration(
       List<String> excludePatterns,
       @Min(1) @Max(100_000) int maxFiles,
       @Min(1) long maxFileBytes,
-      @Valid CrawlConfiguration.Output output) {
+      @Valid CrawlConfiguration.Output output,
+      boolean trustAllCertificates) {
     public Git {
       ref = ref == null ? "" : ref.trim();
       includePatterns = includePatterns == null || includePatterns.isEmpty()
@@ -45,7 +46,7 @@ public record IngestionConfiguration(
 
     public static Git defaults() {
       return new Git("", null, null, List.of("**"), List.of(), 10_000, 1_048_576,
-          CrawlConfiguration.Output.defaults());
+          CrawlConfiguration.Output.defaults(), false);
     }
   }
 }

@@ -56,7 +56,7 @@ class GitSourceRetrieverTest {
     SourceConfiguration source = SourceConfiguration.git(repository.toUri().toString());
     IngestionConfiguration config = IngestionConfiguration.git(new IngestionConfiguration.Git(
         "", null, null, List.of("**"), List.of("docs/ignored.md"), 100, 1024,
-        CrawlConfiguration.Output.defaults()));
+        CrawlConfiguration.Output.defaults(), false));
 
     when(items.findById(rootId)).thenReturn(Optional.of(root));
     when(runs.findById(runId)).thenReturn(Optional.of(run));

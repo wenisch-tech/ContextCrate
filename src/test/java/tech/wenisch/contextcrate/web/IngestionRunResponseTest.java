@@ -17,7 +17,7 @@ class IngestionRunResponseTest {
     IngestionRunResponse response = IngestionRunResponse.from(run, source,
         IngestionConfiguration.git(new IngestionConfiguration.Git("", "git", "secret-token",
             java.util.List.of("**"), java.util.List.of(), 10_000, 1_048_576,
-            CrawlConfiguration.Output.defaults())));
+            CrawlConfiguration.Output.defaults(), false)));
 
     assertThat(response.tokenConfigured()).isTrue();
     assertThat(response.jobConfiguration().git().token()).isNull();

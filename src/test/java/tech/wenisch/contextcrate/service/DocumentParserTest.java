@@ -52,7 +52,7 @@ class DocumentParserTest {
     when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
     when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
         new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000,
-            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"))));
+            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"), false)));
     when(artifacts.open("artifact.md")).thenReturn(new ByteArrayInputStream(
         markdown.getBytes(StandardCharsets.UTF_8)));
     when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
@@ -95,7 +95,7 @@ class DocumentParserTest {
     when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
     when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
         new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000,
-            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"))));
+            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"), false)));
     when(artifacts.open("artifact.md")).thenReturn(
         new ByteArrayInputStream(original.getBytes(StandardCharsets.UTF_8)),
         new ByteArrayInputStream(original.getBytes(StandardCharsets.UTF_8)),

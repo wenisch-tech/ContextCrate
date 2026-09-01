@@ -396,7 +396,7 @@ public class UiController {
     if (source.getConnectorType() == ConnectorType.GIT)
       return IngestionConfiguration.git(new IngestionConfiguration.Git(ref, blankToNull(gitUsername),
           blankToNull(gitToken), csv(includePatterns), csv(excludePatterns), maxFiles,
-          maxFileBytes, output));
+          maxFileBytes, output, trustAllCertificates));
     CrawlConfiguration.Politeness politeness = new CrawlConfiguration.Politeness(userAgent,
         contact, honorRobots, perHostConcurrency, minimumDelayMillis, timeoutMillis);
     CrawlConfiguration.Reliability reliability = new CrawlConfiguration.Reliability(maxAttempts,
