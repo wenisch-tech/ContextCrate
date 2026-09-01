@@ -1,5 +1,6 @@
 package tech.wenisch.contextcrate.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -55,6 +56,7 @@ public class AppUser {
     return email;
   }
 
+  @JsonIgnore
   public String getPasswordHash() {
     return passwordHash;
   }
@@ -75,6 +77,10 @@ public class AppUser {
     return canCreateCrates;
   }
 
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
   public void canCreateCrates(boolean value) {
     canCreateCrates = value;
   }
@@ -82,6 +88,12 @@ public class AppUser {
   public void changePassword(String hash) {
     passwordHash = hash;
     passwordChangeRequired = false;
+  }
+
+  /** Sets an administrator-issued temporary password that must be replaced at the next sign-in. */
+  public void resetPassword(String hash) {
+    passwordHash = hash;
+    passwordChangeRequired = true;
   }
 
   public void enabled(boolean value) {

@@ -2,16 +2,21 @@ package tech.wenisch.contextcrate.web;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import tech.wenisch.contextcrate.repository.AppUserRepository;
+import tech.wenisch.contextcrate.service.ApiKeyService;
 import tech.wenisch.contextcrate.service.CrateAccessService;
 
 @Controller
 public class AccountController {
   private final CrateAccessService access;private final AppUserRepository users;
   private final PasswordEncoder passwords;
-  public AccountController(CrateAccessService access,AppUserRepository users,PasswordEncoder passwords){
-    this.access=access;this.users=users;this.passwords=passwords;
+  private final ApiKeyService apiKeys;
+  public AccountController(CrateAccessService access,AppUserRepository users,PasswordEncoder passwords,
+      ApiKeyService apiKeys){
+    this.access=access;this.users=users;this.passwords=passwords;this.apiKeys=apiKeys;
   }
   @GetMapping("/change-password") String form(){return "change-password";}
   @PostMapping("/change-password") String change(@RequestParam String currentPassword,
@@ -22,5 +27,28 @@ public class AccountController {
     if(newPassword.length()<12)throw new IllegalArgumentException("New password must contain at least 12 characters");
     if(!newPassword.equals(confirmation))throw new IllegalArgumentException("Password confirmation does not match");
     user.changePassword(passwords.encode(newPassword));users.save(user);return "redirect:/";
+  }
+
+  @GetMapping("/account/api-keys")
+  String apiKeys(Model model) {
+    model.addAttribute("isAdmin", access.isAdmin());
+    model.addAttribute("keys", apiKeys.personalKeys(access.currentUser().getId()));
+    return "account-api-keys";
+  }
+
+  @PostMapping("/account/api-keys")
+  String createApiKey(@RequestParam String name, RedirectAttributes redirect) {
+    try {
+      redirect.addFlashAttribute("createdToken", apiKeys.createPersonal(access.currentUser().getId(), name));
+    } catch (IllegalArgumentException e) {
+      redirect.addFlashAttribute("keyError", e.getMessage());
+    }
+    return "redirect:/account/api-keys";
+  }
+
+  @PostMapping("/account/api-keys/{id}/revoke")
+  String revokeApiKey(@PathVariable java.util.UUID id) {
+    apiKeys.revokePersonal(access.currentUser().getId(), id);
+    return "redirect:/account/api-keys";
   }
 }

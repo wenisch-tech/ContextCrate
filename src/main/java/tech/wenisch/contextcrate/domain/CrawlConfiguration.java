@@ -75,7 +75,8 @@ public record CrawlConfiguration(
       @Min(0) long initialBackoffMillis,
       @Min(1024) long maxBodyBytes,
       boolean deduplicateContent,
-      RenderMode renderMode) {
+      RenderMode renderMode,
+      boolean trustAllCertificates) {
     public Reliability {
       maxAttempts = maxAttempts < 1 ? 3 : maxAttempts;
       initialBackoffMillis = Math.max(0, initialBackoffMillis);
@@ -84,7 +85,7 @@ public record CrawlConfiguration(
     }
 
     public static Reliability defaults() {
-      return new Reliability(3, 1000, 10_000_000, true, RenderMode.AUTO);
+      return new Reliability(3, 1000, 10_000_000, true, RenderMode.AUTO, false);
     }
   }
 

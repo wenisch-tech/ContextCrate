@@ -9,20 +9,33 @@ permissions: { contents: read, checks: write, pull-requests: write, packages: re
 jobs:
   test:
     uses: ./.github/workflows/_test.yml
+  version:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs: { version: ${{ steps.next.outputs.version }} }
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      # Derive the next release number from existing tags rather than github.run_number,
+      # which also advances on every branch push/PR and would leave gaps between releases.
+      - id: next
+        run: |
+          last=$(git tag -l 'v0.1.*' | sed 's/^v0\.1\.//' | sort -n | tail -1)
+          echo "version=0.1.$(( ${last:-0} + 1 ))" >> "$GITHUB_OUTPUT"
   docker:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-    needs: test
+    needs: [test, version]
     permissions: { contents: read, packages: write, pull-requests: write, id-token: write, attestations: write }
     uses: ./.github/workflows/_docker.yml
     with:
-      version: 0.1.${{ github.run_number }}
+      version: ${{ github.ref == 'refs/heads/main' && needs.version.outputs.version || format('0.1.{0}', github.run_number) }}
       push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     secrets: inherit
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, docker]
+    needs: [test, version, docker]
     permissions: { contents: write, packages: read, id-token: write }
     uses: ./.github/workflows/_release.yml
     with:
-      version: 0.1.${{ github.run_number }}
+      version: ${{ needs.version.outputs.version }}
     secrets: inherit

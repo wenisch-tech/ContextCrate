@@ -36,11 +36,13 @@ sequenceDiagram
 
 The UI displays a persistent elevation banner. Elevation ends explicitly or after 30 minutes. It never changes the crate membership table.
 
+Elevations are started and ended from the administration panel at `/admin` — see [Administration](operations/administration.md), which also documents the rules that stop an administrator from locking themselves, or the installation, out.
+
 ## API keys
 
 Personal keys belong to a user and follow that user's changing memberships. Crate service keys belong to one crate and receive fixed Viewer or Editor authority; service keys cannot be Owners.
 
-Tokens begin with `cc_` and are shown only once. ContextCrate stores a SHA-256 hash and a short display prefix. Revoking a personal key requires its owner; revoking a crate key requires a crate Owner.
+Tokens begin with `cc_` and are shown only once. They are presented either as `X-API-KEY` or as `Authorization: Bearer <token>`; the bearer form exists so that MCP clients, which send it by convention, can authenticate. HTTP Basic credentials are never treated as a token. ContextCrate stores a SHA-256 hash and a short display prefix. Revoking a personal key requires its owner; revoking a crate key requires a crate Owner.
 
 ## Resource authorization
 

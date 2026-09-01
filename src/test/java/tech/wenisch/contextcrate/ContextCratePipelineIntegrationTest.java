@@ -81,7 +81,7 @@ class ContextCratePipelineIntegrationTest {
                 seed, Set.of("127.0.0.1"), List.of(), List.of(), 2, 10, false, false),
             new CrawlConfiguration.Politeness("ContextCrateTest", "", true, 1, 0, 5000),
             new CrawlConfiguration.Reliability(
-                2, 10, 1_000_000, true, CrawlConfiguration.RenderMode.HTTP_ONLY),
+                2, 10, 1_000_000, true, CrawlConfiguration.RenderMode.HTTP_ONLY, false),
             new CrawlConfiguration.Output(1, "main", List.of("script", "style"), 500, 50, "test"),
             CrawlConfiguration.LoginConfiguration.defaults());
     var source = sources.create(CrateIds.LEGACY, "Fixture website", null, ConnectorType.HTTPS,

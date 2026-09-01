@@ -1,9 +1,12 @@
 package tech.wenisch.contextcrate.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
 
 public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDocument, UUID>,
@@ -27,4 +30,11 @@ public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDo
   List<NormalizedDocument> findByCrateIdAndIndexedFalse(UUID crateId);
   List<NormalizedDocument> findByCrateIdAndCurrentVersionTrue(UUID crateId);
   List<NormalizedDocument> findByCrateIdAndCurrentVersionTrueAndIndexedFalse(UUID crateId);
+
+  @Query(
+      """
+      select d.crateId as crateId, count(d) as total from NormalizedDocument d
+      where d.currentVersion = true and d.crateId in :crateIds group by d.crateId
+      """)
+  List<CrateCount> countCurrentByCrate(@Param("crateIds") Collection<UUID> crateIds);
 }
