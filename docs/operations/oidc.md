@@ -40,6 +40,35 @@ spring:
 The login page exposes **Sign in with Keycloak** at
 `/oauth2/authorization/keycloak`.
 
+## Self-signed or internal CA certificates
+
+If the issuer is served with a certificate ContextCrate's JVM does not already trust (common for
+internal Keycloak instances), startup fails with a `PKIX path building failed` error while
+resolving `.well-known/openid-configuration`. Prefer importing the CA into the JVM truststore.
+When that is not possible, set:
+
+```yaml
+contextcrate:
+  security:
+    oidc:
+      trust-all-certificates: ${CONTEXTCRATE_SECURITY_OIDC_TRUST_ALL_CERTIFICATES:false}
+```
+
+or the environment variable `CONTEXTCRATE_SECURITY_OIDC_TRUST_ALL_CERTIFICATES=true`. This skips
+TLS certificate validation for OIDC issuer discovery, token exchange, userinfo, and ID token JWKS
+retrieval only — it does not affect any other outbound connection. Enable it only for identity
+providers you already trust on an internal/self-signed CA; it removes protection against a
+network-level attacker impersonating the identity provider.
+
+With the Helm chart, set:
+
+```yaml
+security:
+  oidc:
+    enabled: true
+    trustAllCertificates: true
+```
+
 ## Global administrator mapping
 
 Create a Keycloak role named exactly `ContextCrate_Admin` and assign it to a user. ContextCrate

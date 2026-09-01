@@ -114,6 +114,7 @@ contextcrate:
     initial-admin-password: ${CONTEXTCRATE_ADMIN_PASSWORD:admin}
     oidc:
       enabled: ${CONTEXTCRATE_SECURITY_OIDC_ENABLED:false}
+      trust-all-certificates: ${CONTEXTCRATE_SECURITY_OIDC_TRUST_ALL_CERTIFICATES:false}
 server:
   error:
     include-message: always

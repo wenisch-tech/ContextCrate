@@ -10,8 +10,6 @@ import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -19,9 +17,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -34,6 +29,7 @@ import tech.wenisch.contextcrate.domain.CrawlConfiguration.LoginConfiguration;
 import tech.wenisch.contextcrate.service.KeycloakTokenService;
 import tech.wenisch.contextcrate.service.KeycloakTokenService.AccessToken;
 import tech.wenisch.contextcrate.service.KeycloakTokenService.AuthenticationException;
+import tech.wenisch.contextcrate.util.InsecureSsl;
 
 /**
  * Maintains authentication state local to a crawler worker. No session material is written to
@@ -458,32 +454,8 @@ public class CrawlerAuthenticationService {
             .connectTimeout(Duration.ofSeconds(15))
             .followRedirects(HttpClient.Redirect.NEVER);
     if (cookies != null) builder.cookieHandler(cookies);
-    if (trustAllCertificates) builder.sslContext(trustAllSslContext());
+    if (trustAllCertificates) builder.sslContext(InsecureSsl.trustAllContext());
     return builder.build();
-  }
-
-  /** Opt-in only: operators explicitly accept the MITM risk for self-signed/internal CAs. */
-  private static SSLContext trustAllSslContext() {
-    try {
-      TrustManager trustAll =
-          new X509TrustManager() {
-            @Override
-            public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-
-            @Override
-            public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-
-            @Override
-            public X509Certificate[] getAcceptedIssuers() {
-              return new X509Certificate[0];
-            }
-          };
-      SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, new TrustManager[] {trustAll}, new SecureRandom());
-      return context;
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to build a trust-all SSL context", e);
-    }
   }
 
   private static boolean redirect(int status) {
