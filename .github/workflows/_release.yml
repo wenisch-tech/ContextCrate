@@ -3,13 +3,14 @@ on:
   workflow_call:
     inputs:
       version: { required: true, type: string }
+      tag: { required: true, type: string }
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions: { contents: write, id-token: write }
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: '25', cache: maven }
       - run: mvn -B versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
       - run: mvn -B -DskipTests package org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom
@@ -22,4 +23,4 @@ jobs:
       - run: |
           for file in release/*; do cosign sign-blob --yes "$file" --bundle "$file.cosign.bundle"; done
       - uses: softprops/action-gh-release@v2
-        with: { tag_name: 'v${{ inputs.version }}', generate_release_notes: true, files: 'release/*' }
+        with: { tag_name: '${{ inputs.tag }}', generate_release_notes: true, files: 'release/*' }

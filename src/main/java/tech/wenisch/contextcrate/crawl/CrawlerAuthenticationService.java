@@ -10,6 +10,8 @@ import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -17,6 +19,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -42,23 +47,29 @@ public class CrawlerAuthenticationService {
   private final UrlPolicy urls;
   private final KeycloakTokenService tokens;
   private final HttpClient anonymousClient;
+  private final HttpClient insecureAnonymousClient;
   private final Map<UUID, FormSession> formSessions = new ConcurrentHashMap<>();
   private final Map<UUID, AccessToken> accessTokens = new ConcurrentHashMap<>();
 
   public CrawlerAuthenticationService(UrlPolicy urls, KeycloakTokenService tokens) {
     this.urls = urls;
     this.tokens = tokens;
-    this.anonymousClient = newClient(null);
+    this.anonymousClient = newClient(null, false);
+    this.insecureAnonymousClient = newClient(null, true);
   }
 
   public CrawlerResponse get(UUID runId, String url, CrawlConfiguration config) throws Exception {
     LoginConfiguration login = config.loginConfiguration();
     AuthMethod method = login == null ? AuthMethod.NONE : login.authMethod();
     return switch (method) {
-      case NONE -> sendGet(anonymousClient, url, config, null, 0);
+      case NONE -> sendGet(anonymousClient(config), url, config, null, 0);
       case FORM -> formGet(runId, url, config, false);
       case OAUTH2 -> oauthGet(runId, url, config, false);
     };
+  }
+
+  private HttpClient anonymousClient(CrawlConfiguration config) {
+    return config.reliability().trustAllCertificates() ? insecureAnonymousClient : anonymousClient;
   }
 
   public String bearerToken(UUID runId, CrawlConfiguration config) throws Exception {
@@ -104,7 +115,7 @@ public class CrawlerAuthenticationService {
   private CrawlerResponse oauthGet(
       UUID runId, String url, CrawlConfiguration config, boolean retried) throws Exception {
     String token = bearerToken(runId, config);
-    CrawlerResponse response = sendGet(anonymousClient, url, config, token, 0);
+    CrawlerResponse response = sendGet(anonymousClient(config), url, config, token, 0);
     if (!retried && response.status() == 401) {
       response.body().close();
       accessTokens.remove(runId);
@@ -124,7 +135,8 @@ public class CrawlerAuthenticationService {
       existing = formSessions.get(runId);
       if (existing == null) {
         CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
-        FormSession created = new FormSession(newClient(cookies));
+        FormSession created =
+            new FormSession(newClient(cookies, config.reliability().trustAllCertificates()));
         created.authenticationUrl(authenticate(created, config));
         formSessions.put(runId, created);
         existing = created;
@@ -440,13 +452,38 @@ public class CrawlerAuthenticationService {
     return new TextResponse(response.statusCode(), response.uri().toString(), response.body());
   }
 
-  private static HttpClient newClient(CookieManager cookies) {
+  private static HttpClient newClient(CookieManager cookies, boolean trustAllCertificates) {
     HttpClient.Builder builder =
         HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
             .followRedirects(HttpClient.Redirect.NEVER);
     if (cookies != null) builder.cookieHandler(cookies);
+    if (trustAllCertificates) builder.sslContext(trustAllSslContext());
     return builder.build();
+  }
+
+  /** Opt-in only: operators explicitly accept the MITM risk for self-signed/internal CAs. */
+  private static SSLContext trustAllSslContext() {
+    try {
+      TrustManager trustAll =
+          new X509TrustManager() {
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+
+            @Override
+            public X509Certificate[] getAcceptedIssuers() {
+              return new X509Certificate[0];
+            }
+          };
+      SSLContext context = SSLContext.getInstance("TLS");
+      context.init(null, new TrustManager[] {trustAll}, new SecureRandom());
+      return context;
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to build a trust-all SSL context", e);
+    }
   }
 
   private static boolean redirect(int status) {

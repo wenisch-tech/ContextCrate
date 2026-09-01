@@ -47,6 +47,7 @@ public class UiController {
   private final PipelineWorkItemRepository pipelineWork;
   private final DocumentDiffService documentDiffs;
   private final ChunkPropositionRepository chunkPropositions;
+  private final ApiKeyService apiKeys;
 
   public UiController(
       SourceService sources,
@@ -67,7 +68,7 @@ public class UiController {
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
       PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs,
-      ChunkPropositionRepository chunkPropositions) {
+      ChunkPropositionRepository chunkPropositions, ApiKeyService apiKeys) {
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -91,6 +92,7 @@ public class UiController {
     this.pipelineWork = pipelineWork;
     this.documentDiffs = documentDiffs;
     this.chunkPropositions = chunkPropositions;
+    this.apiKeys = apiKeys;
   }
 
   @ModelAttribute
@@ -238,6 +240,7 @@ public class UiController {
       @RequestParam(defaultValue = "10000000") long maxBodyBytes,
       @RequestParam(defaultValue = "true") boolean deduplicateContent,
       @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+      @RequestParam(defaultValue = "false") boolean trustAllCertificates,
       @RequestParam(defaultValue = "30") int rawRetentionDays,
       @RequestParam(defaultValue = "") String contentSelector,
       @RequestParam(defaultValue = "script,style,nav,footer,aside") String removeSelectors,
@@ -264,10 +267,10 @@ public class UiController {
         chunkSize, chunkOverlap, includeUrlPatterns, excludeUrlPatterns, allowSubdomains,
         discoverSitemaps, userAgent, contact, honorRobots, perHostConcurrency,
         minimumDelayMillis, timeoutMillis, maxAttempts, initialBackoffMillis, maxBodyBytes,
-        deduplicateContent, renderMode, rawRetentionDays, contentSelector, removeSelectors,
-        logicalIndex, authMethod, loginPageUrl, username, password, usernameField, passwordField,
-        submitSelector, successUrlPattern, successContentPattern, directLogin, authServerUrl,
-        clientId, clientSecret, realm));
+        deduplicateContent, renderMode, trustAllCertificates, rawRetentionDays, contentSelector,
+        removeSelectors, logicalIndex, authMethod, loginPageUrl, username, password, usernameField,
+        passwordField, submitSelector, successUrlPattern, successContentPattern, directLogin,
+        authServerUrl, clientId, clientSecret, realm));
     return "redirect:/crates/" + crateId + "/sources/" + sourceId;
   }
 
@@ -302,6 +305,7 @@ public class UiController {
       @RequestParam(defaultValue = "10000000") long maxBodyBytes,
       @RequestParam(defaultValue = "true") boolean deduplicateContent,
       @RequestParam(defaultValue = "AUTO") CrawlConfiguration.RenderMode renderMode,
+      @RequestParam(defaultValue = "false") boolean trustAllCertificates,
       @RequestParam(defaultValue = "30") int rawRetentionDays,
       @RequestParam(defaultValue = "") String contentSelector,
       @RequestParam(defaultValue = "script,style,nav,footer,aside") String removeSelectors,
@@ -330,10 +334,10 @@ public class UiController {
             includeUrlPatterns, excludeUrlPatterns, allowSubdomains, discoverSitemaps, userAgent,
             contact, honorRobots, perHostConcurrency, minimumDelayMillis, timeoutMillis,
             maxAttempts, initialBackoffMillis, maxBodyBytes, deduplicateContent, renderMode,
-            rawRetentionDays, contentSelector, removeSelectors, logicalIndex, authMethod,
-            loginPageUrl, username, password, usernameField, passwordField, submitSelector,
-            successUrlPattern, successContentPattern, directLogin, authServerUrl, clientId,
-            clientSecret, realm),
+            trustAllCertificates, rawRetentionDays, contentSelector, removeSelectors, logicalIndex,
+            authMethod, loginPageUrl, username, password, usernameField, passwordField,
+            submitSelector, successUrlPattern, successContentPattern, directLogin, authServerUrl,
+            clientId, clientSecret, realm),
         job.isEnabled());
     return "redirect:/crates/" + crateId + "/sources/" + sourceId;
   }
@@ -381,12 +385,12 @@ public class UiController {
       boolean allowSubdomains, boolean discoverSitemaps, String userAgent, String contact,
       boolean honorRobots, int perHostConcurrency, long minimumDelayMillis, int timeoutMillis,
       int maxAttempts, long initialBackoffMillis, long maxBodyBytes, boolean deduplicateContent,
-      CrawlConfiguration.RenderMode renderMode, int rawRetentionDays, String contentSelector,
-      String removeSelectors, String logicalIndex, CrawlConfiguration.AuthMethod authMethod,
-      String loginPageUrl, String username, String password, String usernameField,
-      String passwordField, String submitSelector, String successUrlPattern,
-      String successContentPattern, boolean directLogin, String authServerUrl, String clientId,
-      String clientSecret, String realm) {
+      CrawlConfiguration.RenderMode renderMode, boolean trustAllCertificates, int rawRetentionDays,
+      String contentSelector, String removeSelectors, String logicalIndex,
+      CrawlConfiguration.AuthMethod authMethod, String loginPageUrl, String username,
+      String password, String usernameField, String passwordField, String submitSelector,
+      String successUrlPattern, String successContentPattern, boolean directLogin,
+      String authServerUrl, String clientId, String clientSecret, String realm) {
     CrawlConfiguration.Output output = new CrawlConfiguration.Output(
         rawRetentionDays, contentSelector, csv(removeSelectors), chunkSize, chunkOverlap, logicalIndex);
     if (source.getConnectorType() == ConnectorType.GIT)
@@ -396,7 +400,7 @@ public class UiController {
     CrawlConfiguration.Politeness politeness = new CrawlConfiguration.Politeness(userAgent,
         contact, honorRobots, perHostConcurrency, minimumDelayMillis, timeoutMillis);
     CrawlConfiguration.Reliability reliability = new CrawlConfiguration.Reliability(maxAttempts,
-        initialBackoffMillis, maxBodyBytes, deduplicateContent, renderMode);
+        initialBackoffMillis, maxBodyBytes, deduplicateContent, renderMode, trustAllCertificates);
     CrawlConfiguration.LoginConfiguration login = new CrawlConfiguration.LoginConfiguration(
         blankToNull(loginPageUrl), blankToNull(username), blankToNull(password), usernameField,
         passwordField, submitSelector, new CrawlConfiguration.SuccessDetection(
@@ -625,5 +629,31 @@ public class UiController {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){reranking.downloadModel();}
     return java.util.Map.of("status", "Local reranking model is ready");
+  }
+
+  @GetMapping("/api-keys")
+  String crateApiKeys(@PathVariable UUID crateId, Model model) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+    model.addAttribute("keys", apiKeys.crateKeys(crateId));
+    return "crate-api-keys";
+  }
+
+  @PostMapping("/api-keys")
+  String createApiKey(@PathVariable UUID crateId, @RequestParam String name,
+      @RequestParam CrateMember.Role role, RedirectAttributes redirect) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+    try {
+      redirect.addFlashAttribute("createdToken", apiKeys.createCrate(crateId, name, role));
+    } catch (IllegalArgumentException e) {
+      redirect.addFlashAttribute("keyError", e.getMessage());
+    }
+    return "redirect:/crates/" + crateId + "/api-keys";
+  }
+
+  @PostMapping("/api-keys/{id}/revoke")
+  String revokeApiKey(@PathVariable UUID crateId, @PathVariable UUID id) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+    apiKeys.revokeCrate(crateId, id);
+    return "redirect:/crates/" + crateId + "/api-keys";
   }
 }

@@ -27,6 +27,8 @@
         <!-- Overrides spring-boot-dependencies' rabbit-amqp-client.version (5.30.0) to clear
              CVE-2026-63337/63335/63336/69219/69220 in the transitive com.rabbitmq:amqp-client. -->
         <rabbit-amqp-client.version>5.35.0</rabbit-amqp-client.version>
+        <!-- Overrides spring-boot-dependencies' tomcat.version (11.0.24). -->
+        <tomcat.version>11.0.25</tomcat.version>
     </properties>
     <dependencyManagement>
         <dependencies>
