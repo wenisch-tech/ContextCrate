@@ -47,6 +47,7 @@ public class UiController {
   private final PipelineWorkItemRepository pipelineWork;
   private final DocumentDiffService documentDiffs;
   private final ChunkPropositionRepository chunkPropositions;
+  private final ApiKeyService apiKeys;
 
   public UiController(
       SourceService sources,
@@ -67,7 +68,7 @@ public class UiController {
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
       PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs,
-      ChunkPropositionRepository chunkPropositions) {
+      ChunkPropositionRepository chunkPropositions, ApiKeyService apiKeys) {
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -91,6 +92,7 @@ public class UiController {
     this.pipelineWork = pipelineWork;
     this.documentDiffs = documentDiffs;
     this.chunkPropositions = chunkPropositions;
+    this.apiKeys = apiKeys;
   }
 
   @ModelAttribute
@@ -627,5 +629,31 @@ public class UiController {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){reranking.downloadModel();}
     return java.util.Map.of("status", "Local reranking model is ready");
+  }
+
+  @GetMapping("/api-keys")
+  String crateApiKeys(@PathVariable UUID crateId, Model model) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+    model.addAttribute("keys", apiKeys.crateKeys(crateId));
+    return "crate-api-keys";
+  }
+
+  @PostMapping("/api-keys")
+  String createApiKey(@PathVariable UUID crateId, @RequestParam String name,
+      @RequestParam CrateMember.Role role, RedirectAttributes redirect) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+    try {
+      redirect.addFlashAttribute("createdToken", apiKeys.createCrate(crateId, name, role));
+    } catch (IllegalArgumentException e) {
+      redirect.addFlashAttribute("keyError", e.getMessage());
+    }
+    return "redirect:/crates/" + crateId + "/api-keys";
+  }
+
+  @PostMapping("/api-keys/{id}/revoke")
+  String revokeApiKey(@PathVariable UUID crateId, @PathVariable UUID id) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+    apiKeys.revokeCrate(crateId, id);
+    return "redirect:/crates/" + crateId + "/api-keys";
   }
 }
