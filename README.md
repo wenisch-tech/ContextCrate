@@ -109,3 +109,4 @@ The first authenticated user owns the automatically migrated Legacy crate. New u
 - [Tutorials](docs/tutorials.md)
 
 ContextCrate is licensed under AGPL-3.0.
+
