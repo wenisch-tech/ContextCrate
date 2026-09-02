@@ -35,6 +35,7 @@ nav:
   - API: api.md
   - Integrations:
     - MCP server: integrations/mcp.md
+    - OpenAI-compatible API: integrations/openai.md
   - Operations:
     - Overview: operations.md
     - Administration: operations/administration.md

@@ -20,6 +20,7 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 - **Organize knowledge into crates** with isolated sources, indexes, settings, members, and service keys for each team or use case.
 - **Search with hybrid retrieval** by combining BM25 keyword search and semantic vectors with reciprocal-rank fusion, filters, and optional cross-encoder reranking.
 - **Generate grounded answers** through OpenAI-compatible models, with streaming responses, stable source lists, and inline citations that lead back to the indexed evidence.
+- **Connect any OpenAI client** to a crate directly — Open WebUI, LiteLLM, the OpenAI SDKs — through a per-crate OpenAI-compatible `chat/completions` endpoint, no custom integration code required.
 - **Improve answer quality** with retrieved-chunk grading, proposition retrieval, and configurable answer verification that can revise, block, or warn about unsupported claims.
 - **Choose your AI providers** with local ONNX models or OpenAI-compatible embedding, reranking, and answer endpoints configured per crate.
 - **Manage data safely** with document versions, background index rebuilds, archive/restore, checksummed crate export/import, and audit-aware access controls.
@@ -103,6 +104,7 @@ The first authenticated user owns the automatically migrated Legacy crate. New u
 - [Architecture](docs/architecture.md)
 - [Configuration](docs/configuration.md)
 - [REST API](docs/api.md)
+- [OpenAI-compatible API](docs/integrations/openai.md)
 - [Operations](docs/operations.md)
 - [Export and import](docs/backup-migration.md)
 - [Upgrade from Harvex](docs/upgrade-from-harvex.md)

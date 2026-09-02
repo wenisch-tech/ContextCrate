@@ -4,6 +4,9 @@ ContextCrate speaks the [Model Context Protocol](https://modelcontextprotocol.io
 application can retrieve from a crate on its own — the model decides when to search, and cites what
 it found. LiteLLM and Open WebUI both support the Streamable HTTP transport natively.
 
+For a plain OpenAI-compatible chat endpoint instead — fewer tools, but works with any OpenAI client
+— see [OpenAI-compatible API](openai.md).
+
 ## Endpoints
 
 | Endpoint | Crate | Use for |

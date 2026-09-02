@@ -35,7 +35,7 @@ Purge body: `{"confirmation":"Exact crate name"}`.
 
 Search modes are `lexical`, `semantic`, and `hybrid`. Answers accept JSON and return server-sent events named `sources`, `delta`, `complete`, or `error`.
 
-Each crate is additionally reachable as an OpenAI chat model: point an OpenAI client's base URL at `/api/v1/crates/{crateId}/v1` with an API key as the bearer token. The crate's configured answer model is authoritative and the request's `model` field is ignored. See [RAG answer generation](answers.md) for the mapping and its limitations.
+Each crate is additionally reachable as an OpenAI chat model: point an OpenAI client's base URL at `/api/v1/crates/{crateId}/v1` with an API key as the bearer token. The crate's configured answer model is authoritative and the request's `model` field is ignored. See [OpenAI-compatible API](integrations/openai.md) for the mapping, streaming behaviour, and client setup.
 
 ```bash
 curl -H "X-API-KEY: $KEY" \
