@@ -23,7 +23,16 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Verifies that {@link InsecureSsl#installGlobalTrustAll()} makes the JVM-default TLS stack
  * (used by every plain {@code java.net.http.HttpClient}, including the model providers, robots,
- * and Keycloak clients) accept a self-signed certificate it would otherwise reject.
+ * and Keycloak clients) accept a certificate signed by an untrusted/self-signed CA that the
+ * default JVM trust store would otherwise reject.
+ *
+ * <p>The test certificate carries a SAN matching the loopback address it is served on, so the
+ * assertion is independent of {@code jdk.internal.httpclient.disableHostnameVerification}: that
+ * system property is read once into a static field the first time {@code java.net.http}'s
+ * internal classes load, so setting it here has no effect once an earlier test in the same
+ * surefire fork has already built an {@code HttpClient}. Production code is unaffected — {@code
+ * InsecureTlsEnvironmentPostProcessor} sets it before the application creates its first
+ * {@code HttpClient} — but this test suite cannot rely on that ordering.
  *
  * <p>Installation is process-wide and irreversible for the life of the JVM. Other test classes in
  * this module may install it too, so this class only asserts the post-install behavior rather
@@ -48,7 +57,8 @@ class InsecureSslTest {
                 "-keystore", keystoreFile.getAbsolutePath(),
                 "-storepass", "changeit",
                 "-keypass", "changeit",
-                "-dname", "CN=insecure-ssl-test.invalid")
+                "-dname", "CN=insecure-ssl-test.invalid",
+                "-ext", "san=ip:127.0.0.1")
             .redirectErrorStream(true)
             .start();
     keytool.waitFor();
