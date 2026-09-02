@@ -3,12 +3,17 @@ package tech.wenisch.contextcrate.web;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +50,31 @@ public class OpenAiChatCompletionsController {
   /** Mirrors the strict-grounding short-circuit in {@link AnswerApiController}. */
   private static final String NO_ANSWER = "No answer was found in the knowledge base.";
 
+  /**
+   * Matches an inline citation marker, capturing any horizontal whitespace in front of it so a
+   * superscript can be attached directly to the preceding word the way a footnote mark is.
+   *
+   * <p>The model is instructed to write {@code [n]} (AnswerService's {@code messages()}), but the
+   * source delimiters it is shown in the prompt are {@code [SOURCE n] ... [END SOURCE n]}, so a
+   * model that imitates that format instead is accepted too — exactly what the dashboard's own
+   * citation renderer already tolerates.
+   */
+  private static final Pattern CITATION = Pattern.compile("([ \\t]*)\\[(?:SOURCE\\s+)?(\\d+)\\]");
+
+  /**
+   * Superscript digits 0-9, indexed by the digit itself. Note when editing that these do not come
+   * from one contiguous Unicode range: 1, 2 and 3 are U+00B9/U+00B2/U+00B3 in Latin-1 Supplement for
+   * historical reasons, while 0 and 4-9 are U+2070 and U+2074-U+2079 in Superscripts and Subscripts.
+   * Arithmetic on a single base code point would therefore produce the wrong glyphs.
+   */
+  private static final char[] SUPERSCRIPT_DIGITS = {
+    '⁰', '¹', '²', '³', '⁴',
+    '⁵', '⁶', '⁷', '⁸', '⁹'
+  };
+
+  /** A Git source's URI is {@code git+<repository>@<40-hex-sha>/<path>}; unwrap it to the repository URL. */
+  private static final Pattern GIT_SOURCE_URI = Pattern.compile("^git\\+(.+)@[0-9a-fA-F]{40}/.+$");
+
   private final AnswerService answers;
   private final CrateAccessService access;
   private final RuntimeProviderSettings settings;
@@ -70,7 +100,7 @@ public class OpenAiChatCompletionsController {
     String model = configuredModel(crateId);
 
     if (!Boolean.TRUE.equals(request.stream())) {
-      String text = generate(prepared);
+      String text = annotateCitations(generate(prepared), prepared.sources());
       return ResponseEntity.ok(completion(id, model, text, prepared));
     }
 
@@ -80,7 +110,8 @@ public class OpenAiChatCompletionsController {
           try {
             // The role arrives first so a client can render the assistant turn before content.
             send(emitter, chunk(id, model, new Delta("assistant", null), null));
-            send(emitter, chunk(id, model, new Delta(null, generate(prepared)), null));
+            String text = annotateCitations(generate(prepared), prepared.sources());
+            send(emitter, chunk(id, model, new Delta(null, text), null));
             send(emitter, chunk(id, model, new Delta(null, null), "stop"));
             send(emitter, "[DONE]");
             emitter.complete();
@@ -116,6 +147,93 @@ public class OpenAiChatCompletionsController {
 
   private String configuredModel(UUID crateId) {
     return settings.effectiveAnswer(crateId).model();
+  }
+
+  /**
+   * Turns each {@code [n]} citation marker whose number matches a known source into a Unicode
+   * superscript ({@code ¹}) attached to the preceding word, and appends a reference list of the
+   * cited sources after a horizontal rule.
+   *
+   * <p>The OpenAI schema has no field for a source list, so the citation has to travel inside the
+   * message text. Superscript digits are real characters rather than {@code <sup>} markup on
+   * purpose: the response is a plain string, and how it is displayed is entirely the client's
+   * choice. Markup only renders where the client happens to support it, and an HTML tag that a
+   * client strips or does not interpret would leave literal {@code <sup>[1]</sup>} noise in the
+   * text — worse than no formatting at all. A superscript character displays as a superscript
+   * everywhere, including in clients that render nothing at all.
+   *
+   * <p>The reference list still uses Markdown links, where the failure mode is benign: a client
+   * that does not render Markdown shows the title and URL as readable text.
+   *
+   * <p>Links are built from ContextCrate's own known source URIs, never from anything the model
+   * wrote, so a citation cannot point somewhere the model hallucinated. A marker whose number does
+   * not match any source, or whose source URI is not a plain http(s) link (an unresolvable Git
+   * commit reference, for instance), is left as plain {@code [n]} text and does not appear in the
+   * reference list — there is nothing accurate to point it at.
+   *
+   * <p>Reference list entries keep the citation's own number rather than renumbering sequentially:
+   * if citations 1 and 3 were used but not 2, the list reads {@code [1] ...} then {@code [3] ...}, so
+   * a marker in the body always matches the same number in the list. (A Markdown ordered list would
+   * silently renumber non-consecutive items, which is why this is a plain bracketed list instead.)
+   */
+  private static String annotateCitations(String text, List<AnswerService.Source> sources) {
+    if (text == null || text.isBlank() || sources.isEmpty()) return text;
+    Map<Integer, AnswerService.Source> linkable = new HashMap<>();
+    for (var source : sources)
+      if (sourceLink(source.sourceUri()) != null) linkable.put(source.citation(), source);
+    if (linkable.isEmpty()) return text;
+
+    Matcher matcher = CITATION.matcher(text);
+    StringBuilder body = new StringBuilder();
+    var used = new java.util.TreeSet<Integer>();
+    while (matcher.find()) {
+      int n = Integer.parseInt(matcher.group(2));
+      if (!linkable.containsKey(n)) {
+        matcher.appendReplacement(body, Matcher.quoteReplacement(matcher.group()));
+        continue;
+      }
+      used.add(n);
+      // A footnote mark sits against the word it belongs to, so drop the space the model wrote
+      // before the marker — unless the marker opens a line, where that space is indentation.
+      boolean opensLine = matcher.start() == 0 || text.charAt(matcher.start() - 1) == '\n';
+      matcher.appendReplacement(
+          body, Matcher.quoteReplacement((opensLine ? matcher.group(1) : "") + superscript(n)));
+    }
+    matcher.appendTail(body);
+    if (used.isEmpty()) return body.toString();
+
+    body.append("\n\n---\n\n");
+    for (int n : used) {
+      var source = linkable.get(n);
+      String label = source.title() == null || source.title().isBlank()
+          ? sourceLink(source.sourceUri())
+          : source.title();
+      body.append("[").append(n).append("] [").append(label).append("](")
+          .append(sourceLink(source.sourceUri())).append(")\n");
+    }
+    return body.toString().stripTrailing();
+  }
+
+  /** Renders a citation number with superscript digits, so 12 becomes {@code ¹²}. */
+  private static String superscript(int number) {
+    StringBuilder rendered = new StringBuilder();
+    for (char digit : Integer.toString(number).toCharArray())
+      rendered.append(SUPERSCRIPT_DIGITS[digit - '0']);
+    return rendered.toString();
+  }
+
+  /** Mirrors the dashboard's sourceLink(): unwraps a Git source URI and rejects non-http(s) links. */
+  private static String sourceLink(String sourceUri) {
+    if (sourceUri == null) return null;
+    Matcher git = GIT_SOURCE_URI.matcher(sourceUri);
+    String candidate = git.matches() ? git.group(1) : sourceUri;
+    try {
+      URI uri = new URI(candidate);
+      String scheme = uri.getScheme();
+      return "http".equals(scheme) || "https".equals(scheme) ? uri.toString() : null;
+    } catch (URISyntaxException invalid) {
+      return null;
+    }
   }
 
   /**

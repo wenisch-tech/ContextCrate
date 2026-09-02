@@ -73,6 +73,40 @@ complete answer before it can decide whether to release it, so the response is o
 content chunk carrying the whole answer, a finish chunk, then `data: [DONE]` — valid
 `chat.completion.chunk` framing, but no token-by-token typewriter effect.
 
+## Citations
+
+When inline citations are on (**Settings → RAG → Inline citations**), the model writes markers like
+`[1]` into the answer. The OpenAI response schema has no field for a source list, so the citation
+has to travel inside the message text. Rather than inlining a link at every mention — which reads as
+cluttered — ContextCrate turns each marker whose number matches a retrieved source into a
+superscript and appends a reference list after a horizontal rule:
+
+```
+Backups run nightly¹ and are retained for 30 days².
+
+---
+
+[1] [Backup policy](https://docs.example.com/backups)
+[2] [Retention policy](https://docs.example.com/retention-policy)
+```
+
+The markers are **real superscript characters** (`¹`, `²`, … — Unicode, not `<sup>` markup). The
+response is a plain string and how it is displayed is entirely the client's choice, so markup would
+only render where a client happens to support it: an HTML tag that a client strips or does not
+interpret would leave literal `<sup>[1]</sup>` noise in the text, which is worse than no formatting
+at all. A superscript character displays as a superscript everywhere, including in clients that
+render nothing. The reference list still uses Markdown links, where the failure mode is benign — a
+client that does not render Markdown simply shows the title and URL as readable text.
+
+Reference list entries keep the citation's own number rather than renumbering sequentially, so a
+marker in the body always matches the same bracketed number below it — even when, say, source `[2]`
+was retrieved but not cited and only `[1]` and `[3]` appear in the list.
+
+The link always comes from ContextCrate's own retrieved-source URI, never from anything the model
+wrote, so a citation cannot point somewhere the model made up. A marker that doesn't match any
+retrieved source, or whose source has no plain `http(s)` URL to link to, is left as plain `[n]` text
+and does not appear in the reference list — there is nothing accurate to point it at.
+
 ## Conversation mapping
 
 - The **last `user` message** becomes the question. Earlier `user`/`assistant` messages become
