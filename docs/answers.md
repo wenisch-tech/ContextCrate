@@ -35,6 +35,48 @@ The stream first emits `sources`, followed by `delta` text events, then `complet
 
 History is supplied by the caller for one request only. ContextCrate does not persist conversations, questions, prompts, generated answers, or source content. It limits question size, history count, source count, context budget, and output tokens through `contextcrate.answering` settings.
 
+## OpenAI-compatible API
+
+A crate is also reachable as an OpenAI chat model, so tools that speak the OpenAI API (Open WebUI,
+LiteLLM, the OpenAI SDKs) can retrieve from it without custom integration code:
+
+- `POST /api/v1/crates/{crateId}/v1/chat/completions`
+- `GET /api/v1/crates/{crateId}/v1/models`
+
+Point the client's OpenAI base URL at `http://your-host:8080/api/v1/crates/{crateId}/v1` and use a
+ContextCrate API key as the OpenAI API key. Both endpoints authenticate like the rest of the API.
+
+```bash
+curl -s "$BASE/api/v1/crates/$CRATE/v1/chat/completions" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"contextcrate","messages":[{"role":"user","content":"What about backups?"}]}'
+```
+
+The endpoint is **per crate**, one client connection per crate, because each crate has its own
+answer provider, RAG policy, and index. The request's `model` field is therefore accepted but
+ignored — the crate's configured answer model is authoritative and is what the response's `model`
+field and `GET /models` report. Configure a different crate to use a different model, and point a
+second connection at that crate.
+
+Mapping and limitations:
+
+- The last `user` message is the question; earlier `user` and `assistant` messages become history,
+  subject to the crate's **Client-supplied conversation history** setting and the configured history
+  limit.
+- A client `system` message is **dropped**, not rejected. ContextCrate supplies its own system
+  prompt, and honouring a client one would override the grounding and citation instructions that
+  make retrieved sources untrusted data rather than instructions. Clients that attach a boilerplate
+  system prompt by default therefore keep working.
+- With `"stream": true` the response is a valid `chat.completion.chunk` stream terminated by
+  `data: [DONE]`, but the whole answer arrives in a single content chunk rather than token by token:
+  answer verification needs the complete text before anything can be sent. This is the same
+  behaviour as the native SSE API above.
+- Retrieval mode, source count, citations, strict grounding, and verification come from the crate's
+  RAG settings; there are no OpenAI request fields for them. `temperature`, `max_tokens`, and
+  `top_p` are ignored because they are crate and deployment level provider configuration here.
+- `n` greater than 1, `tools`/`functions`, and a non-text `response_format` are refused with `400`
+  rather than silently ignored. Errors use OpenAI's `{"error":{"message":...}}` shape.
+
 ## Grounding and safety
 
 Retrieved pages are untrusted content. ContextCrate wraps them in explicit source delimiters and tells the model not to follow instructions contained in sources or client history. When retrieved material is insufficient, the model must begin with an evidence warning before offering general knowledge; it must not imply the sources support that general answer.

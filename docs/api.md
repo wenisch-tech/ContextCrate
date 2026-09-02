@@ -28,11 +28,14 @@ Purge body: `{"confirmation":"Exact crate name"}`.
 | Documents | `/api/v1/crates/{crateId}/documents` |
 | Search | `/api/v1/crates/{crateId}/search?q=...&mode=hybrid` |
 | Streaming answers | `/api/v1/crates/{crateId}/answers` |
+| OpenAI-compatible chat | `/api/v1/crates/{crateId}/v1/chat/completions`, `/v1/models` |
 | Extraction rules/results | `/api/v1/crates/{crateId}/extraction-rules`, `/extraction-results` |
 | Index health/rebuild | `/api/v1/crates/{crateId}/index` |
 | Audit | `/api/v1/crates/{crateId}/audit` |
 
 Search modes are `lexical`, `semantic`, and `hybrid`. Answers accept JSON and return server-sent events named `sources`, `delta`, `complete`, or `error`.
+
+Each crate is additionally reachable as an OpenAI chat model: point an OpenAI client's base URL at `/api/v1/crates/{crateId}/v1` with an API key as the bearer token. The crate's configured answer model is authoritative and the request's `model` field is ignored. See [RAG answer generation](answers.md) for the mapping and its limitations.
 
 ```bash
 curl -H "X-API-KEY: $KEY" \
