@@ -60,6 +60,10 @@ retrieval only — it does not affect any other outbound connection. Enable it o
 providers you already trust on an internal/self-signed CA; it removes protection against a
 network-level attacker impersonating the identity provider.
 
+`CONTEXTCRATE_TLS_TRUST_ALL_CERTIFICATES=true` (see [Configuration](../configuration.md#tls-certificate-validation))
+implies this flag, plus the same trust-all behavior for every other outbound connection
+ContextCrate makes. Prefer the OIDC-only flag above unless other integrations also need it.
+
 With the Helm chart, set:
 
 ```yaml

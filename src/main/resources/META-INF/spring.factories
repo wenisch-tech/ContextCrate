@@ -1,1 +1,3 @@
-org.springframework.boot.env.EnvironmentPostProcessor=tech.wenisch.contextcrate.config.OidcTrustAutoConfigurationExcluder
+org.springframework.boot.env.EnvironmentPostProcessor=\
+tech.wenisch.contextcrate.config.InsecureTlsEnvironmentPostProcessor,\
+tech.wenisch.contextcrate.config.OidcTrustAutoConfigurationExcluder

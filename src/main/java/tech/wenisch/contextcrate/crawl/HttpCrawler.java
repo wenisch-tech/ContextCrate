@@ -40,9 +40,11 @@ import tech.wenisch.contextcrate.repository.SourceItemRepository;
 import tech.wenisch.contextcrate.service.IngestionService;
 import tech.wenisch.contextcrate.service.PipelinePayload;
 import tech.wenisch.contextcrate.storage.ArtifactStore;
+import tech.wenisch.contextcrate.util.InsecureSsl;
 
 @Service
 public class HttpCrawler {
+
   private static final int MAX_LOGIN_STEPS = 3;
   private static final Logger log = LoggerFactory.getLogger(HttpCrawler.class);
   private final SourceItemRepository frontier;
@@ -175,7 +177,7 @@ public class HttpCrawler {
               .launch(new BrowserType.LaunchOptions().setHeadless(true));
       try {
         Browser.NewContextOptions options = new Browser.NewContextOptions();
-        options.setIgnoreHTTPSErrors(config.reliability().trustAllCertificates());
+        options.setIgnoreHTTPSErrors(ignoreHttpsErrors(config));
         String stored = browserStorage.get(run.getId());
         if (stored != null) options.setStorageState(stored);
         if (config.loginConfiguration().authMethod() == AuthMethod.OAUTH2) {
@@ -216,7 +218,7 @@ public class HttpCrawler {
           authentication.clear(run.getId());
           options =
               new Browser.NewContextOptions()
-                  .setIgnoreHTTPSErrors(config.reliability().trustAllCertificates())
+                  .setIgnoreHTTPSErrors(ignoreHttpsErrors(config))
                   .setExtraHTTPHeaders(
                       Map.of(
                           "Authorization",
@@ -525,6 +527,11 @@ public class HttpCrawler {
 
   private static long elapsedMillis(long started) {
     return Duration.ofNanos(System.nanoTime() - started).toMillis();
+  }
+
+  /** Per-job flag OR'd with the global {@code contextcrate.tls.trust-all-certificates} flag. */
+  private static boolean ignoreHttpsErrors(CrawlConfiguration config) {
+    return config.reliability().trustAllCertificates() || InsecureSsl.globalTrustAll();
   }
 
   private static String safeMessage(Exception exception) {

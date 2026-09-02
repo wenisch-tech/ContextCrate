@@ -46,6 +46,17 @@ acquires a complete selected-ref snapshot.
 Git tokens are removed from API responses, logs, audit messages, and exports, but they are stored
 as plaintext in the ingestion-job configuration JSON. Protect database access and backups accordingly.
 
+## TLS certificate validation
+
+`CONTEXTCRATE_TLS_TRUST_ALL_CERTIFICATES` (`contextcrate.tls.trust-all-certificates`, default
+`false`) disables TLS certificate and hostname validation process-wide: model providers
+(answering, embedding, reranking), OIDC, Git and web-crawler ingestion, robots.txt fetches,
+Keycloak token requests, the MCP client, S3, RabbitMQ (when `spring.rabbitmq.ssl.enabled=true`),
+and Postgres. It ORs on top of the existing per-job Git/crawler "ignore TLS certificate errors"
+checkboxes and `CONTEXTCRATE_SECURITY_OIDC_TRUST_ALL_CERTIFICATES` — those flags keep working
+independently for narrower cases. Only enable it for internal/self-signed CAs you already trust;
+see [Security](security.md) for the risk and a safer alternative.
+
 ## Environment examples
 
 Spring properties map to uppercase underscore environment variables. Distributed connection variables are shown in `compose.distributed.yml`. AWS credentials use the standard AWS SDK provider chain.

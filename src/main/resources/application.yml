@@ -115,6 +115,8 @@ contextcrate:
     oidc:
       enabled: ${CONTEXTCRATE_SECURITY_OIDC_ENABLED:false}
       trust-all-certificates: ${CONTEXTCRATE_SECURITY_OIDC_TRUST_ALL_CERTIFICATES:false}
+  tls:
+    trust-all-certificates: ${CONTEXTCRATE_TLS_TRUST_ALL_CERTIFICATES:false}
 server:
   error:
     include-message: always

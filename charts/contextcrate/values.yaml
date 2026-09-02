@@ -21,6 +21,11 @@ security:
     # Skips TLS certificate validation for the OIDC issuer (discovery, token, userinfo, JWKS).
     # Only enable for identity providers behind an internal/self-signed CA you already trust.
     trustAllCertificates: false
+tls:
+  # Disables ALL TLS certificate and hostname validation process-wide (models, OIDC, ingestion,
+  # S3, RabbitMQ, Postgres). Implies security.oidc.trustAllCertificates. Only for internal/
+  # self-signed CAs you already trust.
+  trustAllCertificates: false
 resources:
   requests: { cpu: 250m, memory: 512Mi }
   limits: { cpu: "2", memory: 2Gi }

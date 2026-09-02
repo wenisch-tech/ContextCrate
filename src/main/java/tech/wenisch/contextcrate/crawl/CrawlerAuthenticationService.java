@@ -65,7 +65,9 @@ public class CrawlerAuthenticationService {
   }
 
   private HttpClient anonymousClient(CrawlConfiguration config) {
-    return config.reliability().trustAllCertificates() ? insecureAnonymousClient : anonymousClient;
+    return config.reliability().trustAllCertificates() || InsecureSsl.globalTrustAll()
+        ? insecureAnonymousClient
+        : anonymousClient;
   }
 
   public String bearerToken(UUID runId, CrawlConfiguration config) throws Exception {
@@ -132,7 +134,10 @@ public class CrawlerAuthenticationService {
       if (existing == null) {
         CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
         FormSession created =
-            new FormSession(newClient(cookies, config.reliability().trustAllCertificates()));
+            new FormSession(
+                newClient(
+                    cookies,
+                    config.reliability().trustAllCertificates() || InsecureSsl.globalTrustAll()));
         created.authenticationUrl(authenticate(created, config));
         formSessions.put(runId, created);
         existing = created;
