@@ -11,6 +11,7 @@ public interface SourceRepository extends JpaRepository<Source, UUID> {
   Optional<Source> findByIdAndCrateId(UUID id, UUID crateId);
   List<Source> findByCrateId(UUID crateId);
   long countByCrateId(UUID crateId);
+  long countByCrateIdAndEnabledTrue(UUID crateId);
 
   @Query("select s.crateId as crateId, count(s) as total from Source s where s.crateId in :crateIds group by s.crateId")
   List<CrateCount> countByCrate(@Param("crateIds") Collection<UUID> crateIds);

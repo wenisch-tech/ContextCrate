@@ -24,13 +24,18 @@ class CrateLiveViewServiceTest {
     var index = mock(SearchIndex.class);
     when(documents.countByCrateIdAndCurrentVersionTrue(crateId)).thenReturn(42L);
     when(documents.countByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId)).thenReturn(2L);
+    when(documents.findByCrateIdAndCurrentVersionTrueAndCreatedAtGreaterThanEqual(eq(crateId), any()))
+        .thenReturn(List.of());
+    when(documents.findByCrateIdAndIndexedAtGreaterThanEqual(eq(crateId), any())).thenReturn(List.of());
     when(chunks.countByCrateId(crateId)).thenReturn(318L);
     when(sources.countByCrateId(crateId)).thenReturn(3L);
+    when(sources.countByCrateIdAndEnabledTrue(crateId)).thenReturn(2L);
     when(jobs.countByCrateId(crateId)).thenReturn(5L);
     when(runs.countByCrateIdAndStatusIn(eq(crateId), anyCollection())).thenReturn(1L);
     when(work.countByCrateIdAndStatusIn(eq(crateId), anyCollection())).thenReturn(4L);
     when(work.countsByCrate(crateId)).thenReturn(List.of());
     when(runs.findTop20ByCrateIdOrderByStartedAtDesc(crateId)).thenReturn(List.of());
+    when(runs.findByCrateIdAndStartedAtGreaterThanEqual(eq(crateId), any())).thenReturn(List.of());
     when(index.health(crateId)).thenReturn(new SearchIndex.IndexHealth(crateId, "lucene", true, 42, "ready"));
 
     var snapshot = new CrateLiveViewService(documents, chunks, sources, jobs, runs, work,
@@ -44,6 +49,9 @@ class CrateLiveViewServiceTest {
     assertThat(snapshot.pipeline()).containsKeys(WorkStage.values());
     assertThat(snapshot.pipeline().get(WorkStage.INDEX)).containsEntry(WorkStatus.PROCESSING, 0L);
     assertThat(snapshot.run()).isNull();
+    assertThat(snapshot.analytics().documentIndex().total()).isEqualTo(42);
+    assertThat(snapshot.analytics().sourcesMonitored().total()).isEqualTo(2);
+    assertThat(snapshot.analytics().indexingActivity().hourly()).hasSize(24);
     verify(documents, never()).findByCrateId(any());
     verify(chunks, never()).findByCrateId(any());
     verify(sources, never()).findByCrateIdOrderByCreatedAtDesc(any());

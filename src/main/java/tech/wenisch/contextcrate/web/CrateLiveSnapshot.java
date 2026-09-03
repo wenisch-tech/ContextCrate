@@ -15,7 +15,8 @@ public record CrateLiveSnapshot(
     SearchIndex.IndexHealth indexHealth,
     Map<WorkStage, Map<WorkStatus, Long>> pipeline,
     List<RunSummary> runs,
-    RunDetail run) {
+    RunDetail run,
+    DashboardAnalytics analytics) {
 
   public record Metrics(long documents, long chunks, long sources, long jobs, long activeRuns,
       long failedWork, long unindexedDocuments) {}
@@ -31,4 +32,13 @@ public record CrateLiveSnapshot(
 
   public record WorkItem(UUID id, WorkStage stage, WorkStatus status, int attempts,
       Instant updatedAt, String error) {}
+
+  /** Historical dashboard values, calculated in UTC for the most recent 24 completed hours. */
+  public record DashboardAnalytics(Activity documentIndex, Activity sourcesMonitored,
+      Activity indexingActivity) {}
+
+  public record Activity(long total, long last24Hours, long previous24Hours,
+      int changePercent, List<HourlyPoint> hourly) {}
+
+  public record HourlyPoint(String label, long value, int percent) {}
 }

@@ -18,6 +18,8 @@ class DashboardTemplateTest {
     assertThat(html)
         .contains("x-data=\"liveView($el.dataset.crateId)\"")
         .contains("Chunks", "Active runs", "Failed work", "Pipeline activity")
+        .contains("Document index", "Sources monitored", "Indexing activity", "Documents indexed")
+        .contains("analytics-chart", "contextcrate-logo-clean.png", "last 24h")
         .contains("WEB_FETCH", "GIT_FETCH", "BROWSER_FETCH", "PARSE", "DISCOVERY", "EXTRACT", "INDEX")
         .contains("pipeline-graph", "pipeline-packet", "x-cloak", "PROCESSING")
         .doesNotContain("pipeline?.[k]?.COMPLETED")

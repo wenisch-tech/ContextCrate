@@ -12,7 +12,6 @@ ContextCrate is an open-source, self-hosted retrieval-augmented generation platf
 
 ContextCrate keeps that context on infrastructure you control, combines lexical and semantic retrieval, and makes answer evidence traceable back to the original source. 
 
-
 ## Capabilities
 
 - **Crawl websites reliably** with HTTP or Playwright rendering, robots-policy enforcement, login support, retries, and crawler safety controls.
@@ -111,4 +110,3 @@ The first authenticated user owns the automatically migrated Legacy crate. New u
 - [Tutorials](docs/tutorials.md)
 
 ContextCrate is licensed under AGPL-3.0.
-

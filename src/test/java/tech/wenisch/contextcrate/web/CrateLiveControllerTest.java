@@ -48,6 +48,6 @@ class CrateLiveControllerTest {
     Map<WorkStatus, Long> statuses = Map.of(WorkStatus.PENDING, 0L);
     return new CrateLiveSnapshot(crateId, Instant.now(), 1L,
         new CrateLiveSnapshot.Metrics(0, 0, 0, 0, 0, 0, 0), null,
-        Map.of(WorkStage.WEB_FETCH, statuses), List.of(), null);
+        Map.of(WorkStage.WEB_FETCH, statuses), List.of(), null, null);
   }
 }

@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,6 +31,9 @@ public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDo
   List<NormalizedDocument> findByCrateIdAndIndexedFalse(UUID crateId);
   List<NormalizedDocument> findByCrateIdAndCurrentVersionTrue(UUID crateId);
   List<NormalizedDocument> findByCrateIdAndCurrentVersionTrueAndIndexedFalse(UUID crateId);
+  List<NormalizedDocument> findByCrateIdAndCurrentVersionTrueAndCreatedAtGreaterThanEqual(
+      UUID crateId, Instant createdAt);
+  List<NormalizedDocument> findByCrateIdAndIndexedAtGreaterThanEqual(UUID crateId, Instant indexedAt);
   long countByCrateIdAndCurrentVersionTrue(UUID crateId);
   long countByCrateIdAndCurrentVersionTrueAndIndexedFalse(UUID crateId);
 
