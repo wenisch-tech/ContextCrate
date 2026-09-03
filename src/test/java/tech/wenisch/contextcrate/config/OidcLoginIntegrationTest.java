@@ -43,9 +43,11 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.support.TestPropertySourceUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -111,7 +113,8 @@ class OidcLoginIntegrationTest {
         "spring.security.oauth2.client.provider.keycloak.issuer-uri=" + issuer);
     context.register(LoginTestConfiguration.class);
     context.refresh();
-    mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(new ForwardedHeaderFilter())
+        .apply(springSecurity()).build();
   }
 
   @AfterEach
@@ -123,10 +126,12 @@ class OidcLoginIntegrationTest {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void callbackAuthenticatesAndSynchronizesLocalRole(boolean admin) throws Exception {
-    var login = mvc.perform(get("/oauth2/authorization/keycloak"))
+    var login = mvc.perform(get("/oauth2/authorization/keycloak").with(httpsProxy()))
         .andExpect(status().is3xxRedirection()).andReturn();
     var parameters = UriComponentsBuilder.fromUriString(login.getResponse().getRedirectedUrl())
         .build().getQueryParams();
+    assertThat(parameters.getFirst("redirect_uri"))
+        .isEqualTo("https://harvex.example.com/login/oauth2/code/keycloak");
     idToken = signedIdToken(UriUtils.decode(parameters.getFirst("nonce"), StandardCharsets.UTF_8), admin);
     var session = (MockHttpSession) login.getRequest().getSession(false);
 
@@ -179,6 +184,15 @@ class OidcLoginIntegrationTest {
     var jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signingKey.getKeyID()).build(), claims);
     jwt.sign(new RSASSASigner(signingKey));
     return jwt.serialize();
+  }
+
+  private static RequestPostProcessor httpsProxy() {
+    return request -> {
+      request.addHeader("X-Forwarded-Proto", "https");
+      request.addHeader("X-Forwarded-Host", "harvex.example.com");
+      request.addHeader("X-Forwarded-Port", "443");
+      return request;
+    };
   }
 
   private void reply(HttpExchange exchange, int status, Map<String, ?> body) throws IOException {
