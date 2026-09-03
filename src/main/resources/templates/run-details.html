@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script>
 </head>
 <body x-data="liveView($el.dataset.crateId, $el.dataset.runId)" th:data-crate-id="${crate.id}" th:data-run-id="${run.id}">
-<nav th:replace="~{fragments :: nav}"></nav>
+<aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header>
 <main class="container-fluid p-4 p-lg-5">
   <div class="d-flex justify-content-between align-items-start mb-4">
     <div>

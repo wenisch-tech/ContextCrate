@@ -4,7 +4,7 @@
 
 
   <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
-<body><nav th:replace="~{fragments :: nav}"></nav><main class="container p-4 p-lg-5">
+<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header><main class="container p-4 p-lg-5">
   <div class="mb-4"><p class="eyebrow">ACCOUNT</p><h1 class="display-6 fw-semibold">API keys</h1>
     <p class="text-secondary">Personal keys authenticate as you, with access to every crate you are a member of.</p></div>
 

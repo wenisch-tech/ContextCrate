@@ -38,6 +38,14 @@ class FrontendMigrationTest {
   }
 
   @Test
+  void everyTemplateUsesTheSingleSidebarLayout() throws IOException {
+    try (var files = Files.walk(Path.of("src/main/resources/templates"))) {
+      for (Path file : files.filter(path -> path.toString().endsWith(".html")).toList())
+        assertThat(Files.readString(file)).as(file.toString()).doesNotContain("fragments :: nav");
+    }
+  }
+
+  @Test
   void frontendRestoresCrateCardLinksAndAppliesLightThemeReliably() throws IOException {
     String css = Files.readString(Path.of("src/main/frontend/contextcrate.css"));
     String javascript = Files.readString(Path.of("src/main/frontend/contextcrate.js"));

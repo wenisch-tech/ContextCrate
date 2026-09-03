@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Documents · ContextCrate</title><link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
-<body><nav th:replace="~{fragments :: nav}"></nav><main class="container-fluid p-4 p-lg-5">
+<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header><main class="container-fluid p-4 p-lg-5">
   <p class="eyebrow">NORMALIZED CONTENT</p>
   <div class="d-flex align-items-start justify-content-between gap-3 mb-2"><div><h1 class="mb-1">Documents</h1><p class="text-secondary mb-0">Normalized, versioned source content that ContextCrate indexes and uses as retrieval context.</p></div>
     <form th:if="${unindexedCount > 0 and crateRole.includes(T(tech.wenisch.contextcrate.domain.CrateMember.Role).EDITOR)}" method="post" th:action="@{/crates/{crateId}/documents/retry-unindexed(crateId=${crate.id})}"><input type="hidden" name="q" th:value="${query}"><input type="hidden" name="sourceId" th:value="${sourceId}"><input type="hidden" name="sort" th:value="${sort}"><input type="hidden" name="direction" th:value="${direction}"><input type="hidden" name="page" th:value="${documentPage.number}"><button class="btn btn-outline-warning" type="submit">Index missing (<span th:text="${unindexedCount}"></span>)</button></form>

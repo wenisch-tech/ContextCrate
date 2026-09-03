@@ -5,7 +5,7 @@
 
 
   <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
-<body><nav th:replace="~{fragments :: nav}"></nav><main class="container py-5">
+<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header><main class="container py-5">
   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
     <div><p class="eyebrow">CONTEXTCRATE</p><h1 class="mb-2">Your crates</h1>
       <p class="text-secondary mb-0">A crate is an isolated context workspace containing sources, jobs, documents, extraction rules, members, and AI settings.</p></div>
