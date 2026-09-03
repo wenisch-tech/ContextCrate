@@ -41,6 +41,7 @@ Alpine.store('theme', {
 Alpine.data('wizard', (steps = 5, initial = 1) => ({
   step: Math.min(Math.max(Number(initial) || 1, 1), steps),
   steps,
+  authMethod: 'NONE',
   next() {
     const panel = this.$root.querySelector(`[data-step="${this.step}"]`);
     const invalid = panel?.querySelector(':invalid') || [...this.$root.querySelectorAll(':invalid')].find(field => field.offsetParent !== null);
@@ -54,7 +55,8 @@ Alpine.data('wizard', (steps = 5, initial = 1) => ({
     const groups = [
       ['name','seedUrl','ref'],
       ['allowedHost','includeUrlPatterns','excludeUrlPatterns','maxDepth','maxPages','allowSubdomains','discoverSitemaps','includePatterns','excludePatterns','maxFiles','maxFileBytes'],
-      ['userAgent','contact','perHostConcurrency','minimumDelayMillis','timeoutMillis','honorRobots','maxAttempts','initialBackoffMillis','maxBodyBytes','renderMode','deduplicateContent','trustAllCertificates','authMethod','loginPageUrl','username','password','directLogin','usernameField','passwordField','submitSelector','successUrlPattern','successContentPattern','authServerUrl','realm','clientId','clientSecret','gitUsername','gitToken'],
+      ['userAgent','contact','perHostConcurrency','minimumDelayMillis','timeoutMillis','honorRobots','maxAttempts','initialBackoffMillis','maxBodyBytes','renderMode','deduplicateContent','trustAllCertificates','gitUsername','gitToken'],
+      ['authMethod','loginPageUrl','username','password','directLogin','usernameField','passwordField','submitSelector','successUrlPattern','successContentPattern','authServerUrl','realm','clientId','clientSecret'],
       ['rawRetentionDays','chunkSize','chunkOverlap','logicalIndex','contentSelector','removeSelectors']
     ];
     const found = groups.findIndex(group => group.includes(name));
