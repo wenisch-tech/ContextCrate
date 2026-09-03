@@ -11,4 +11,5 @@ public interface IngestionJobRepository extends JpaRepository<IngestionJob, UUID
   Optional<IngestionJob> findByIdAndCrateId(UUID id, UUID crateId);
   List<IngestionJob> findByCrateId(UUID crateId);
   long countBySourceId(UUID sourceId);
+  long countByCrateId(UUID crateId);
 }

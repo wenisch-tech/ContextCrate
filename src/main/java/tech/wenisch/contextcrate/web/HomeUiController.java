@@ -32,5 +32,6 @@ public class HomeUiController {
     model.addAttribute("crates",cards.stream().map(CrateOverviewService.CrateCard::crate).toList());
     model.addAttribute("canCreateCrate",crates.canCreate());
     model.addAttribute("isAdmin",access.isAdmin());
+    model.addAttribute("currentUser",access.currentUser());
   }
 }

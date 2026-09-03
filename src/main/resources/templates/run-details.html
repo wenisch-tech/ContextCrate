@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Run details · ContextCrate</title>
-  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
-  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="/css/contextcrate.css">
+
+
+  <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script>
 </head>
-<body>
+<body x-data="liveView($el.dataset.crateId, $el.dataset.runId)" th:data-crate-id="${crate.id}" th:data-run-id="${run.id}">
 <nav th:replace="~{fragments :: nav}"></nav>
 <main class="container-fluid p-4 p-lg-5">
   <div class="d-flex justify-content-between align-items-start mb-4">
@@ -33,7 +33,7 @@
           </div>
           <div class="backend-row">
             <span>Status</span>
-            <span class="status-pill" th:text="${run.status}"></span>
+            <span class="status-pill" x-text="state?.run?.summary?.status ?? $el.dataset.initial" th:data-initial="${run.status}" th:text="${run.status}"></span>
           </div>
           <div class="backend-row">
             <span>Started at</span>
@@ -85,9 +85,9 @@
   </div>
 
   <div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="metric-card"><span>Discovered</span><strong th:text="${frontierTotal}">0</strong></div></div>
-    <div class="col-md-4"><div class="metric-card"><span>Fetched</span><strong th:text="${frontierFetched}">0</strong></div></div>
-    <div class="col-md-4"><div class="metric-card"><span>Failed</span><strong th:text="${frontierFailed}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Discovered</span><strong x-text="state?.run?.discovered ?? $el.dataset.initial" th:data-initial="${frontierTotal}" th:text="${frontierTotal}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Fetched</span><strong x-text="state?.run?.fetched ?? $el.dataset.initial" th:data-initial="${frontierFetched}" th:text="${frontierFetched}">0</strong></div></div>
+    <div class="col-md-4"><div class="metric-card"><span>Failed</span><strong x-text="state?.run?.failed ?? $el.dataset.initial" th:data-initial="${frontierFailed}" th:text="${frontierFailed}">0</strong></div></div>
   </div>
 
   <div class="card panel">
@@ -128,6 +128,6 @@
     </div>
   </div>
 </main>
-<script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

@@ -10,4 +10,5 @@ public interface IngestionRunRepository extends JpaRepository<IngestionRun, UUID
   List<IngestionRun> findTop20BySourceIdOrderByStartedAtDesc(UUID sourceId);
   Optional<IngestionRun> findByIdAndCrateId(UUID id, UUID crateId);
   List<IngestionRun> findByCrateId(UUID crateId);
+  long countByCrateIdAndStatusIn(UUID crateId, Collection<tech.wenisch.contextcrate.domain.PipelineTypes.RunStatus> statuses);
 }

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class DashboardTemplateTest {
   @Test
-  void markdownRendererDoesNotUseThymeleafJavaScriptInlining() throws IOException {
+  void dashboardCombinesLiveOperationsWithAnimatedPipelineFlow() throws IOException {
     String html;
     try (var input = getClass().getResourceAsStream("/templates/dashboard.html")) {
       assertThat(input).isNotNull();
@@ -16,16 +16,12 @@ class DashboardTemplateTest {
     }
 
     assertThat(html)
-        .contains("th:data-crate-id=\"${crate.id}\"")
-        .contains("const crateId=document.getElementById('dashboard').dataset.crateId;")
-        .contains("const sourceLink=value=>")
-        .contains("name.textContent=s.title||s.sourceUri")
-        .contains("link.textContent=s.sourceUri")
-        .contains("/^`[a-zA-Z0-9_+-]*$/.test(line)")
-        .contains("\\[(?:SOURCE\\s+)?\\d+\\]")
-        .contains("a.textContent='['+citation[1]+']'")
-        .contains("const renderMarkdown=()=>")
-        .contains("<script th:inline=\"none\">")
-        .doesNotContain("<script th:inline=\"javascript\">");
+        .contains("x-data=\"liveView($el.dataset.crateId)\"")
+        .contains("Chunks", "Active runs", "Failed work", "Pipeline activity")
+        .contains("WEB_FETCH", "GIT_FETCH", "BROWSER_FETCH", "PARSE", "DISCOVERY", "EXTRACT", "INDEX")
+        .contains("pipeline-graph", "pipeline-packet", "x-cloak", "PROCESSING")
+        .doesNotContain("pipeline?.[k]?.COMPLETED")
+        .doesNotContain("answer-form", "content-search")
+        .doesNotContain("innerHTML", "/webjars/bootstrap");
   }
 }

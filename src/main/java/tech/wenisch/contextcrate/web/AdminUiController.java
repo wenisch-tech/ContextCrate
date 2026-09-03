@@ -43,6 +43,7 @@ public class AdminUiController {
   void admin(Model model) {
     administration.requireAdmin();
     model.addAttribute("isAdmin", true);
+    model.addAttribute("currentUser", access.currentUser());
   }
 
   @GetMapping({"", "/"})

@@ -19,16 +19,18 @@ class AdminTemplateTest {
     assertThat(template("crates.html"))
         .contains("<a th:if=\"${isAdmin}\" class=\"card panel admin-tile mb-4\" href=\"/admin\">");
     assertThat(template("fragments.html"))
-        .contains("<a class=\"nav-link\" th:if=\"${isAdmin}\" href=\"/admin\">");
+        .contains("th:if=\"${isAdmin}\" href=\"/admin\"")
+        .contains("Crate management", "Personal API keys");
   }
 
   @Test
   void theNavigationFragmentToleratesPagesWithoutACrate() throws IOException {
     String fragments = template("fragments.html");
 
-    assertThat(fragments).contains("<th:block th:if=\"${crate != null}\">");
+    assertThat(fragments).contains("th:if=\"${crate != null}\"");
     assertThat(fragments)
-        .contains("th:href=\"${crate != null} ? @{/crates/{id}(id=${crate.id})} : @{/crates}\"");
+        .contains("th:href=\"${crate == null ? '/crates' : '/crates/' + crate.id}\"")
+        .contains("id=${crate?.id}");
   }
 
   @Test

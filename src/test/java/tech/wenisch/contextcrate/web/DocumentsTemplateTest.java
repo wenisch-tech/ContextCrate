@@ -10,8 +10,16 @@ class DocumentsTemplateTest {
   @Test
   void catalogueIncludesSearchSortAndPagination() throws IOException {
     String html = template("documents.html");
-    assertThat(html).contains("Search title or source URI", "sort='title'", "sort='uri'",
+    assertThat(html).contains("Search indexed content", "name=\"contentQ\"",
+        "Search title or source URI", "sort='title'", "sort='uri'",
         "sort='chunks'", "sort='indexed'", "documentPage.totalPages");
+  }
+
+  @Test
+  void chatIsADedicatedSafeStreamingWorkspace() throws IOException {
+    assertThat(template("chat.html"))
+        .contains("Chat with this crate", "answer-form", "textContent", "noopener noreferrer")
+        .doesNotContain("innerHTML");
   }
 
   @Test

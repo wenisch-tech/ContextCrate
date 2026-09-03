@@ -21,6 +21,7 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, UU
   List<DocumentChunk> findByDocumentIdAndCrateIdOrderByOrdinal(UUID documentId, UUID crateId);
   Optional<DocumentChunk> findByIdAndCrateId(UUID id, UUID crateId);
   List<DocumentChunk> findByCrateId(UUID crateId);
+  long countByCrateId(UUID crateId);
 
   @org.springframework.data.jpa.repository.Query(
       "select c.documentId as documentId, count(c) as chunkCount from DocumentChunk c "

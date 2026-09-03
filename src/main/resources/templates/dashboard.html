@@ -1,167 +1,43 @@
-<!doctype html>
-<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Overview · ContextCrate</title>
-  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
-  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="/css/contextcrate.css">
-</head>
-<body>
-<nav th:replace="~{fragments :: nav}"></nav>
-<main id="dashboard" class="container-fluid p-4 p-lg-5" th:data-crate-id="${crate.id}">
-  <div class="d-flex justify-content-between align-items-start mb-4">
-    <div>
-      <p class="eyebrow">CONTROL PLANE</p>
-      <h1 class="display-6 fw-semibold">Ingestion overview</h1>
-      <p class="text-secondary">A live view of work moving through ContextCrate.</p>
-    </div>
-    <a class="btn btn-primary" th:href="@{/crates/{id}/sources/new(id=${crate.id})}"><i class="bi bi-plus-lg me-1"></i>New source</a>
-  </div>
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org"><head><th:block th:replace="~{fragments :: head('Overview')}"></th:block></head>
+<body x-data="liveView($el.dataset.crateId)" th:data-crate-id="${crate.id}" class="app-shell">
+<aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div>
+<div class="app-main"><header th:replace="~{fragments :: topbar('Overview')}"></header><div th:replace="~{fragments :: elevation}"></div>
+<main id="dashboard" class="page" th:data-crate-id="${crate.id}">
+  <div class="page-header"><div><p class="eyebrow">Live control plane</p><h2 class="page-title">Ingestion overview</h2><p class="page-copy">Current content, pipeline throughput, and work requiring attention.</p></div><div class="flex items-center gap-2"><span class="badge" :class="{'badge-good':connection==='live','badge-warn':connection==='polling'||connection==='stale','badge-bad':connection==='offline'}"><span class="size-1.5 rounded-full bg-current"></span><span x-text="connection">connecting</span></span><a class="btn-primary" th:if="${crateRole.includes(T(tech.wenisch.contextcrate.domain.CrateMember.Role).EDITOR)}" th:href="@{/crates/{id}/sources/new(id=${crate.id})}"><i data-lucide="plus" class="size-4"></i>New source</a></div></div>
 
-  <div class="card panel p-4 mb-4">
-    <form class="row g-3 align-items-end" th:action="@{/crates/{id}(id=${crate.id})}" method="get">
-      <div class="col-lg-10">
-        <label class="form-label">Search indexed content</label>
-        <input class="form-control form-control-lg" name="q" th:value="${searchQuery}" placeholder="Search documents and chunks">
-      </div>
-      <div class="col-lg-2 d-grid">
-        <button class="btn btn-primary btn-lg"><i class="bi bi-search me-1"></i>Search</button>
-      </div>
-    </form>
-    <div th:if="${searchResults != null}" class="mt-4">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h2 class="h5 mb-0">Search results</h2>
-        <span class="text-secondary small" th:text="${searchResults.hits.size()} + ' hits'"></span>
-      </div>
-      <div class="list-group list-group-flush">
-        <div th:each="hit:${searchResults.hits}" class="list-group-item bg-transparent px-0">
-          <div class="d-flex justify-content-between gap-3">
-            <div>
-              <div class="fw-semibold" th:text="${hit.title ?: hit.sourceUri}"></div>
-              <div class="small text-secondary text-truncate" th:text="${hit.sourceUri}"></div>
-            </div>
-            <div class="text-end small">
-              <span class="badge text-bg-secondary" th:text="${hit.kind}"></span>
-              <div th:text="${#numbers.formatDecimal(hit.score, 1, 2)}"></div>
-            </div>
-          </div>
-          <p class="mb-0 mt-2 small" th:text="${hit.snippet}"></p>
-        </div>
-        <div th:if="${searchResults.hits.empty}" class="empty-state">No indexed chunks matched this query.</div>
-      </div>
-    </div>
-  </div>
+  <section class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-7" aria-label="Crate metrics">
+    <div class="metric-card"><span class="metric-label">Documents</span><strong class="metric-value" th:data-initial="${liveSnapshot.metrics.documents}" th:text="${liveSnapshot.metrics.documents}" x-text="state?.metrics?.documents ?? $el.dataset.initial"></strong></div>
+    <div class="metric-card"><span class="metric-label">Chunks</span><strong class="metric-value" th:data-initial="${liveSnapshot.metrics.chunks}" th:text="${liveSnapshot.metrics.chunks}" x-text="state?.metrics?.chunks ?? $el.dataset.initial"></strong></div>
+    <div class="metric-card"><span class="metric-label">Sources</span><strong class="metric-value" th:data-initial="${liveSnapshot.metrics.sources}" th:text="${liveSnapshot.metrics.sources}" x-text="state?.metrics?.sources ?? $el.dataset.initial"></strong></div>
+    <div class="metric-card"><span class="metric-label">Jobs</span><strong class="metric-value" th:data-initial="${liveSnapshot.metrics.jobs}" th:text="${liveSnapshot.metrics.jobs}" x-text="state?.metrics?.jobs ?? $el.dataset.initial"></strong></div>
+    <div class="metric-card"><span class="metric-label">Active runs</span><strong class="metric-value text-cyan-500" th:data-initial="${liveSnapshot.metrics.activeRuns}" th:text="${liveSnapshot.metrics.activeRuns}" x-text="state?.metrics?.activeRuns ?? $el.dataset.initial"></strong></div>
+    <div class="metric-card"><span class="metric-label">Failed work</span><strong class="metric-value" th:data-initial="${liveSnapshot.metrics.failedWork}" th:text="${liveSnapshot.metrics.failedWork}" :class="(state?.metrics?.failedWork ?? Number($el.dataset.initial))>0?'text-bad-500':'text-good-500'" x-text="state?.metrics?.failedWork ?? $el.dataset.initial"></strong></div>
+    <div class="metric-card"><span class="metric-label">Unindexed</span><strong class="metric-value" th:data-initial="${liveSnapshot.metrics.unindexedDocuments}" th:text="${liveSnapshot.metrics.unindexedDocuments}" :class="(state?.metrics?.unindexedDocuments ?? Number($el.dataset.initial))>0?'text-warn-500':'text-good-500'" x-text="state?.metrics?.unindexedDocuments ?? $el.dataset.initial"></strong></div>
+  </section>
 
-  <div class="card panel p-4 mb-4" id="ask-contextcrate">
-    <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Ask ContextCrate</h2><p class="text-secondary small mb-0">Answers stream from the configured model and include retrieved sources.</p></div><button id="cancel-answer" class="btn btn-outline-secondary btn-sm d-none" type="button">Cancel</button></div>
-    <form id="answer-form" class="row g-3">
-      <div class="col-lg-10"><label class="visually-hidden" for="answer-question">Question</label><input id="answer-question" class="form-control form-control-lg" required maxlength="8000" placeholder="Ask a question about indexed content"></div>
-      <div class="col-lg-2 d-grid"><button class="btn btn-primary btn-lg" type="submit">Ask</button></div>
-    </form>
-    <div id="answer-status" class="small text-secondary mt-3"></div>
-    <div id="answer-verification-status" class="alert mt-3 d-none mb-0" role="status"></div>
-    <div id="answer-text" class="mt-3"></div>
-    <div id="answer-sources" class="mt-3"></div>
-  </div>
-
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-xl-3"><div class="metric-card"><span>Sources / jobs</span><strong th:text="|${sources.size()} / ${jobs.size()}|">0</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric-card"><span>Runs</span><strong th:text="${runs.size()}">0</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric-card"><span>Documents</span><strong th:text="${documentCount}">0</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric-card"><span>Index</span><strong class="fs-5" th:classappend="${indexHealth.healthy} ? 'text-success' : 'text-danger'" th:text="${indexHealth.backend}">Lucene</strong></div></div>
-  </div>
-
-  <div class="row g-4">
-    <div class="col-xl-8">
-       <section class="card panel">
-         <div class="card-header d-flex justify-content-between"><span>Recent ingestion runs</span><a th:href="@{/crates/{id}/sources(id=${crate.id})}" class="small">Manage sources</a></div>
-         <div class="table-responsive">
-           <table class="table mb-0 align-middle">
-             <thead><tr><th>Run</th><th>Job</th><th>Status</th><th>Started</th></tr></thead>
-             <tbody>
-             <tr th:each="run:${runs}">
-               <td class="font-monospace small"><a th:href="@{/crates/{crateId}/runs/{id}(crateId=${crate.id},id=${run.id})}" th:text="${run.id}"></a></td>
-               <td th:text="${jobNames[run.ingestionJobId]}"></td>
-               <td><span class="status-pill" th:text="${run.status}"></span></td>
-               <td th:text="${run.startedAt}"></td>
-             </tr>
-             <tr th:if="${runs.empty}"><td colspan="4" class="empty-state">No runs yet. Create a source and ingestion job to begin.</td></tr>
-             </tbody>
-           </table>
-         </div>
-       </section>
+  <section class="panel mb-6"><div class="panel-header"><span>Pipeline activity</span><span class="text-xs font-normal text-ink-500" x-text="state?.generatedAt ? 'Updated '+new Date(state.generatedAt).toLocaleTimeString() : 'Server snapshot'"></span></div><div class="panel-body">
+    <div class="overflow-x-auto" aria-label="Live pipeline flow"><div class="pipeline-graph">
+      <div class="pipeline-node" :class="{'active':['WEB_FETCH','GIT_FETCH','BROWSER_FETCH'].some(k=>(state?.pipeline?.[k]?.PROCESSING||0)>0)}"><span class="metric-label">Acquire</span><strong class="mt-1 text-lg tabular-nums text-white" x-cloak x-show="['WEB_FETCH','GIT_FETCH','BROWSER_FETCH'].some(k=>(state?.pipeline?.[k]?.PROCESSING||0)>0)" x-text="['WEB_FETCH','GIT_FETCH','BROWSER_FETCH'].reduce((n,k)=>n+(state?.pipeline?.[k]?.PROCESSING||0),0)"></strong></div>
+      <div class="pipeline-connector"><span class="pipeline-packet" x-cloak x-show="['WEB_FETCH','GIT_FETCH','BROWSER_FETCH'].some(k=>(state?.pipeline?.[k]?.PROCESSING||0)>0)" x-text="['WEB_FETCH','GIT_FETCH','BROWSER_FETCH'].reduce((n,k)=>n+(state?.pipeline?.[k]?.PROCESSING||0),0)"></span></div>
+      <div class="pipeline-node" :class="{'active':(state?.pipeline?.PARSE?.PROCESSING||0)>0}"><span class="metric-label">Parse</span><strong class="mt-1 text-lg tabular-nums text-white" x-cloak x-show="(state?.pipeline?.PARSE?.PROCESSING||0)>0" x-text="state?.pipeline?.PARSE?.PROCESSING"></strong></div>
+      <div class="pipeline-connector"><span class="pipeline-packet" x-cloak x-show="(state?.pipeline?.PARSE?.PROCESSING||0)>0" style="animation-delay:-.5s" x-text="state?.pipeline?.PARSE?.PROCESSING"></span></div>
+      <div class="pipeline-node" :class="{'active':(state?.pipeline?.DISCOVERY?.PROCESSING||0)>0}"><span class="metric-label">Discover</span><strong class="mt-1 text-lg tabular-nums text-white" x-cloak x-show="(state?.pipeline?.DISCOVERY?.PROCESSING||0)>0" x-text="state?.pipeline?.DISCOVERY?.PROCESSING"></strong></div>
+      <div class="pipeline-connector"><span class="pipeline-packet" x-cloak x-show="(state?.pipeline?.DISCOVERY?.PROCESSING||0)>0" style="animation-delay:-1s" x-text="state?.pipeline?.DISCOVERY?.PROCESSING"></span></div>
+      <div class="pipeline-node" :class="{'active':(state?.pipeline?.EXTRACT?.PROCESSING||0)>0}"><span class="metric-label">Extract</span><strong class="mt-1 text-lg tabular-nums text-white" x-cloak x-show="(state?.pipeline?.EXTRACT?.PROCESSING||0)>0" x-text="state?.pipeline?.EXTRACT?.PROCESSING"></strong></div>
+      <div class="pipeline-connector"><span class="pipeline-packet" x-cloak x-show="(state?.pipeline?.EXTRACT?.PROCESSING||0)>0" style="animation-delay:-1.5s" x-text="state?.pipeline?.EXTRACT?.PROCESSING"></span></div>
+      <div class="pipeline-node" :class="{'active':(state?.pipeline?.INDEX?.PROCESSING||0)>0}"><span class="metric-label">Index</span><strong class="mt-1 text-lg tabular-nums text-white" x-cloak x-show="(state?.pipeline?.INDEX?.PROCESSING||0)>0" x-text="state?.pipeline?.INDEX?.PROCESSING"></strong></div>
+    </div></div>
+    <div class="pipeline mt-4">
+    <template x-for="stage in [{name:'Acquire',keys:['WEB_FETCH','GIT_FETCH','BROWSER_FETCH']},{name:'Parse',keys:['PARSE']},{name:'Discover',keys:['DISCOVERY']},{name:'Extract',keys:['EXTRACT']},{name:'Index',keys:['INDEX']}]" :key="stage.name"><article class="pipeline-stage" :class="{'active':stage.keys.some(k=>(state?.pipeline?.[k]?.PROCESSING||0)>0)}"><div class="mb-4 flex items-center justify-between"><h3 class="text-sm font-semibold text-white" x-text="stage.name"></h3><span class="pipeline-dot"></span></div><div class="grid grid-cols-2 gap-2 text-xs"><span class="text-ink-500">Queued</span><strong class="text-right tabular-nums" x-text="stage.keys.reduce((n,k)=>n+(state?.pipeline?.[k]?.PENDING||0)+(state?.pipeline?.[k]?.RETRY_WAITING||0),0)"></strong><span class="text-ink-500">Active</span><strong class="text-right tabular-nums text-cyan-500" x-text="stage.keys.reduce((n,k)=>n+(state?.pipeline?.[k]?.PROCESSING||0),0)"></strong><span class="text-ink-500">Failed</span><strong class="text-right tabular-nums text-bad-500" x-text="stage.keys.reduce((n,k)=>n+(state?.pipeline?.[k]?.FAILED||0)+(state?.pipeline?.[k]?.DEAD_LETTERED||0),0)"></strong></div></article></template>
     </div>
-    <div class="col-xl-4">
-      <section class="card panel mb-4">
-        <div class="card-header">Runtime</div>
-        <div class="card-body">
-          <div class="backend-row"><span>Profile</span><code th:text="${properties.profile}"></code></div>
-          <div class="backend-row"><span>Queue</span><code th:text="${properties.queue.backend}"></code></div>
-          <div class="backend-row"><span>Database</span><code th:text="${properties.database.backend}"></code></div>
-          <div class="backend-row"><span>Artifacts</span><code th:text="${properties.artifacts.backend}"></code></div>
-          <div class="backend-row"><span>Index</span><code th:text="${properties.index.backend}"></code></div>
-        </div>
-      </section>
-      <section class="card panel">
-        <div class="card-header">Queue depth</div>
-        <div class="card-body">
-          <div class="backend-row" th:each="q:${queueDepth}"><span th:text="${q.key}"></span><strong th:text="${q.value}"></strong></div>
-        </div>
-      </section>
-    </div>
+  </div></section>
+
+  <div class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+    <section class="panel min-w-0"><div class="panel-header"><span>Recent ingestion runs</span><a class="text-xs text-brand-400 hover:text-brand-300" th:href="@{/crates/{id}/sources(id=${crate.id})}">Manage sources</a></div><div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Job</th><th>Source</th><th>Stage</th><th>Status</th><th>Started</th></tr></thead>
+      <tbody x-show="!state"><tr th:each="run:${liveSnapshot.runs}"><td><a class="font-semibold text-brand-400" th:href="@{/crates/{crateId}/runs/{id}(crateId=${crate.id},id=${run.id})}" th:text="${run.job}"></a></td><td th:text="${run.source}"></td><td th:text="${run.stage ?: '—'}"></td><td><span class="badge" th:text="${run.status}"></span></td><td th:text="${run.startedAt}"></td></tr><tr th:if="${liveSnapshot.runs.empty}"><td colspan="5" class="empty-state">No runs yet. Create a source and ingestion job to begin.</td></tr></tbody>
+      <tbody x-show="state" x-cloak><template x-for="run in state?.runs||[]" :key="run.id"><tr><td><a class="font-semibold text-brand-400" :href="`/crates/${state.crateId}/runs/${run.id}`" x-text="run.job"></a></td><td x-text="run.source"></td><td x-text="run.stage||'—'"></td><td><span class="badge" :class="{'badge-good':run.status==='COMPLETED','badge-bad':run.status==='FAILED','badge-warn':run.status==='PAUSED'}" x-text="run.status"></span></td><td x-text="new Date(run.startedAt).toLocaleString()"></td></tr></template><tr x-show="!state?.runs?.length"><td colspan="5" class="empty-state">No runs yet.</td></tr></tbody>
+    </table></div></section>
+    <aside class="space-y-6"><section class="panel"><div class="panel-header">Index health</div><div class="panel-body"><div class="flex items-center gap-3"><span class="size-3 rounded-full" th:data-initial="${liveSnapshot.indexHealth.healthy}" :class="(state?.indexHealth?.healthy ?? ($el.dataset.initial==='true'))?'bg-good-500 shadow-[0_0_14px_rgba(54,211,153,.5)]':'bg-bad-500'"></span><div><strong class="text-sm text-white" th:data-initial="${liveSnapshot.indexHealth.backend}" th:text="${liveSnapshot.indexHealth.backend}" x-text="state?.indexHealth?.backend ?? $el.dataset.initial"></strong><p class="mt-1 text-xs text-ink-500" th:data-initial="${liveSnapshot.indexHealth.detail}" th:text="${liveSnapshot.indexHealth.detail}" x-text="state?.indexHealth?.detail ?? $el.dataset.initial"></p></div></div></div></section><section class="panel"><div class="panel-header">Runtime</div><div class="panel-body"><div class="kv-row"><span>Profile</span><code th:text="${properties.profile}"></code></div><div class="kv-row"><span>Queue</span><code th:text="${properties.queue.backend}"></code></div><div class="kv-row"><span>Database</span><code th:text="${properties.database.backend}"></code></div><div class="kv-row"><span>Artifacts</span><code th:text="${properties.artifacts.backend}"></code></div></div></section></aside>
   </div>
-</main>
-<script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script th:inline="none">
-(() => {
-  const crateId=document.getElementById('dashboard').dataset.crateId;
-  const form=document.getElementById('answer-form'), status=document.getElementById('answer-status'), verification=document.getElementById('answer-verification-status'), text=document.getElementById('answer-text'), sources=document.getElementById('answer-sources'), cancel=document.getElementById('cancel-answer'); let controller, sourceList=[], markdown='';
-  const safeUrl=value=>{try{const url=new URL(value,window.location.origin);return ['http:','https:'].includes(url.protocol)?url.href:null}catch{return null}};
-  const sourceLink=value=>{
-    const git=value?.match(/^git\+(.+)@[0-9a-f]{40}\/.+$/i);
-    return safeUrl(git?git[1]:value);
-  };
-  const appendInline=(parent,value)=>{
-    const token=/(`[^`]*`|!?\[[^\]]+\]\([^\s)]+\)|\[(?:SOURCE\s+)?\d+\]|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
-    let last=0;
-    const appendToken=part=>{
-      if(part.startsWith('`')){const code=document.createElement('code');code.textContent=part.slice(1,-1);parent.append(code);return}
-      const link=part.match(/^(!)?\[([^\]]+)\]\(([^\s)]+)\)$/);
-      if(link){
-        if(link[1]){parent.append(document.createTextNode(link[2]));return}
-        const href=safeUrl(link[3]);
-        if(!href){parent.append(document.createTextNode(link[2]));return}
-        const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener';a.textContent=link[2];parent.append(a);return
-      }
-      const citation=part.match(/^\[(?:SOURCE\s+)?(\d+)\]$/);
-      if(citation){const known=sourceList.some(s=>s.citation===Number(citation[1]));if(known){const a=document.createElement('a');a.href='#citation-'+citation[1];a.textContent='['+citation[1]+']';parent.append(a)}else parent.append(document.createTextNode(part));return}
-      const emphasized=document.createElement(part.startsWith('**')||part.startsWith('__')?'strong':'em');emphasized.textContent=part.slice(part.startsWith('**')||part.startsWith('__')?2:1,part.startsWith('**')||part.startsWith('__')?-2:-1);parent.append(emphasized);
-    };
-    for(const match of value.matchAll(token)){parent.append(document.createTextNode(value.slice(last,match.index)));appendToken(match[0]);last=match.index+match[0].length}parent.append(document.createTextNode(value.slice(last)));
-  };
-  const renderMarkdown=()=>{
-    text.replaceChildren();const lines=markdown.replace(/\r/g,'').split('\n');
-    for(let i=0;i<lines.length;){
-      const line=lines[i];
-      if(!line.trim()){i++;continue}
-      if(line.startsWith('```')){const code=[];while(++i<lines.length&&!lines[i].startsWith('```'))code.push(lines[i]);if(i<lines.length)i++;const pre=document.createElement('pre'), node=document.createElement('code');node.textContent=code.join('\n');pre.append(node);text.append(pre);continue}
-      if(/^`[a-zA-Z0-9_+-]*$/.test(line)){const code=[];while(++i<lines.length&&lines[i]!=='`')code.push(lines[i]);if(i<lines.length)i++;const pre=document.createElement('pre'), node=document.createElement('code');node.textContent=code.join('\n');pre.append(node);text.append(pre);continue}
-      const heading=line.match(/^(#{1,6})\s+(.+)$/);
-      if(heading){const node=document.createElement('h'+heading[1].length);appendInline(node,heading[2]);text.append(node);i++;continue}
-      const list=line.match(/^\s*([-*+]|\d+\.)\s+(.+)$/);
-      if(list){const ordered=/\d+\./.test(list[1]),node=document.createElement(ordered?'ol':'ul');do{const item=lines[i].match(/^\s*(?:[-*+]|\d+\.)\s+(.+)$/);if(!item)break;const li=document.createElement('li');appendInline(li,item[1]);node.append(li);i++}while(i<lines.length);text.append(node);continue}
-      const quote=line.match(/^>\s?(.*)$/);
-      if(quote){const node=document.createElement('blockquote');appendInline(node,quote[1]);text.append(node);i++;continue}
-      const paragraph=[];while(i<lines.length&&lines[i].trim()&&!lines[i].startsWith('```')&&!/^(#{1,6})\s+/.test(lines[i])&&!/^\s*(?:[-*+]|\d+\.)\s+/.test(lines[i])&&!/^>\s?/.test(lines[i]))paragraph.push(lines[i++]);const node=document.createElement('p');paragraph.forEach((part,index)=>{if(index)node.append(document.createElement('br'));appendInline(node,part)});text.append(node);
-    }
-  };
-  const renderSources=items=>{sourceList=items; sources.replaceChildren(); if(!items.length)return; const heading=document.createElement('h3');heading.className='h6';heading.textContent='Retrieved sources';sources.append(heading); const list=document.createElement('ol'); items.forEach(s=>{const li=document.createElement('li'),name=document.createElement('div'),link=document.createElement('a'),details=document.createElement('div'),href=sourceLink(s.sourceUri);li.id='citation-'+s.citation;name.className='fw-semibold';name.textContent=s.title||s.sourceUri;link.className='small d-block text-break';link.textContent=s.sourceUri;if(href){link.href=href;link.target='_blank';link.rel='noopener'}else link.removeAttribute('href');details.className='small text-secondary mt-1';details.textContent=s.snippet;li.append(name,link,details);list.append(li)});sources.append(list);renderMarkdown()};
-  const renderVerification=value=>{const messages={verified:'Answer verified against the retrieved sources.',revised:'Answer was revised to use only retrieved-source facts.',blocked:'Answer was blocked because unsupported claims were found.',unsupported:'Answer contains claims not supported by the retrieved sources.',unavailable:'Answer verification was unavailable; review the sources carefully.'};verification.className='alert mt-3 mb-0 '+(value==='verified'||value==='revised'?'alert-success':'alert-warning');verification.textContent=messages[value]||'Answer verification status is unavailable.';verification.classList.remove('d-none')};
-  cancel.addEventListener('click',()=>controller?.abort());
-  form.addEventListener('submit',async event=>{event.preventDefault();controller?.abort();controller=new AbortController();markdown='';sourceList=[];status.textContent='Finding sources…';verification.classList.add('d-none');text.replaceChildren();sources.replaceChildren();cancel.classList.remove('d-none');try{const response=await fetch('/api/v1/crates/'+crateId+'/answers',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:document.getElementById('answer-question').value}),signal:controller.signal});if(!response.ok)throw new Error(response.status===503?'Answer generation is not configured.':'Unable to generate an answer.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';status.textContent='Generating and verifying answer…';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop();for(const eventText of events){let name='',data='';eventText.split('\n').forEach(line=>{if(line.startsWith('event:'))name=line.slice(6).trim();if(line.startsWith('data:'))data+=line.slice(5).trim()});if(!data)continue;const payload=JSON.parse(data);if(name==='sources')renderSources(payload);if(name==='verification')renderVerification(payload.status);if(name==='delta'){markdown+=payload.text;renderMarkdown()}if(name==='complete'){status.textContent='Complete.'}if(name==='error')throw new Error(payload.error)}}}catch(error){if(error.name==='AbortError')status.textContent='Cancelled.';else status.textContent=error.message}finally{cancel.classList.add('d-none')}});
-})();
-</script>
-</body>
-</html>
+</main></div>
+</body></html>

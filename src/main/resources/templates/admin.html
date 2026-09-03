@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration · ContextCrate</title>
-  <link rel="stylesheet" href="/webjars/bootstrap/css/bootstrap.min.css">
-  <link rel="stylesheet" href="/webjars/bootstrap-icons/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="/css/contextcrate.css"></head>
+
+
+  <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
 <body><nav th:replace="~{fragments :: nav}"></nav><main class="container p-4 p-lg-5">
   <div class="mb-4"><p class="eyebrow">ADMINISTRATION</p><h1 class="display-6 fw-semibold">Installation settings</h1>
     <p class="text-secondary">Users, crate creation policy, every crate in this installation, and system operations.</p></div>
@@ -18,10 +18,10 @@
   <div class="alert alert-danger" th:if="${param.error != null}" th:text="${param.error[0]}"></div>
 
   <ul class="nav nav-pills mb-4 gap-2" role="tablist">
-    <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#users" type="button"><i class="bi bi-people me-1"></i>Users</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#policies" type="button"><i class="bi bi-clipboard-check me-1"></i>Policies</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#crates" type="button"><i class="bi bi-boxes me-1"></i>Crates</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#system" type="button"><i class="bi bi-hdd-stack me-1"></i>System</button></li>
+    <li class="nav-item"><button class="nav-link active" data-ui-toggle="pill" data-ui-target="#users" type="button">Users</button></li>
+    <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#policies" type="button">Policies</button></li>
+    <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#crates" type="button">Crates</button></li>
+    <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#system" type="button">System</button></li>
   </ul>
 
   <div class="tab-content">
@@ -52,7 +52,7 @@
               <button class="btn btn-sm btn-outline-secondary" th:disabled="${user.id == currentUserId}"
                       th:title="${user.id == currentUserId} ? 'You cannot disable your own account' : null"
                       th:text="${user.enabled} ? 'Disable' : 'Enable'"></button></form>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" th:data-bs-target="'#reset-' + ${user.id}">Reset password</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-ui-toggle="modal" th:data-ui-target="'#reset-' + ${user.id}">Reset password</button>
           </div></td>
         </tr>
         <tr th:if="${users.empty}"><td colspan="6" class="empty-state">No users.</td></tr></tbody>
@@ -61,10 +61,10 @@
       <div class="modal fade" th:each="user:${users}" th:id="'reset-' + ${user.id}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered"><form class="modal-content panel" method="post" th:action="@{/admin/users/{id}/password-reset(id=${user.id})}">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <div class="modal-header border-0"><h2 class="h5 modal-title">Reset password</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+          <div class="modal-header border-0"><h2 class="h5 modal-title">Reset password</h2><button type="button" class="btn-close" data-ui-dismiss="modal" aria-label="Close"></button></div>
           <div class="modal-body"><p class="text-secondary small">A temporary password for <strong th:text="${user.email}"></strong>. The user must replace it at the next sign-in.</p>
             <input class="form-control" type="text" name="temporaryPassword" required minlength="12" autocomplete="off" placeholder="At least 12 characters"></div>
-          <div class="modal-footer border-0"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Set password</button></div>
+          <div class="modal-footer border-0"><button type="button" class="btn btn-outline-secondary" data-ui-dismiss="modal">Cancel</button><button class="btn btn-primary">Set password</button></div>
         </form></div>
       </div>
 
@@ -77,7 +77,7 @@
           <div class="col-md-6"><label class="form-label" for="new-password">Temporary password</label><input class="form-control" id="new-password" type="text" name="temporaryPassword" required minlength="12" autocomplete="off">
             <div class="form-text">At least 12 characters — the change-password page enforces the same minimum.</div></div>
         </div>
-        <button class="btn btn-primary mt-4"><i class="bi bi-person-plus me-1"></i>Create user</button>
+        <button class="btn btn-primary mt-4">Create user</button>
       </form>
     </section>
 
@@ -121,7 +121,7 @@
           <td><span class="badge" th:classappend="${card.crate.status.name() == 'ACTIVE'} ? 'text-bg-success' : (${card.crate.status.name() == 'PURGE_FAILED'} ? 'text-bg-danger' : (${card.crate.status.name() == 'ARCHIVED'} ? 'text-bg-secondary' : 'text-bg-warning'))" th:text="${card.crate.status}"></span></td>
           <td th:text="${card.documents}"></td><td th:text="${card.sources}"></td><td th:text="${card.members}"></td>
           <td class="small text-secondary" th:text="${card.updatedOn()}"></td>
-          <td class="text-end"><button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="modal" th:data-bs-target="'#elevate-' + ${card.crate.id}">Elevate</button></td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-warning" type="button" data-ui-toggle="modal" th:data-ui-target="'#elevate-' + ${card.crate.id}">Elevate</button></td>
         </tr>
         <tr th:if="${cards.empty}"><td colspan="7" class="empty-state">No crates in this installation.</td></tr></tbody>
       </table></div>
@@ -129,11 +129,11 @@
       <div class="modal fade" th:each="card:${cards}" th:id="'elevate-' + ${card.crate.id}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered"><form class="modal-content panel" method="post" th:action="@{/admin/crates/{id}/elevations(id=${card.crate.id})}">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <div class="modal-header border-0"><h2 class="h5 modal-title">Elevate access</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+          <div class="modal-header border-0"><h2 class="h5 modal-title">Elevate access</h2><button type="button" class="btn-close" data-ui-dismiss="modal" aria-label="Close"></button></div>
           <div class="modal-body"><p class="text-secondary small">Owner-equivalent access to <strong th:text="${card.crate.name}"></strong> for 30 minutes. The reason is written to the crate's audit log.</p>
             <label class="form-label" th:for="'reason-' + ${card.crate.id}">Reason</label>
             <textarea class="form-control" th:id="'reason-' + ${card.crate.id}" name="reason" rows="3" required maxlength="1000"></textarea></div>
-          <div class="modal-footer border-0"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Start elevation</button></div>
+          <div class="modal-footer border-0"><button type="button" class="btn btn-outline-secondary" data-ui-dismiss="modal">Cancel</button><button class="btn btn-primary">Start elevation</button></div>
         </form></div>
       </div>
     </section>
@@ -159,14 +159,12 @@
             <td th:text="${message.stage}"></td><td class="font-monospace small" th:text="${message.id}"></td><td th:text="${message.attempts}"></td>
             <td class="text-end"><form method="post" th:action="@{/admin/queue/dead-letters/{id}/requeue(id=${message.id})}">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-              <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Requeue</button></form></td>
+              <button class="btn btn-sm btn-outline-secondary">Requeue</button></form></td>
           </tr>
           <tr th:if="${deadLetters.empty}"><td colspan="4" class="empty-state">No dead-lettered work.</td></tr></tbody></table>
         </div></div></div>
       </div>
     </section>
   </div>
-</main><script src="/webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script th:inline="none">
-(()=>{const tab=location.hash&&document.querySelector('[data-bs-target="'+location.hash+'"]');if(tab)bootstrap.Tab.getOrCreateInstance(tab).show()})();
-</script></body></html>
+</main>
+</body></html>

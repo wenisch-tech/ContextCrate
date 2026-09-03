@@ -48,6 +48,7 @@ public class UiController {
   private final DocumentDiffService documentDiffs;
   private final ChunkPropositionRepository chunkPropositions;
   private final ApiKeyService apiKeys;
+  private final CrateLiveViewService liveView;
 
   public UiController(
       SourceService sources,
@@ -68,7 +69,8 @@ public class UiController {
       SourceItemRepository sourceItems, CrateService crates, CrateAccessService access,
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
       PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs,
-      ChunkPropositionRepository chunkPropositions, ApiKeyService apiKeys) {
+      ChunkPropositionRepository chunkPropositions, ApiKeyService apiKeys,
+      CrateLiveViewService liveView) {
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -93,38 +95,29 @@ public class UiController {
     this.documentDiffs = documentDiffs;
     this.chunkPropositions = chunkPropositions;
     this.apiKeys = apiKeys;
+    this.liveView = liveView;
   }
 
   @ModelAttribute
   void crate(@PathVariable UUID crateId, Model model) {
     model.addAttribute("crate", crates.require(crateId, CrateMember.Role.VIEWER));
+    model.addAttribute("crateRole", access.require(crateId, CrateMember.Role.VIEWER));
     model.addAttribute("crates", crates.accessible());
     model.addAttribute("adminElevation", access.activeElevation(crateId).orElse(null));
     model.addAttribute("isAdmin", access.isAdmin());
+    model.addAttribute("currentUser", access.currentUser());
   }
 
   @GetMapping({"", "/"})
-  String dashboard(@PathVariable UUID crateId,@RequestParam(defaultValue = "") String q, Model model) throws Exception {
-    var allJobs = ingestion.allJobs(crateId);
-    model.addAttribute("sources", sources.list(crateId));
-    model.addAttribute("jobs", allJobs);
-    model.addAttribute("runs", ingestion.runs(crateId));
-    model.addAttribute(
-        "jobNames",
-        allJobs.stream()
-            .collect(java.util.stream.Collectors.toMap(IngestionJob::getId, IngestionJob::getName)));
+  String dashboard(@PathVariable UUID crateId, Model model) {
     model.addAttribute("properties", properties);
-    model.addAttribute("indexHealth", index.health(crateId));
-    model.addAttribute(
-        "queueDepth",
-        Arrays.stream(WorkStage.values())
-            .collect(java.util.stream.Collectors.toMap(Enum::name, queue::depth)));
-    model.addAttribute("documentCount", documents.findByCrateIdAndCurrentVersionTrue(crateId).size());
-        model.addAttribute("searchQuery", q);
-        model.addAttribute(
-          "searchResults",
-          q.isBlank() ? null : index.search(new SearchIndex.SearchRequest(crateId,q, 10, null, null, null)));
+    model.addAttribute("liveSnapshot", liveView.snapshot(crateId, null));
     return "dashboard";
+  }
+
+  @GetMapping("/chat")
+  String chat() {
+    return "chat";
   }
 
   @GetMapping("/sources")
@@ -373,6 +366,7 @@ public class UiController {
         sourceItems.countByRunIdAndStatus(
             id, tech.wenisch.contextcrate.domain.PipelineTypes.FrontierStatus.FAILED));
     model.addAttribute("pipelineWork", pipelineWork.findTop100ByCorrelationIdOrderByUpdatedAtDesc(id));
+    model.addAttribute("liveSnapshot", liveView.snapshot(crateId, id));
 
     return "run-details";
   }
@@ -424,9 +418,10 @@ public class UiController {
 
   @GetMapping("/documents")
   String docs(@PathVariable UUID crateId, @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "") String contentQ,
       @RequestParam(defaultValue = "created") String sort,
       @RequestParam(defaultValue = "desc") String direction,
-      @RequestParam(defaultValue = "0") int page, Model model) {
+      @RequestParam(defaultValue = "0") int page, Model model) throws Exception {
     var requestedSort = DocumentSort.from(sort);
     var requestedDirection = "asc".equalsIgnoreCase(direction)
         ? org.springframework.data.domain.Sort.Direction.ASC
@@ -435,6 +430,9 @@ public class UiController {
         PageRequest.of(Math.max(0, page), 50));
     model.addAttribute("documentPage", values);
     model.addAttribute("query", q);
+    model.addAttribute("contentQuery", contentQ);
+    model.addAttribute("searchResults", contentQ.isBlank() ? null
+        : index.search(new SearchIndex.SearchRequest(crateId, contentQ, 20, null, null, null)));
     model.addAttribute("sort", requestedSort.name().toLowerCase(Locale.ROOT));
     model.addAttribute("direction", requestedDirection.name().toLowerCase(Locale.ROOT));
     model.addAttribute("nextDirections", java.util.Map.of(
@@ -442,7 +440,8 @@ public class UiController {
         "uri", nextDirection(requestedSort, requestedDirection, DocumentSort.URI),
         "chunks", nextDirection(requestedSort, requestedDirection, DocumentSort.CHUNKS),
         "indexed", nextDirection(requestedSort, requestedDirection, DocumentSort.INDEXED)));
-    model.addAttribute("unindexedCount", documents.findByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId).size());
+    model.addAttribute("unindexedCount",
+        documents.countByCrateIdAndCurrentVersionTrueAndIndexedFalse(crateId));
     return "documents";
   }
 

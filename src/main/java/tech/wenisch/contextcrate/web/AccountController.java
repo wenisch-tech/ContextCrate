@@ -32,6 +32,7 @@ public class AccountController {
   @GetMapping("/account/api-keys")
   String apiKeys(Model model) {
     model.addAttribute("isAdmin", access.isAdmin());
+    model.addAttribute("currentUser", access.currentUser());
     model.addAttribute("keys", apiKeys.personalKeys(access.currentUser().getId()));
     return "account-api-keys";
   }

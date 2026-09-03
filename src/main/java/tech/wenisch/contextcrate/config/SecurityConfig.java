@@ -53,7 +53,7 @@ public class SecurityConfig {
       throws Exception {
     HttpSecurity security = http.authorizeHttpRequests(
             a ->
-                a.requestMatchers("/webjars/**", "/css/**", "/actuator/health/**")
+                a.requestMatchers("/css/**", "/js/**", "/img/**", "/actuator/health/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

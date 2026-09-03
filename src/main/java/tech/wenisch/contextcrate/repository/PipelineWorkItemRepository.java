@@ -2,6 +2,7 @@ package tech.wenisch.contextcrate.repository;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,11 @@ import tech.wenisch.contextcrate.domain.PipelineTypes.*;
 import tech.wenisch.contextcrate.domain.PipelineWorkItem;
 
 public interface PipelineWorkItemRepository extends JpaRepository<PipelineWorkItem, UUID> {
+  interface StageStatusCount {
+    WorkStage getStage();
+    WorkStatus getStatus();
+    long getTotal();
+  }
   boolean existsByStageAndIdempotencyKey(WorkStage stage, String idempotencyKey);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -34,8 +40,15 @@ public interface PipelineWorkItemRepository extends JpaRepository<PipelineWorkIt
   long countByCorrelationIdAndStatus(UUID correlationId, WorkStatus status);
 
   List<PipelineWorkItem> findTop100ByCorrelationIdOrderByUpdatedAtDesc(UUID correlationId);
+  List<PipelineWorkItem> findByCrateIdAndCorrelationIdInOrderByUpdatedAtDesc(
+      UUID crateId, Collection<UUID> correlationIds);
 
   List<PipelineWorkItem> findTop100ByStatusOrderByUpdatedAtDesc(WorkStatus status);
+
+  long countByCrateIdAndStatusIn(UUID crateId, Collection<WorkStatus> statuses);
+
+  @Query("select w.stage as stage, w.status as status, count(w) as total from PipelineWorkItem w where w.crateId=:crateId group by w.stage,w.status")
+  List<StageStatusCount> countsByCrate(@Param("crateId") UUID crateId);
 
   long deleteByCrateId(UUID crateId);
 }
