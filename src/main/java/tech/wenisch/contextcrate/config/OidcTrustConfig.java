@@ -83,8 +83,7 @@ public class OidcTrustConfig {
                       .clientSecret(registration.getClientSecret())
                       .clientName(
                           registration.getClientName() != null ? registration.getClientName() : id);
-              if (registration.getScope() != null && !registration.getScope().isEmpty())
-                builder.scope(registration.getScope());
+              builder.scope(OidcClientRegistrationRepository.scopes(registration.getScope()));
               registrations.add(builder.build());
             });
     return new InMemoryClientRegistrationRepository(registrations);

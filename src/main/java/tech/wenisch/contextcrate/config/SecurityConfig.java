@@ -13,6 +13,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
@@ -51,6 +52,7 @@ public class SecurityConfig {
       tech.wenisch.contextcrate.mcp.McpCrateAccessFilter mcpCrateAccess,
       AppUserRepository users, KeycloakOidcUserService oidcUsers,
       ObjectProvider<InsecureOidcHttpClients> insecureOidc,
+      ObjectProvider<ClientRegistrationRepository> clientRegistrations,
       @Value("${contextcrate.security.oidc.enabled:false}") boolean oidcEnabled)
       throws Exception {
     HttpSecurity security = http.authorizeHttpRequests(
@@ -81,6 +83,9 @@ public class SecurityConfig {
         .csrf(c -> c.ignoringRequestMatchers("/api/v1/**"));
     if (oidcEnabled)
       security.oauth2Login(o -> {
+        // Spring selects its OAuth2/OIDC authentication provider from the requested scopes.
+        // Normalize before authorization so openid also causes Spring to generate/validate nonce.
+        o.clientRegistrationRepository(new OidcClientRegistrationRepository(clientRegistrations.getObject()));
         o.loginPage("/login")
             .failureHandler((request, response, exception) -> {
               log.warn("OIDC login failed: {}", exception.getMessage());

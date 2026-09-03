@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -104,15 +105,23 @@ class OidcLoginIntegrationTest {
     });
     provider.start();
 
+    configureClient("profile,email", true);
+  }
+
+  private void configureClient(String scopes, boolean trustAll) {
+    if (context != null) context.close();
     context = new AnnotationConfigWebApplicationContext();
     context.setServletContext(new MockServletContext());
     TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
         "contextcrate.security.oidc.enabled=true",
-        "contextcrate.security.oidc.trust-all-certificates=true",
+        "contextcrate.security.oidc.trust-all-certificates=" + trustAll,
         "spring.security.oauth2.client.registration.keycloak.client-id=contextcrate",
         "spring.security.oauth2.client.registration.keycloak.client-secret=test-secret",
-        "spring.security.oauth2.client.registration.keycloak.scope=openid,profile,email",
         "spring.security.oauth2.client.provider.keycloak.issuer-uri=" + issuer);
+    if (scopes != null) TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+        "spring.security.oauth2.client.registration.keycloak.scope=" + scopes);
+    if (!trustAll) context.register(
+        org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration.class);
     context.register(LoginTestConfiguration.class);
     context.refresh();
     mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(new ForwardedHeaderFilter())
@@ -135,7 +144,9 @@ class OidcLoginIntegrationTest {
         .build().getQueryParams();
     assertThat(parameters.getFirst("redirect_uri"))
         .isEqualTo("https://harvex.example.com/login/oauth2/code/keycloak");
-    idToken = signedIdToken(UriUtils.decode(parameters.getFirst("nonce"), StandardCharsets.UTF_8), admin);
+    // Let the pre-fix request reach its callback even when it incorrectly omitted an OIDC nonce.
+    String nonce = parameters.getFirst("nonce");
+    idToken = signedIdToken(nonce == null ? "missing-nonce" : UriUtils.decode(nonce, StandardCharsets.UTF_8), admin);
     var session = (MockHttpSession) login.getRequest().getSession(false);
 
     mvc.perform(get("/login/oauth2/code/keycloak").session(session)
@@ -156,6 +167,26 @@ class OidcLoginIntegrationTest {
     assertThat(saved.getValue().getEmail()).isEqualTo("oidc@example.com");
     assertThat(saved.getValue().getRole()).isEqualTo(admin ? "ADMIN" : "USER");
     assertThat(userInfoRequests.get()).isZero();
+  }
+
+  @Test
+  void authorizationAlwaysRequestsOidcScopesAndNonce() throws Exception {
+    var login = mvc.perform(get("/oauth2/authorization/keycloak")).andReturn();
+    var parameters = UriComponentsBuilder.fromUriString(login.getResponse().getRedirectedUrl())
+        .build().getQueryParams();
+    assertThat(UriUtils.decode(parameters.getFirst("scope"), StandardCharsets.UTF_8).split(" "))
+        .contains("openid", "profile", "email");
+    assertThat(parameters.getFirst("nonce")).isNotBlank();
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {"true|", "false|", "true|profile,email,roles", "false|profile,email,roles",
+      "true|openid,profile,email", "false|openid,profile,email"}, delimiter = '|')
+  void callbackUsesOidcWithDefaultOrCustomScopesInBothTlsModes(boolean trustAll, String scopes)
+      throws Exception {
+    configureClient(scopes, trustAll);
+    authorizationAlwaysRequestsOidcScopesAndNonce();
+    callbackAuthenticatesAndSynchronizesLocalRoleWithoutCallingForbiddenUserInfo(true);
   }
 
   @Test

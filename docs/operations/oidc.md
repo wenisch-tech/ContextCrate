@@ -10,7 +10,10 @@ memberships remain managed by ContextCrate.
 ## Keycloak realm
 
 Create a realm and a confidential OIDC client. The client must use the authorization-code flow and
-request `openid`, `profile`, and `email`. Configure the exact callback URL:
+request `openid`, `profile`, and `email`. ContextCrate always includes these required scopes,
+even when the scope setting is absent or only lists additional scopes. This matches Kairos and
+keeps Spring Security on its OIDC path, including signed ID token and nonce validation.
+Configure the exact callback URL:
 
 ```text
 https://app.example.com/login/oauth2/code/keycloak
