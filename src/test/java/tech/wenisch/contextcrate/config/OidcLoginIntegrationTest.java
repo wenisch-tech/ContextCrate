@@ -40,8 +40,6 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.support.TestPropertySourceUtils;
@@ -70,6 +68,10 @@ class OidcLoginIntegrationTest {
   private String issuer;
   private volatile String idToken;
   private volatile boolean rejectCode;
+  private volatile String userInfoEmail = "oidc@example.com";
+  private volatile String userInfoUsername;
+  private volatile String idTokenEmail = "oidc@example.com";
+  private volatile String idTokenUsername;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -98,7 +100,11 @@ class OidcLoginIntegrationTest {
         reply(exchange, 401, Map.of("error", "invalid_token"));
         return;
       }
-      reply(exchange, 200, Map.of("sub", "keycloak-user", "email", "oidc@example.com"));
+      var claims = new java.util.LinkedHashMap<String, Object>();
+      claims.put("sub", "keycloak-user");
+      if (userInfoEmail != null) claims.put("email", userInfoEmail);
+      if (userInfoUsername != null) claims.put("preferred_username", userInfoUsername);
+      reply(exchange, 200, claims);
     });
     provider.start();
 
@@ -164,23 +170,47 @@ class OidcLoginIntegrationTest {
 
     mvc.perform(get("/login/oauth2/code/keycloak").session(session)
             .param("code", "expired-code").param("state", UriUtils.decode(state, StandardCharsets.UTF_8)))
-        .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login?error"));
+        .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login?oidcError"));
 
     assertThat(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY))
         .isNull();
-    assertThat(session.getAttribute(WebAttributes.AUTHENTICATION_EXCEPTION))
-        .isInstanceOfSatisfying(OAuth2AuthenticationException.class, exception ->
-            assertThat(exception.getError().getErrorCode()).isEqualTo("invalid_grant"));
     verifyNoInteractions(context.getBean(AppUserRepository.class));
+  }
+
+  @Test
+  void callbackCreatesUserFromPreferredUsernameWhenEmailIsAbsent() throws Exception {
+    userInfoEmail = null;
+    userInfoUsername = "keycloak-user";
+    idTokenEmail = null;
+    idTokenUsername = "keycloak-user";
+    var login = mvc.perform(get("/oauth2/authorization/keycloak")).andReturn();
+    var parameters = UriComponentsBuilder.fromUriString(login.getResponse().getRedirectedUrl())
+        .build().getQueryParams();
+    idToken = signedIdToken(UriUtils.decode(parameters.getFirst("nonce"), StandardCharsets.UTF_8), false);
+    var session = (MockHttpSession) login.getRequest().getSession(false);
+
+    mvc.perform(get("/login/oauth2/code/keycloak").session(session).param("code", "test-code")
+            .param("state", UriUtils.decode(parameters.getFirst("state"), StandardCharsets.UTF_8)))
+        .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/"));
+
+    var security = (SecurityContext) session.getAttribute(
+        HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+    assertThat(security.getAuthentication().getName()).isEqualTo("keycloak-user");
+    var saved = ArgumentCaptor.forClass(AppUser.class);
+    verify(context.getBean(AppUserRepository.class)).save(saved.capture());
+    assertThat(saved.getValue().getEmail()).isEqualTo("keycloak-user");
+    assertThat(saved.getValue().getRole()).isEqualTo("USER");
   }
 
   private String signedIdToken(String nonce, boolean admin) throws JOSEException {
     Instant now = Instant.now();
-    var claims = new JWTClaimsSet.Builder().issuer(issuer).subject("keycloak-user")
+    var builder = new JWTClaimsSet.Builder().issuer(issuer).subject("keycloak-user")
         .audience("contextcrate").issueTime(Date.from(now)).expirationTime(Date.from(now.plusSeconds(300)))
-        .claim("nonce", nonce).claim("email", "oidc@example.com")
-        .claim("realm_access", Map.of("roles", List.of(admin ? "ContextCrate_Admin" : "user")))
-        .build();
+        .claim("nonce", nonce)
+        .claim("realm_access", Map.of("roles", List.of(admin ? "ContextCrate_Admin" : "user")));
+    if (idTokenEmail != null) builder.claim("email", idTokenEmail);
+    if (idTokenUsername != null) builder.claim("preferred_username", idTokenUsername);
+    var claims = builder.build();
     var jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signingKey.getKeyID()).build(), claims);
     jwt.sign(new RSASSASigner(signingKey));
     return jwt.serialize();

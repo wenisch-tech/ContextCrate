@@ -13,6 +13,7 @@
   <h1 class="h3 text-center">Welcome to ContextCrate</h1>
   <p class="text-secondary text-center mb-4">Crawl, normalize, and index the web you care about.</p>
   <div th:if="${param.error}" class="alert alert-danger">The email or password is incorrect.</div>
+  <div th:if="${param.oidcError}" class="alert alert-danger">Keycloak sign-in failed. Please contact an administrator.</div>
   <div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div>
   <form method="post" action="/login"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
     <div class="mb-3"><label class="form-label" for="username">Email</label><input id="username" class="form-control form-control-lg" name="username" type="email" autofocus required></div>

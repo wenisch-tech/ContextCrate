@@ -1,6 +1,8 @@
 package tech.wenisch.contextcrate.config;
 
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.*;
@@ -24,6 +26,7 @@ import tech.wenisch.contextcrate.domain.*;
 
 @Configuration
 public class SecurityConfig {
+  private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
   @Bean
   PasswordEncoder passwordEncoder() {
     return PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -79,7 +82,12 @@ public class SecurityConfig {
         .csrf(c -> c.ignoringRequestMatchers("/api/v1/**"));
     if (oidcEnabled)
       security.oauth2Login(o -> {
-        o.loginPage("/login").userInfoEndpoint(u -> u.oidcUserService(oidcUsers));
+        o.loginPage("/login")
+            .failureHandler((request, response, exception) -> {
+              log.warn("OIDC login failed: {}", exception.getMessage());
+              response.sendRedirect("/login?oidcError");
+            })
+            .userInfoEndpoint(u -> u.oidcUserService(oidcUsers));
         insecureOidc.ifAvailable(insecure -> {
           var userInfoService = new DefaultOAuth2UserService();
           userInfoService.setRestOperations(insecure.restOperations());

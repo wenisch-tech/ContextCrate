@@ -7,6 +7,7 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
 import org.springframework.stereotype.Service;
 import tech.wenisch.contextcrate.domain.AppUser;
@@ -25,27 +26,39 @@ public class KeycloakOidcUserService extends OidcUserService {
   @Override
   public OidcUser loadUser(OidcUserRequest request) {
     OidcUser oidcUser = super.loadUser(request);
-    String email = email(oidcUser.getClaims());
+    String identifier = identifier(oidcUser.getClaims());
     boolean admin = hasContextCrateAdminRole(oidcUser.getClaims());
-    AppUser user = users.findByEmailIgnoreCase(email)
-        .orElseGet(() -> new AppUser(UUID.randomUUID(), email, "{noop}oidc", "USER", false));
+    AppUser user = users.findByEmailIgnoreCase(identifier)
+        .orElseGet(() -> new AppUser(UUID.randomUUID(), identifier, "{noop}oidc", "USER", false));
     user.role(admin ? "ADMIN" : "USER");
     users.save(user);
 
     Set<GrantedAuthority> authorities = new LinkedHashSet<>(oidcUser.getAuthorities());
-    authorities.add(new OAuth2UserAuthority(oidcUser.getClaims()));
+    Map<String, Object> claims = new LinkedHashMap<>(oidcUser.getClaims());
+    // The local user model identifies users by its email field. Give the OIDC principal the same
+    // stable name when Keycloak supplied preferred_username instead of an email address.
+    if (stringClaim(claims, "email") == null) claims.put("email", identifier);
+    authorities.add(new OAuth2UserAuthority(claims));
     authorities.add(new SimpleGrantedAuthority(admin ? "ROLE_ADMIN" : "ROLE_USER"));
-    return new DefaultOidcUser(authorities, oidcUser.getIdToken(), oidcUser.getUserInfo(), "email");
+    return new DefaultOidcUser(authorities, oidcUser.getIdToken(), new OidcUserInfo(claims), "email");
   }
 
   static boolean hasContextCrateAdminRole(Map<String, Object> claims) {
     return roles(claims).stream().anyMatch(ADMIN_ROLE::equalsIgnoreCase);
   }
 
-  private static String email(Map<String, Object> claims) {
-    Object value = claims.get("email");
-    if (value instanceof String email && !email.isBlank()) return email;
-    throw new IllegalArgumentException("OIDC provider did not supply an email claim");
+  static String identifier(Map<String, Object> claims) {
+    String email = stringClaim(claims, "email");
+    if (email != null) return email;
+    String username = stringClaim(claims, "preferred_username");
+    if (username != null) return username;
+    throw new IllegalArgumentException(
+        "OIDC provider did not supply an email or preferred_username claim");
+  }
+
+  private static String stringClaim(Map<String, Object> claims, String name) {
+    Object value = claims.get(name);
+    return value instanceof String text && !text.isBlank() ? text.trim() : null;
   }
 
   @SuppressWarnings("unchecked")

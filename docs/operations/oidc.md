@@ -2,7 +2,9 @@
 
 ContextCrate supports OpenID Connect login through Spring Security. On a successful OIDC login,
 ContextCrate creates the local application account if it does not already exist, using the verified
-`email` claim as its identity. Local crate memberships remain managed by ContextCrate.
+`email` claim as its identity. If Keycloak does not supply email, it uses `preferred_username`.
+That username must be unique and stable: changing it creates a separate local account. Local crate
+memberships remain managed by ContextCrate.
 
 ## Keycloak realm
 
@@ -85,8 +87,8 @@ security:
 
 Create a Keycloak role named exactly `ContextCrate_Admin` and assign it to a user. ContextCrate
 reads realm roles, client roles, and a top-level `roles` claim on every login. A user holding that
-role is synchronized to ContextCrate's global `ADMIN` role; without it the user is synchronized
-to `USER`.
+role is synchronized to ContextCrate's global `ADMIN` role and active session; without it the user
+is synchronized to `USER` on their next login.
 
 Global administrators still need a crate membership, or a temporary audited administrator
 elevation, to read or modify crate content. This preserves ContextCrate's crate isolation model.
