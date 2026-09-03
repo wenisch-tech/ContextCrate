@@ -45,4 +45,15 @@ class FrontendMigrationTest {
     assertThat(css).contains(".stretched-link", "absolute inset-0", "html[data-theme=\"light\"]");
     assertThat(javascript).contains("applyTheme", "document.documentElement.dataset.theme");
   }
+
+  @Test
+  void sourcePagesExposeCurrentCorpusAndPreserveDocumentSourceFilters() throws IOException {
+    assertThat(Files.readString(Path.of("src/main/resources/templates/sources.html")))
+        .contains("summary.documents", "summary.chunks", "summary.latestRun", "sourceId=${source.id}");
+    assertThat(Files.readString(Path.of("src/main/resources/templates/source-details.html")))
+        .contains("Last run", "latestRuns.get(job.id)", "Not run yet");
+    assertThat(Files.readString(Path.of("src/main/resources/templates/documents.html")))
+        .contains("name=\"sourceId\"", "id=\"source-filter\"", "availableSources", "source.id == sourceId",
+            "All sources", "filteredSource", "Clear source filter", "sourceId=${sourceId}");
+  }
 }

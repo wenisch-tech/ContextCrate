@@ -147,7 +147,7 @@ class McpToolsTest {
     when(document.getId()).thenReturn(UUID.randomUUID());
     when(document.getTitle()).thenReturn("Guide");
     when(document.getSourceUri()).thenReturn("https://example.com/g");
-    when(documents.findCurrentPage(any(), any(), any(), any(), any()))
+    when(documents.findCurrentPage(any(), any(), any(), any(), any(), any()))
         .thenReturn(new PageImpl<>(List.of(new DocumentListRow(document, 4L)),
             PageRequest.of(0, 25, Sort.Direction.DESC, "createdAt"), 137L));
 

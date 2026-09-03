@@ -204,7 +204,7 @@ public class McpTools {
     int offset = Math.max(0, integer(arguments, "offset", 0));
     String query = text(arguments, "query");
 
-    var page = documents.findCurrentPage(crate.getId(), query, DocumentSort.CREATED, Sort.Direction.DESC,
+    var page = documents.findCurrentPage(crate.getId(), query, null, DocumentSort.CREATED, Sort.Direction.DESC,
         PageRequest.of(offset / limit, limit));
     long total = page.getTotalElements();
 

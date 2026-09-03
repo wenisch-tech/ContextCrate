@@ -122,8 +122,7 @@ public class UiController {
 
   @GetMapping("/sources")
   String sourceList(@PathVariable UUID crateId, Model model) {
-    model.addAttribute("sources", sources.list(crateId));
-    model.addAttribute("sourceService", sources);
+    model.addAttribute("sourceSummaries", sources.summaries(crateId));
     model.addAttribute("sourceCodec", sourceCodec);
     return "sources";
   }
@@ -152,7 +151,9 @@ public class UiController {
     model.addAttribute("source", source);
     model.addAttribute("sourceConfig", sourceCodec.read(source.getConfigurationJson(),
         source.getConnectorType()).withoutSecrets());
-    model.addAttribute("jobs", ingestion.jobs(crateId, sourceId));
+    var jobs = ingestion.jobs(crateId, sourceId);
+    model.addAttribute("jobs", jobs);
+    model.addAttribute("latestRuns", ingestion.latestRunsByJob(crateId, jobs));
     model.addAttribute("ingestionCodec", ingestionCodec);
     return "source-details";
   }
@@ -419,6 +420,7 @@ public class UiController {
   @GetMapping("/documents")
   String docs(@PathVariable UUID crateId, @RequestParam(defaultValue = "") String q,
       @RequestParam(defaultValue = "") String contentQ,
+      @RequestParam(required = false) UUID sourceId,
       @RequestParam(defaultValue = "created") String sort,
       @RequestParam(defaultValue = "desc") String direction,
       @RequestParam(defaultValue = "0") int page, Model model) throws Exception {
@@ -426,11 +428,15 @@ public class UiController {
     var requestedDirection = "asc".equalsIgnoreCase(direction)
         ? org.springframework.data.domain.Sort.Direction.ASC
         : org.springframework.data.domain.Sort.Direction.DESC;
-    var values = documents.findCurrentPage(crateId, q, requestedSort, requestedDirection,
+    var filteredSource = sourceId == null ? null : sources.require(crateId, sourceId);
+    var values = documents.findCurrentPage(crateId, q, sourceId, requestedSort, requestedDirection,
         PageRequest.of(Math.max(0, page), 50));
     model.addAttribute("documentPage", values);
     model.addAttribute("query", q);
     model.addAttribute("contentQuery", contentQ);
+    model.addAttribute("sourceId", sourceId);
+    model.addAttribute("filteredSource", filteredSource);
+    model.addAttribute("availableSources", sources.list(crateId));
     model.addAttribute("searchResults", contentQ.isBlank() ? null
         : index.search(new SearchIndex.SearchRequest(crateId, contentQ, 20, null, null, null)));
     model.addAttribute("sort", requestedSort.name().toLowerCase(Locale.ROOT));
@@ -491,6 +497,7 @@ public class UiController {
   String retryUnindexedDocuments(@PathVariable UUID crateId,
       @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "created") String sort,
       @RequestParam(defaultValue = "desc") String direction,
+      @RequestParam(required = false) UUID sourceId,
       @RequestParam(defaultValue = "0") int page, RedirectAttributes redirect) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
     int queued = indexRecovery.enqueueMissing(crateId);
@@ -500,6 +507,7 @@ public class UiController {
     redirect.addAttribute("q", q);
     redirect.addAttribute("sort", sort);
     redirect.addAttribute("direction", direction);
+    if (sourceId != null) redirect.addAttribute("sourceId", sourceId);
     redirect.addAttribute("page", Math.max(0, page));
     return "redirect:/crates/" + crateId + "/documents";
   }

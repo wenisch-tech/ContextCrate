@@ -140,6 +140,15 @@ public class IngestionService {
   public List<IngestionRun> runs(UUID crateId) {
     return runs.findTop20ByCrateIdOrderByStartedAtDesc(crateId);
   }
+
+  public Map<UUID, IngestionRun> latestRunsByJob(UUID crateId, List<IngestionJob> values) {
+    if (values.isEmpty()) return Map.of();
+    return runs.findLatestByIngestionJobIdIn(crateId,
+        values.stream().map(IngestionJob::getId).toList()).stream()
+        .collect(java.util.stream.Collectors.toMap(IngestionRun::getIngestionJobId, value -> value,
+            (first, ignored) -> first));
+  }
+
   public IngestionRun requireRun(UUID crateId, UUID id) {
     return runs.findByIdAndCrateId(id, crateId).orElseThrow();
   }

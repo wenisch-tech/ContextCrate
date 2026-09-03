@@ -12,6 +12,12 @@ import tech.wenisch.contextcrate.domain.NormalizedDocument;
 
 public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDocument, UUID>,
     NormalizedDocumentRepositoryCustom {
+  interface SourceContentCount {
+    UUID getSourceId();
+    long getDocuments();
+    long getChunks();
+  }
+
   Optional<NormalizedDocument> findByRunIdAndSourceUri(UUID runId, String sourceUri);
 
   Optional<NormalizedDocument> findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
@@ -43,4 +49,12 @@ public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDo
       where d.currentVersion = true and d.crateId in :crateIds group by d.crateId
       """)
   List<CrateCount> countCurrentByCrate(@Param("crateIds") Collection<UUID> crateIds);
+
+  @Query(
+      "select d.sourceId as sourceId, count(distinct d) as documents, count(c) as chunks "
+          + "from NormalizedDocument d left join DocumentChunk c on c.documentId = d.id "
+          + "where d.crateId = :crateId and d.currentVersion = true and d.sourceId in :sourceIds "
+          + "group by d.sourceId")
+  List<SourceContentCount> countCurrentContentBySource(@Param("crateId") UUID crateId,
+      @Param("sourceIds") Collection<UUID> sourceIds);
 }

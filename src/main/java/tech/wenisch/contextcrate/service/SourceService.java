@@ -10,13 +10,18 @@ import tech.wenisch.contextcrate.repository.*;
 public class SourceService {
   private final SourceRepository sources;
   private final IngestionJobRepository jobs;
+  private final NormalizedDocumentRepository documents;
+  private final IngestionRunRepository runs;
   private final SourceConfigurationCodec codec;
   private final AuditLogRepository audits;
 
   public SourceService(SourceRepository sources, IngestionJobRepository jobs,
+      NormalizedDocumentRepository documents, IngestionRunRepository runs,
       SourceConfigurationCodec codec, AuditLogRepository audits) {
     this.sources = sources;
     this.jobs = jobs;
+    this.documents = documents;
+    this.runs = runs;
     this.codec = codec;
     this.audits = audits;
   }
@@ -53,6 +58,31 @@ public class SourceService {
   public long jobCount(UUID sourceId) {
     return jobs.countBySourceId(sourceId);
   }
+
+  @Transactional(readOnly = true)
+  public List<SourceSummary> summaries(UUID crateId) {
+    List<Source> values = list(crateId);
+    if (values.isEmpty()) return List.of();
+    List<UUID> ids = values.stream().map(Source::getId).toList();
+    Map<UUID, Long> jobCounts = jobs.countBySource(crateId, ids).stream()
+        .collect(java.util.stream.Collectors.toMap(IngestionJobRepository.SourceJobCount::getSourceId,
+            IngestionJobRepository.SourceJobCount::getJobs));
+    Map<UUID, NormalizedDocumentRepository.SourceContentCount> content = documents
+        .countCurrentContentBySource(crateId, ids).stream().collect(java.util.stream.Collectors.toMap(
+            NormalizedDocumentRepository.SourceContentCount::getSourceId, value -> value));
+    Map<UUID, IngestionRun> latestRuns = runs.findLatestBySourceIdIn(crateId, ids).stream()
+        .collect(java.util.stream.Collectors.toMap(IngestionRun::getSourceId, value -> value,
+            (first, ignored) -> first));
+    return values.stream().map(source -> {
+      var counts = content.get(source.getId());
+      return new SourceSummary(source, jobCounts.getOrDefault(source.getId(), 0L),
+          counts == null ? 0 : counts.getDocuments(), counts == null ? 0 : counts.getChunks(),
+          latestRuns.get(source.getId()));
+    }).toList();
+  }
+
+  public record SourceSummary(Source source, long jobs, long documents, long chunks,
+      IngestionRun latestRun) {}
 
   private static void validate(ConnectorType type, SourceConfiguration config) {
     if (config == null) throw new IllegalArgumentException("configuration is required");

@@ -6,6 +6,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 public interface NormalizedDocumentRepositoryCustom {
-  Page<DocumentListRow> findCurrentPage(UUID crateId, String query, DocumentSort sort,
-      Sort.Direction direction, Pageable pageable);
+  Page<DocumentListRow> findCurrentPage(UUID crateId, String query, UUID sourceId,
+      DocumentSort sort, Sort.Direction direction, Pageable pageable);
 }

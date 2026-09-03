@@ -24,12 +24,12 @@ class NormalizedDocumentRepositoryImpl implements NormalizedDocumentRepositoryCu
   @PersistenceContext private EntityManager entityManager;
 
   @Override
-  public Page<DocumentListRow> findCurrentPage(UUID crateId, String query, DocumentSort sort,
-      Sort.Direction direction, Pageable pageable) {
+  public Page<DocumentListRow> findCurrentPage(UUID crateId, String query, UUID sourceId,
+      DocumentSort sort, Sort.Direction direction, Pageable pageable) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<NormalizedDocument> contentQuery = cb.createQuery(NormalizedDocument.class);
     Root<NormalizedDocument> document = contentQuery.from(NormalizedDocument.class);
-    Predicate filter = filter(cb, document, crateId, query);
+    Predicate filter = filter(cb, document, crateId, query, sourceId);
     contentQuery.where(filter);
     Expression<?> order = order(cb, contentQuery, document, sort);
     contentQuery.orderBy(direction.isAscending() ? cb.asc(order) : cb.desc(order), cb.asc(document.get("id")));
@@ -38,7 +38,7 @@ class NormalizedDocumentRepositoryImpl implements NormalizedDocumentRepositoryCu
 
     CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
     Root<NormalizedDocument> counted = countQuery.from(NormalizedDocument.class);
-    countQuery.select(cb.count(counted)).where(filter(cb, counted, crateId, query));
+    countQuery.select(cb.count(counted)).where(filter(cb, counted, crateId, query, sourceId));
     long total = entityManager.createQuery(countQuery).getSingleResult();
     var ids = documents.stream().map(NormalizedDocument::getId).toList();
     var counts = ids.isEmpty() ? java.util.Map.<UUID, Long>of()
@@ -53,10 +53,11 @@ class NormalizedDocumentRepositoryImpl implements NormalizedDocumentRepositoryCu
   }
 
   private static Predicate filter(CriteriaBuilder cb, Root<NormalizedDocument> document,
-      UUID crateId, String query) {
+      UUID crateId, String query, UUID sourceId) {
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(cb.equal(document.get("crateId"), crateId));
     predicates.add(cb.isTrue(document.get("currentVersion")));
+    if (sourceId != null) predicates.add(cb.equal(document.get("sourceId"), sourceId));
     if (query != null && !query.isBlank()) {
       String pattern = "%" + query.trim().toLowerCase(java.util.Locale.ROOT) + "%";
       predicates.add(cb.or(
