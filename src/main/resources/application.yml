@@ -118,6 +118,8 @@ contextcrate:
   tls:
     trust-all-certificates: ${CONTEXTCRATE_TLS_TRUST_ALL_CERTIFICATES:false}
 server:
+  # Build external URLs, including the OIDC callback, from headers set by the TLS-terminating proxy.
+  forward-headers-strategy: framework
   error:
     include-message: always
 ---

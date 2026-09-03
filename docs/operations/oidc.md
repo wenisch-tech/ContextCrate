@@ -40,6 +40,14 @@ spring:
 The login page exposes **Sign in with Keycloak** at
 `/oauth2/authorization/keycloak`.
 
+## HTTPS reverse proxies
+
+ContextCrate automatically uses standard forwarded headers when deriving its public URL. This makes
+the callback URL HTTPS when TLS terminates at an ingress or reverse proxy. Ensure the proxy sends
+`X-Forwarded-Proto`, `X-Forwarded-Host`, and, when needed, `X-Forwarded-Port`; Kubernetes ingress
+controllers normally provide these headers. Do not expose the application directly to untrusted
+clients that can supply those headers themselves.
+
 ## Self-signed or internal CA certificates
 
 If the issuer is served with a certificate ContextCrate's JVM does not already trust (common for
