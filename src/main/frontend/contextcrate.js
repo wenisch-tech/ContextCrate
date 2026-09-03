@@ -42,6 +42,7 @@ Alpine.data('wizard', (steps = 5, initial = 1) => ({
   step: Math.min(Math.max(Number(initial) || 1, 1), steps),
   steps,
   authMethod: 'NONE',
+  jobMode: 'SCHEDULED',
   next() {
     const panel = this.$root.querySelector(`[data-step="${this.step}"]`);
     const invalid = panel?.querySelector(':invalid') || [...this.$root.querySelectorAll(':invalid')].find(field => field.offsetParent !== null);
