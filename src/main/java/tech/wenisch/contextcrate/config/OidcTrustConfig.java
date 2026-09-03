@@ -9,12 +9,15 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.converter.FormHttpMessageConverter;
+import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -38,7 +41,15 @@ public class OidcTrustConfig {
     HttpClient httpClient = HttpClient.newBuilder().sslContext(InsecureSsl.trustAllContext()).build();
     JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
     RestTemplate restTemplate = new RestTemplate(requestFactory);
-    RestClient restClient = RestClient.builder().requestFactory(requestFactory).build();
+    // Replacing the token client's RestClient must preserve Spring Security's OAuth converters.
+    RestClient restClient = RestClient.builder()
+        .requestFactory(requestFactory)
+        .configureMessageConverters(converters -> {
+          converters.addCustomConverter(new FormHttpMessageConverter());
+          converters.addCustomConverter(new OAuth2AccessTokenResponseHttpMessageConverter());
+        })
+        .defaultStatusHandler(new OAuth2ErrorResponseErrorHandler())
+        .build();
     return new InsecureOidcHttpClients(restTemplate, restClient);
   }
 
