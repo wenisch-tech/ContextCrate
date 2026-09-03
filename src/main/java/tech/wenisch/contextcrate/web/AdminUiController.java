@@ -54,6 +54,11 @@ public class AdminUiController {
     model.addAttribute("cards", overview.all());
     model.addAttribute("systemSetting", administration.systemSetting());
     model.addAttribute("creationModes", SystemSetting.CrateCreationMode.values());
+    model.addAttribute("timeZones", List.of("UTC", "Europe/London", "Europe/Berlin", "Europe/Paris",
+        "Europe/Moscow", "Africa/Cairo", "Africa/Johannesburg", "America/New_York",
+        "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Sao_Paulo",
+        "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Tokyo", "Asia/Shanghai",
+        "Australia/Sydney", "Pacific/Auckland"));
     model.addAttribute("properties", properties);
     model.addAttribute("queueDepth", depths);
     model.addAttribute("deadLetters", queue.deadLetters());
@@ -98,6 +103,12 @@ public class AdminUiController {
   String crateCreation(@RequestParam SystemSetting.CrateCreationMode mode) {
     administration.crateCreationMode(mode);
     return "redirect:/admin?policySaved#policies";
+  }
+
+  @PostMapping("/settings/time-zone")
+  String timeZone(@RequestParam String timeZone) {
+    administration.timeZone(timeZone);
+    return "redirect:/admin?timeZoneSaved#policies";
   }
 
   @PostMapping("/crates/{crateId}/elevations")

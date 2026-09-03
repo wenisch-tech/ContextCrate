@@ -40,10 +40,20 @@ public class IngestionService {
   @Transactional
   public IngestionJob create(UUID crateId, UUID sourceId, String name,
       IngestionConfiguration configuration) {
+    return create(crateId, sourceId, name, configuration, IngestionJobMode.SCHEDULED,
+        "0 7 * * *");
+  }
+
+  @Transactional
+  public IngestionJob create(UUID crateId, UUID sourceId, String name,
+      IngestionConfiguration configuration, IngestionJobMode mode, String cronExpression) {
     Source source = requireSource(crateId, sourceId);
     validate(source, configuration);
-    IngestionJob job = jobs.save(new IngestionJob(UUID.randomUUID(), crateId, sourceId, name,
-        jobCodec.write(configuration)));
+    validateSchedule(mode, cronExpression);
+    IngestionJob job = new IngestionJob(UUID.randomUUID(), crateId, sourceId, name,
+        jobCodec.write(configuration));
+    job.update(name, job.getConfigurationJson(), true, mode, normalizedCron(mode, cronExpression));
+    job = jobs.save(job);
     audits.save(new AuditLog(crateId, actor(), "INGESTION_JOB_CREATED", job.getId().toString(),
         "Created ingestion job " + name));
     return job;
@@ -52,12 +62,22 @@ public class IngestionService {
   @Transactional
   public IngestionJob update(UUID crateId, UUID sourceId, UUID id, String name,
       IngestionConfiguration configuration, boolean enabled) {
+    IngestionJob existing = requireJob(crateId, sourceId, id);
+    return update(crateId, sourceId, id, name, configuration, enabled, existing.getMode(),
+        existing.getCronExpression());
+  }
+
+  @Transactional
+  public IngestionJob update(UUID crateId, UUID sourceId, UUID id, String name,
+      IngestionConfiguration configuration, boolean enabled, IngestionJobMode mode,
+      String cronExpression) {
     Source source = requireSource(crateId, sourceId);
     IngestionJob job = requireJob(crateId, sourceId, id);
     IngestionConfiguration retained = retainSecrets(source.getConnectorType(),
         jobCodec.read(job.getConfigurationJson(), source.getConnectorType()), configuration);
     validate(source, retained);
-    job.update(name, jobCodec.write(retained), enabled);
+    validateSchedule(mode, cronExpression);
+    job.update(name, jobCodec.write(retained), enabled, mode, normalizedCron(mode, cronExpression));
     return jobs.save(job);
   }
 
@@ -131,6 +151,7 @@ public class IngestionService {
   public List<IngestionJob> allJobs(UUID crateId) {
     return jobs.findByCrateIdOrderByCreatedAtDesc(crateId);
   }
+  public List<IngestionJob> scheduledJobs() { return jobs.findByMode(IngestionJobMode.SCHEDULED); }
   public IngestionJob requireJob(UUID crateId, UUID sourceId, UUID id) {
     return jobs.findByIdAndSourceIdAndCrateId(id, sourceId, crateId).orElseThrow();
   }
@@ -181,6 +202,16 @@ public class IngestionService {
     } else if (config.git() == null) {
       throw new IllegalArgumentException("git configuration is required");
     }
+  }
+
+  private static void validateSchedule(IngestionJobMode mode, String cronExpression) {
+    if (mode == null) throw new IllegalArgumentException("Ingestion job mode is required");
+    if (mode == IngestionJobMode.SCHEDULED) IngestionSchedule.parse(cronExpression);
+    else if (cronExpression != null && !cronExpression.isBlank())
+      throw new IllegalArgumentException("Manual ingestion jobs cannot have a cron expression");
+  }
+  private static String normalizedCron(IngestionJobMode mode, String cronExpression) {
+    return mode == IngestionJobMode.SCHEDULED ? cronExpression.trim().replaceAll("\\s+", " ") : null;
   }
 
   private static IngestionConfiguration retainSecrets(ConnectorType type,

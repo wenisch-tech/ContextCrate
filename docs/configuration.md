@@ -14,6 +14,11 @@ Local queue and file-backed H2 require `role=all`. Lucene requires a singleton i
 
 ## Sources and ingestion jobs
 
+Ingestion jobs can be **Manual** or **Scheduled**. Scheduled jobs use a five-field cron expression
+and the city-based IANA time zone selected by an administrator in **Administration → Policies**.
+The default is `UTC`; daylight-saving changes follow the selected city. A scheduled occurrence is
+skipped when that job already has a running ingestion run, and missed occurrences are not replayed.
+
 A source owns its endpoint and credentials. Multiple ingestion jobs can reuse the source with
 different scopes, refs, path filters, limits, and normalization settings.
 

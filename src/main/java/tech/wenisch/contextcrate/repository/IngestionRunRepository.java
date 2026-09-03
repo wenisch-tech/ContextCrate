@@ -13,6 +13,8 @@ public interface IngestionRunRepository extends JpaRepository<IngestionRun, UUID
   List<IngestionRun> findByCrateId(UUID crateId);
   List<IngestionRun> findByCrateIdAndStartedAtGreaterThanEqual(UUID crateId, Instant startedAt);
   long countByCrateIdAndStatusIn(UUID crateId, Collection<tech.wenisch.contextcrate.domain.PipelineTypes.RunStatus> statuses);
+  boolean existsByIngestionJobIdAndStatus(UUID ingestionJobId,
+      tech.wenisch.contextcrate.domain.PipelineTypes.RunStatus status);
 
   @org.springframework.data.jpa.repository.Query(
       "select r from IngestionRun r where r.crateId = :crateId and r.sourceId in :sourceIds "

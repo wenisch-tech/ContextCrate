@@ -12,6 +12,7 @@
   <div class="alert alert-success" th:if="${param.userSaved != null}">User updated.</div>
   <div class="alert alert-success" th:if="${param.passwordReset != null}">Temporary password set. The user must change it at the next sign-in.</div>
   <div class="alert alert-success" th:if="${param.policySaved != null}">Policy saved.</div>
+  <div class="alert alert-success" th:if="${param.timeZoneSaved != null}">Time zone saved.</div>
   <div class="alert alert-success" th:if="${param.elevationStarted != null}">Elevation started. It expires automatically after 30 minutes.</div>
   <div class="alert alert-success" th:if="${param.elevationEnded != null}">Elevation ended.</div>
   <div class="alert alert-success" th:if="${param.requeued != null}">Message requeued.</div>
@@ -96,6 +97,16 @@
           <strong>ENTITLED_USERS</strong> — administrators plus users with the entitlement granted on the Users tab.
         </div>
         <button class="btn btn-primary mt-4">Save policy</button>
+      </form>
+      <form class="card panel p-4 mt-4" method="post" action="/admin/settings/time-zone">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <h2 class="h5">Schedule time zone</h2>
+        <p class="text-secondary small">Scheduled ingestion jobs use this city-based IANA time zone. Daylight-saving changes follow the selected city.</p>
+        <label class="form-label" for="timeZone">Time zone</label>
+        <select class="form-select" id="timeZone" name="timeZone">
+          <option th:each="value:${timeZones}" th:value="${value}" th:text="${value}" th:selected="${value == systemSetting.timeZone}"></option>
+        </select>
+        <button class="btn btn-primary mt-4">Save time zone</button>
       </form>
     </section>
 

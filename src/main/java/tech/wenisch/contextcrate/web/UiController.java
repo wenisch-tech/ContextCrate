@@ -252,7 +252,9 @@ public class UiController {
       @RequestParam(defaultValue = "") String authServerUrl,
       @RequestParam(defaultValue = "") String clientId,
       @RequestParam(defaultValue = "") String clientSecret,
-      @RequestParam(defaultValue = "") String realm) {
+      @RequestParam(defaultValue = "") String realm,
+      @RequestParam(defaultValue = "SCHEDULED") IngestionJobMode mode,
+      @RequestParam(defaultValue = "") String cronExpression) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
     Source source = sources.require(crateId, sourceId);
     ingestion.create(crateId, sourceId, name, formConfiguration(source, seedUrl, allowedHost, ref,
@@ -264,7 +266,7 @@ public class UiController {
         deduplicateContent, renderMode, trustAllCertificates, rawRetentionDays, contentSelector,
         removeSelectors, logicalIndex, authMethod, loginPageUrl, username, password, usernameField,
         passwordField, submitSelector, successUrlPattern, successContentPattern, directLogin,
-        authServerUrl, clientId, clientSecret, realm));
+        authServerUrl, clientId, clientSecret, realm), mode, cronExpression);
     return "redirect:/crates/" + crateId + "/sources/" + sourceId;
   }
 
@@ -317,7 +319,9 @@ public class UiController {
       @RequestParam(defaultValue = "") String authServerUrl,
       @RequestParam(defaultValue = "") String clientId,
       @RequestParam(defaultValue = "") String clientSecret,
-      @RequestParam(defaultValue = "") String realm) {
+      @RequestParam(defaultValue = "") String realm,
+      @RequestParam(defaultValue = "MANUAL") IngestionJobMode mode,
+      @RequestParam(defaultValue = "") String cronExpression) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
     Source source = sources.require(crateId, sourceId);
     IngestionJob job = ingestion.requireJob(crateId, sourceId, jobId);
@@ -332,7 +336,7 @@ public class UiController {
             authMethod, loginPageUrl, username, password, usernameField, passwordField,
             submitSelector, successUrlPattern, successContentPattern, directLogin, authServerUrl,
             clientId, clientSecret, realm),
-        job.isEnabled());
+        job.isEnabled(), mode, cronExpression);
     return "redirect:/crates/" + crateId + "/sources/" + sourceId;
   }
 

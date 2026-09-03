@@ -155,9 +155,12 @@ document.addEventListener('click', event => {
   }
   const dismiss = event.target.closest('[data-ui-dismiss="modal"]');
   if (dismiss) dismiss.closest('.modal')?.classList.remove('show');
-  const tab = event.target.closest('[data-ui-toggle="tab"]');
+  const tab = event.target.closest('[data-ui-toggle="tab"], [data-ui-toggle="pill"]');
   if (tab) {
     event.preventDefault();
+    document.querySelectorAll('[data-ui-toggle="tab"], [data-ui-toggle="pill"]')
+      .forEach(node => node.classList.remove('active'));
+    tab.classList.add('active');
     document.querySelectorAll('.tab-pane').forEach(node => node.classList.remove('show', 'active'));
     document.querySelector(tab.dataset.uiTarget)?.classList.add('show', 'active');
     history.replaceState(null, '', tab.dataset.uiTarget);

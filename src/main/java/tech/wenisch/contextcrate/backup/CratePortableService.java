@@ -137,9 +137,12 @@ public class CratePortableService {
         source.getConnectorType());
     boolean tokenConfigured = configuration.git() != null && configuration.git().token() != null
         && !configuration.git().token().isBlank();
-    return Map.of("id", job.getId(), "sourceId", job.getSourceId(), "name", job.getName(),
-        "enabled", job.isEnabled(), "tokenConfigured", tokenConfigured,
-        "configurationJson", jobCodec.write(configuration.withoutSecrets()));
+    Map<String, Object> value = new LinkedHashMap<>();
+    value.put("id", job.getId()); value.put("sourceId", job.getSourceId()); value.put("name", job.getName());
+    value.put("enabled", job.isEnabled()); value.put("mode", job.getMode());
+    value.put("cronExpression", job.getCronExpression()); value.put("tokenConfigured", tokenConfigured);
+    value.put("configurationJson", jobCodec.write(configuration.withoutSecrets()));
+    return value;
   }
 
   public Manifest validate(Path bundle) throws Exception { return readBundle(bundle).manifest(); }
@@ -179,6 +182,10 @@ public class CratePortableService {
             && node.path("tokenConfigured").asBoolean(false);
         value.update(value.getName(), value.getConfigurationJson(),
             node.path("enabled").asBoolean() && source.isEnabled() && !missingCredential);
+        IngestionJobMode mode = node.hasNonNull("mode")
+            ? IngestionJobMode.valueOf(text(node, "mode")) : IngestionJobMode.MANUAL;
+        value.update(value.getName(), value.getConfigurationJson(), value.isEnabled(), mode,
+            mode == IngestionJobMode.SCHEDULED ? nullable(node, "cronExpression") : null);
         jobs.save(value);
       }
     }

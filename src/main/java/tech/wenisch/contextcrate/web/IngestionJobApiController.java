@@ -43,7 +43,8 @@ public class IngestionJobApiController {
       @Valid @RequestBody JobRequest request) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
     Source source = ingestion.requireSource(crateId, sourceId);
-    return response(ingestion.create(crateId, sourceId, request.name(), request.configuration()),
+    return response(ingestion.create(crateId, sourceId, request.name(), request.configuration(),
+        request.modeOrDefault(), request.cronExpressionOrDefault()),
         source.getConnectorType());
   }
 
@@ -52,8 +53,11 @@ public class IngestionJobApiController {
       @PathVariable UUID jobId, @Valid @RequestBody JobRequest request) {
     access.requireMutable(crateId, CrateMember.Role.EDITOR);
     Source source = ingestion.requireSource(crateId, sourceId);
+    IngestionJob existing = ingestion.requireJob(crateId, sourceId, jobId);
     return response(ingestion.update(crateId, sourceId, jobId, request.name(),
-        request.configuration(), request.enabled() == null || request.enabled()),
+        request.configuration(), request.enabled() == null || request.enabled(),
+        request.mode() == null ? existing.getMode() : request.mode(),
+        request.cronExpression() == null ? existing.getCronExpression() : request.cronExpression()),
         source.getConnectorType());
   }
 
@@ -67,7 +71,8 @@ public class IngestionJobApiController {
   }
 
   private JobResponse response(IngestionJob job, ConnectorType type) {
-    return new JobResponse(job.getId(), job.getSourceId(), job.getName(), job.isEnabled(),
+    return new JobResponse(job.getId(), job.getSourceId(), job.getName(), job.isEnabled(), job.getMode(),
+        job.getCronExpression(),
         codec.read(job.getConfigurationJson(), type).withoutSecrets());
   }
 
@@ -77,11 +82,17 @@ public class IngestionJobApiController {
   }
 
   public record JobRequest(String name, @Valid IngestionConfiguration configuration,
-      Boolean enabled) {
+      Boolean enabled, IngestionJobMode mode, String cronExpression) {
     public JobRequest {
       if (name == null || name.isBlank()) throw new IllegalArgumentException("name is required");
     }
+    public IngestionJobMode modeOrDefault() { return mode == null ? IngestionJobMode.SCHEDULED : mode; }
+    public String cronExpressionOrDefault() {
+      return cronExpression == null && modeOrDefault() == IngestionJobMode.SCHEDULED
+          ? "0 7 * * *" : cronExpression;
+    }
   }
   public record JobResponse(UUID id, UUID sourceId, String name, boolean enabled,
+      IngestionJobMode mode, String cronExpression,
       IngestionConfiguration configuration) {}
 }

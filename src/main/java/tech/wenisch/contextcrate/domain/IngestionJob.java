@@ -15,6 +15,9 @@ public class IngestionJob {
   @Column(name = "configuration_json", nullable = false, columnDefinition = "text")
   private String configurationJson;
   @Column(nullable = false) private boolean enabled;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 16) private IngestionJobMode mode;
+  @Column(name = "cron_expression", length = 120) private String cronExpression;
   @Column(name = "created_at", nullable = false) private Instant createdAt;
   @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
@@ -27,6 +30,7 @@ public class IngestionJob {
     this.name = Objects.requireNonNull(name);
     this.configurationJson = Objects.requireNonNull(configurationJson);
     this.enabled = true;
+    this.mode = IngestionJobMode.MANUAL;
     this.createdAt = Instant.now();
     this.updatedAt = createdAt;
   }
@@ -37,13 +41,21 @@ public class IngestionJob {
   public String getName() { return name; }
   public String getConfigurationJson() { return configurationJson; }
   public boolean isEnabled() { return enabled; }
+  public IngestionJobMode getMode() { return mode; }
+  public String getCronExpression() { return cronExpression; }
   public Instant getCreatedAt() { return createdAt; }
   public Instant getUpdatedAt() { return updatedAt; }
 
   public void update(String name, String json, boolean enabled) {
+    update(name, json, enabled, mode, cronExpression);
+  }
+  public void update(String name, String json, boolean enabled, IngestionJobMode mode,
+      String cronExpression) {
     this.name = Objects.requireNonNull(name);
     this.configurationJson = Objects.requireNonNull(json);
     this.enabled = enabled;
+    this.mode = Objects.requireNonNull(mode);
+    this.cronExpression = cronExpression;
     this.updatedAt = Instant.now();
   }
 }

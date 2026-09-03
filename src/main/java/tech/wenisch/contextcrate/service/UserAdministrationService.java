@@ -109,6 +109,16 @@ public class UserAdministrationService {
     return settings.save(setting);
   }
 
+  @Transactional
+  public SystemSetting timeZone(String timeZone) {
+    requireAdmin();
+    try { java.time.ZoneId.of(timeZone); }
+    catch (RuntimeException e) { throw new IllegalArgumentException("A valid IANA time zone is required"); }
+    SystemSetting setting = settings.findById(1).orElseThrow();
+    setting.timeZone(timeZone);
+    return settings.save(setting);
+  }
+
   public void requireAdmin() {
     if (!access.isAdmin()) throw new AccessDeniedException("Administrator required");
   }

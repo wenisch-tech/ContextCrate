@@ -71,6 +71,7 @@ Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructu
 - `PUT /api/v1/admin/users/{id}/role` — `{"role": "ADMIN"}`
 - `POST /api/v1/admin/users/{id}/password-reset` — `{"temporaryPassword": "..."}`
 - `PUT /api/v1/admin/settings/crate-creation` — `{"mode": "ENTITLED_USERS"}`
+- `PUT /api/v1/admin/settings/time-zone` — `{"timeZone": "Europe/Berlin"}`
 - `GET /api/v1/admin/crates` — every crate with document, source, and member counts
 - `GET /api/v1/admin/elevations` — the caller's active elevations
 - `POST /api/v1/admin/crates/{crateId}/elevations` — `{"reason": "..."}`
@@ -131,6 +132,12 @@ Attach any number of jobs at
   }
 }
 ```
+
+Jobs default to `"mode": "MANUAL"`. To run automatically, set `"mode": "SCHEDULED"`
+and provide a five-field `cronExpression` (`minute hour day-of-month month weekday`), for example
+`"*/5 * * * *"` for every five minutes, `"0 0 * * *"` for daily at midnight, or
+`"0 0 * * 6,0"` for weekends. Cron expressions use the installation-wide administration time
+zone. `POST .../ingestion-jobs/{jobId}/runs` remains available for both manual and scheduled jobs.
 
 Start it with `POST .../ingestion-jobs/{jobId}/runs`. A Git run records its resolved commit in
 `resolvedRevision`. Website sources use `connectorType: HTTPS`; their source configuration
