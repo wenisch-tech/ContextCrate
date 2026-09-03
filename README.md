@@ -14,7 +14,7 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 
 ![ContextCrate overview and chat demo with populated metrics, live pipeline activity, and cited answers](docs/img/contextcrate-demo.gif)
 
-*Recorded from the actual frontend with synthetic sample data and a mocked chat response; no LLM or live sources required.*
+
 
 ## Capabilities
 
