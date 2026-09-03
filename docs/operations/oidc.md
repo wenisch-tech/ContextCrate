@@ -1,8 +1,9 @@
 # OIDC with Keycloak
 
 ContextCrate supports OpenID Connect login through Spring Security. On a successful OIDC login,
-ContextCrate creates the local application account if it does not already exist, using the verified
-`email` claim as its identity. If Keycloak does not supply email, it uses `preferred_username`.
+ContextCrate creates the local application account if it does not already exist, using the verified,
+signed ID token's `email` claim as its identity. If Keycloak does not supply email, it uses
+`preferred_username`.
 That username must be unique and stable: changing it creates a separate local account. Local crate
 memberships remain managed by ContextCrate.
 
@@ -14,6 +15,10 @@ request `openid`, `profile`, and `email`. Configure the exact callback URL:
 ```text
 https://app.example.com/login/oauth2/code/keycloak
 ```
+
+ContextCrate does not call Keycloak's UserInfo endpoint. Configure Keycloak protocol mappers so
+the signed ID token contains either `email` or `preferred_username`. To synchronize administrator
+access, include assigned realm or client roles in the ID token as well.
 
 Allow user registration in the realm when users should self-register. In Keycloak this is the
 **User registration** realm setting. Configure email verification and SMTP before enabling it on
@@ -65,8 +70,8 @@ contextcrate:
 ```
 
 or the environment variable `CONTEXTCRATE_SECURITY_OIDC_TRUST_ALL_CERTIFICATES=true`. This skips
-TLS certificate validation for OIDC issuer discovery, token exchange, userinfo, and ID token JWKS
-retrieval only — it does not affect any other outbound connection. Enable it only for identity
+TLS certificate validation for OIDC issuer discovery, token exchange, and ID token JWKS retrieval
+only — it does not affect any other outbound connection. Enable it only for identity
 providers you already trust on an internal/self-signed CA; it removes protection against a
 network-level attacker impersonating the identity provider.
 

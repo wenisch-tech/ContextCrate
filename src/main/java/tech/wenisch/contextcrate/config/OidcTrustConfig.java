@@ -26,8 +26,8 @@ import org.springframework.web.client.RestTemplate;
 import tech.wenisch.contextcrate.util.InsecureSsl;
 
 /**
- * Skips TLS certificate validation for OIDC issuer discovery, token exchange, userinfo, and ID
- * token JWKS retrieval. Opt-in only, for identity providers behind an internal/self-signed CA.
+ * Skips TLS certificate validation for OIDC issuer discovery, token exchange, and ID token JWKS
+ * retrieval. Opt-in only, for identity providers behind an internal/self-signed CA.
  */
 @Configuration
 @ConditionalOnProperty(

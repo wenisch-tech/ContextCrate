@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,10 +69,9 @@ class OidcLoginIntegrationTest {
   private String issuer;
   private volatile String idToken;
   private volatile boolean rejectCode;
-  private volatile String userInfoEmail = "oidc@example.com";
-  private volatile String userInfoUsername;
   private volatile String idTokenEmail = "oidc@example.com";
   private volatile String idTokenUsername;
+  private final AtomicInteger userInfoRequests = new AtomicInteger();
 
   @BeforeEach
   void setUp() throws Exception {
@@ -96,15 +96,11 @@ class OidcLoginIntegrationTest {
       }
     });
     provider.createContext("/userinfo", exchange -> {
-      if (!"Bearer test-access-token".equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
-        reply(exchange, 401, Map.of("error", "invalid_token"));
-        return;
-      }
-      var claims = new java.util.LinkedHashMap<String, Object>();
-      claims.put("sub", "keycloak-user");
-      if (userInfoEmail != null) claims.put("email", userInfoEmail);
-      if (userInfoUsername != null) claims.put("preferred_username", userInfoUsername);
-      reply(exchange, 200, claims);
+      userInfoRequests.incrementAndGet();
+      // This reproduces Keycloak's disabled/forbidden UserInfo endpoint. A valid callback must
+      // still authenticate from its signed ID token without touching this endpoint.
+      exchange.sendResponseHeaders(403, -1);
+      exchange.close();
     });
     provider.start();
 
@@ -131,7 +127,8 @@ class OidcLoginIntegrationTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  void callbackAuthenticatesAndSynchronizesLocalRole(boolean admin) throws Exception {
+  void callbackAuthenticatesAndSynchronizesLocalRoleWithoutCallingForbiddenUserInfo(boolean admin)
+      throws Exception {
     var login = mvc.perform(get("/oauth2/authorization/keycloak").with(httpsProxy()))
         .andExpect(status().is3xxRedirection()).andReturn();
     var parameters = UriComponentsBuilder.fromUriString(login.getResponse().getRedirectedUrl())
@@ -158,6 +155,7 @@ class OidcLoginIntegrationTest {
     verify(context.getBean(AppUserRepository.class)).save(saved.capture());
     assertThat(saved.getValue().getEmail()).isEqualTo("oidc@example.com");
     assertThat(saved.getValue().getRole()).isEqualTo(admin ? "ADMIN" : "USER");
+    assertThat(userInfoRequests.get()).isZero();
   }
 
   @Test
@@ -179,8 +177,6 @@ class OidcLoginIntegrationTest {
 
   @Test
   void callbackCreatesUserFromPreferredUsernameWhenEmailIsAbsent() throws Exception {
-    userInfoEmail = null;
-    userInfoUsername = "keycloak-user";
     idTokenEmail = null;
     idTokenUsername = "keycloak-user";
     var login = mvc.perform(get("/oauth2/authorization/keycloak")).andReturn();

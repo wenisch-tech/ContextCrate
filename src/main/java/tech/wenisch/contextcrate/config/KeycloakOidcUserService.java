@@ -4,7 +4,7 @@ import java.util.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
@@ -15,7 +15,7 @@ import tech.wenisch.contextcrate.repository.AppUserRepository;
 
 /** Creates local accounts for OIDC users and maps Keycloak's ContextCrate_Admin role. */
 @Service
-public class KeycloakOidcUserService extends OidcUserService {
+public class KeycloakOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
   static final String ADMIN_ROLE = "ContextCrate_Admin";
   private final AppUserRepository users;
 
@@ -25,22 +25,24 @@ public class KeycloakOidcUserService extends OidcUserService {
 
   @Override
   public OidcUser loadUser(OidcUserRequest request) {
-    OidcUser oidcUser = super.loadUser(request);
-    String identifier = identifier(oidcUser.getClaims());
-    boolean admin = hasContextCrateAdminRole(oidcUser.getClaims());
+    // The ID token was signature- and claim-validated by Spring Security before this service is
+    // invoked. Keycloak deployments commonly disable the UserInfo endpoint, so do not make a
+    // second request for the same identity data here.
+    Map<String, Object> claims = new LinkedHashMap<>(request.getIdToken().getClaims());
+    String identifier = identifier(claims);
+    boolean admin = hasContextCrateAdminRole(claims);
     AppUser user = users.findByEmailIgnoreCase(identifier)
         .orElseGet(() -> new AppUser(UUID.randomUUID(), identifier, "{noop}oidc", "USER", false));
     user.role(admin ? "ADMIN" : "USER");
     users.save(user);
 
-    Set<GrantedAuthority> authorities = new LinkedHashSet<>(oidcUser.getAuthorities());
-    Map<String, Object> claims = new LinkedHashMap<>(oidcUser.getClaims());
+    Set<GrantedAuthority> authorities = new LinkedHashSet<>();
     // The local user model identifies users by its email field. Give the OIDC principal the same
     // stable name when Keycloak supplied preferred_username instead of an email address.
     if (stringClaim(claims, "email") == null) claims.put("email", identifier);
     authorities.add(new OAuth2UserAuthority(claims));
     authorities.add(new SimpleGrantedAuthority(admin ? "ROLE_ADMIN" : "ROLE_USER"));
-    return new DefaultOidcUser(authorities, oidcUser.getIdToken(), new OidcUserInfo(claims), "email");
+    return new DefaultOidcUser(authorities, request.getIdToken(), new OidcUserInfo(claims), "email");
   }
 
   static boolean hasContextCrateAdminRole(Map<String, Object> claims) {

@@ -18,7 +18,7 @@ persistence: { enabled: true, storageClassName: "", accessMode: ReadWriteOnce, s
 security:
   oidc:
     enabled: false
-    # Skips TLS certificate validation for the OIDC issuer (discovery, token, userinfo, JWKS).
+    # Skips TLS certificate validation for the OIDC issuer (discovery, token, JWKS).
     # Only enable for identity providers behind an internal/self-signed CA you already trust.
     trustAllCertificates: false
 tls:

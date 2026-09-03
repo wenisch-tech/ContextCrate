@@ -13,7 +13,6 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
-import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
@@ -89,9 +88,6 @@ public class SecurityConfig {
             })
             .userInfoEndpoint(u -> u.oidcUserService(oidcUsers));
         insecureOidc.ifAvailable(insecure -> {
-          var userInfoService = new DefaultOAuth2UserService();
-          userInfoService.setRestOperations(insecure.restOperations());
-          oidcUsers.setOauth2UserService(userInfoService);
           var tokenResponseClient = new RestClientAuthorizationCodeTokenResponseClient();
           tokenResponseClient.setRestClient(insecure.restClient());
           o.tokenEndpoint(t -> t.accessTokenResponseClient(tokenResponseClient));
