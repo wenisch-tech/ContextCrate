@@ -43,6 +43,15 @@ public class CrateService {
     return members.findByCrateId(crateId);
   }
 
+  public List<MemberView> memberViews(UUID crateId) {
+    access.require(crateId, CrateMember.Role.OWNER);
+    return members.findByCrateId(crateId).stream()
+        .map(member -> new MemberView(member,
+            users.findById(member.getUserId()).orElseThrow().getEmail()))
+        .sorted(Comparator.comparing(MemberView::email, String.CASE_INSENSITIVE_ORDER))
+        .toList();
+  }
+
   public Optional<CrateMember> membership(UUID crateId) {
     return members.findByCrateIdAndUserId(crateId, access.currentUser().getId());
   }
@@ -120,4 +129,6 @@ public class CrateService {
         values (?, 1, 'ACTIVE', 'initial', 0, current_timestamp, current_timestamp)
         """, crateId);
   }
+
+  public record MemberView(CrateMember member, String email) { }
 }

@@ -3,6 +3,9 @@ package tech.wenisch.contextcrate.web;
 import static tech.wenisch.contextcrate.domain.PipelineTypes.WorkStage;
 
 import java.util.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -578,6 +581,42 @@ public class UiController {
     model.addAttribute("rerankingProvider", providerSettings.effectiveReranking(crateId));
     model.addAttribute("answerProvider", providerSettings.effectiveAnswer(crateId));
     return "settings";
+  }
+
+  @GetMapping("/permissions")
+  String permissions(@PathVariable UUID crateId, Model model) {
+    model.addAttribute("members", crates.memberViews(crateId));
+    model.addAttribute("roles", CrateMember.Role.values());
+    return "permissions";
+  }
+
+  @PostMapping("/permissions/members")
+  String addPermissionMember(@PathVariable UUID crateId, @RequestParam String email,
+      @RequestParam CrateMember.Role role) {
+    crates.addMember(crateId, email, role);
+    return "redirect:/crates/" + crateId + "/permissions?memberSaved";
+  }
+
+  @PostMapping("/permissions/members/{userId}/role")
+  String changePermissionRole(@PathVariable UUID crateId, @PathVariable UUID userId,
+      @RequestParam CrateMember.Role role) {
+    var member = crates.memberViews(crateId).stream()
+        .filter(view -> view.member().getUserId().equals(userId)).findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("Unknown crate member"));
+    crates.addMember(crateId, member.email(), role);
+    return "redirect:/crates/" + crateId + "/permissions?memberSaved";
+  }
+
+  @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+  String rejected(HttpServletRequest request, RuntimeException error) {
+    String message = error.getMessage() == null ? "The change was rejected." : error.getMessage();
+    String path = request.getRequestURI();
+    if (path.endsWith("/permissions") || path.contains("/permissions/")) {
+      String crateId = path.split("/")[2];
+      return "redirect:/crates/" + crateId + "/permissions?error="
+          + URLEncoder.encode(message, StandardCharsets.UTF_8);
+    }
+    throw error;
   }
 
   @PostMapping("/settings/general")
