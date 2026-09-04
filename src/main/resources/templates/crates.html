@@ -25,19 +25,21 @@
 
   <div th:if="${cards.empty}" class="card panel"><p class="empty-state mb-0">You do not belong to a crate yet. Create your first crate or ask an administrator to add you.</p></div>
 
-  <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
-    <div class="col" th:each="card:${cards}">
+  <div class="crate-grid">
+    <div th:each="card:${cards}">
       <div class="card panel crate-card p-4 h-100 position-relative d-flex flex-column gap-3">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <h2 class="fw-semibold" th:text="${card.crate.name}"></h2>
           <span class="badge" th:classappend="${card.crate.status.name() == 'ACTIVE'} ? 'text-bg-success' : (${card.crate.status.name() == 'PURGE_FAILED'} ? 'text-bg-danger' : (${card.crate.status.name() == 'ARCHIVED'} ? 'text-bg-secondary' : 'text-bg-warning'))" th:text="${card.crate.status}"></span>
         </div>
         <p class="crate-card__description mb-0" th:text="${card.crate.description ?: 'No description yet.'}"></p>
-        <div class="crate-stats">
-          <div class="crate-stat"><strong th:text="${card.documents}"></strong><span>DOCUMENTS</span></div>
-          <div class="crate-stat"><strong th:text="${card.sources}"></strong><span>SOURCES</span></div>
-          <div class="crate-stat"><strong th:text="${card.members}"></strong><span>MEMBERS</span></div>
+        <div class="crate-stats crate-stats--four">
+          <div class="crate-stat"><i data-lucide="network" class="crate-stat__icon"></i><strong th:text="${card.sources}"></strong><span>SOURCES</span></div>
+          <div class="crate-stat"><i data-lucide="files" class="crate-stat__icon"></i><strong th:text="${card.documents}"></strong><span>DOCUMENTS</span></div>
+          <div class="crate-stat"><i data-lucide="braces" class="crate-stat__icon"></i><strong th:text="${card.chunks}"></strong><span>CHUNKS</span></div>
+          <div class="crate-stat"><i data-lucide="users-round" class="crate-stat__icon"></i><strong th:text="${card.members}"></strong><span>MEMBERS</span></div>
         </div>
+        <div class="crate-activity" th:attr="aria-label=|${card.ingestion.ingestedLastSevenDays} documents ingested in the last 7 days|" role="img"><div class="crate-activity__caption"><span>7-DAY INGESTION</span><strong th:text="|${card.ingestion.ingestedLastSevenDays} documents|">0 documents</strong></div><svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true" th:classappend="${card.ingestion.hasActivity} ? ' active' : ''"><polyline th:attr="points=${card.ingestion.points}"></polyline></svg></div>
         <div class="crate-card__footer mt-auto">
           <span class="status-pill" th:if="${card.role != null}" th:text="${card.role}"></span>
           <span th:unless="${card.role != null}" class="status-pill">NO MEMBERSHIP</span>

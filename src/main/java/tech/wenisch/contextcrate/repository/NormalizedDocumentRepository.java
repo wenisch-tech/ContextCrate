@@ -39,6 +39,9 @@ public interface NormalizedDocumentRepository extends JpaRepository<NormalizedDo
   List<NormalizedDocument> findByCrateIdAndCurrentVersionTrueAndIndexedFalse(UUID crateId);
   List<NormalizedDocument> findByCrateIdAndCurrentVersionTrueAndCreatedAtGreaterThanEqual(
       UUID crateId, Instant createdAt);
+  List<NormalizedDocument>
+      findByCrateIdInAndCurrentVersionTrueAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+          Collection<UUID> crateIds, Instant createdAt, Instant beforeCreatedAt);
   List<NormalizedDocument> findByCrateIdAndIndexedAtGreaterThanEqual(UUID crateId, Instant indexedAt);
   long countByCrateIdAndCurrentVersionTrue(UUID crateId);
   long countByCrateIdAndCurrentVersionTrueAndIndexedFalse(UUID crateId);

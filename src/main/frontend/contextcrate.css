@@ -109,11 +109,17 @@
   .backend-row > :first-child { @apply text-ink-500; }
   .status-pill { @apply inline-flex rounded-full border border-ink-700 bg-ink-800 px-2 py-1 text-[.68rem] font-bold uppercase tracking-wide text-ink-300; }
   .health-dot { @apply size-3 rounded-full bg-bad-500; }.health-dot.healthy { @apply bg-good-500 shadow-[0_0_14px_rgba(54,211,153,.5)]; }
-  .crate-card { @apply h-full rounded-xl transition hover:-translate-y-0.5 hover:border-brand-500/60; }
+  .crate-grid { @apply grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3; }
+  .crate-card { @apply relative h-full overflow-hidden rounded-xl border-ink-700/80 transition duration-300 hover:border-brand-500/60; isolation:isolate; transform:perspective(1100px) rotateX(1.2deg); box-shadow:0 18px 0 rgba(7,12,25,.68),0 28px 48px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.055); }
+  .crate-card::before { content:""; @apply pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent; }
+  .crate-card::after { content:""; @apply pointer-events-none absolute inset-y-2 -right-3 -z-10 w-5 rounded-r-xl bg-ink-950/80; transform:skewY(-5deg); filter:blur(1px); }
+  .crate-card:hover { transform:perspective(1100px) translateY(-6px) rotateX(0deg); box-shadow:0 22px 0 rgba(7,12,25,.72),0 38px 60px rgba(0,0,0,.36),0 0 28px rgba(113,128,255,.1),inset 0 1px 0 rgba(255,255,255,.08); }
   .stretched-link { @apply absolute inset-0 z-10 rounded-xl; }
+  .crate-card > :not(.crate-activity):not(.stretched-link) { @apply relative z-[1]; }
   .crate-card__description { @apply line-clamp-2 min-h-10 text-sm text-ink-500; }
-  .crate-stats { @apply grid grid-cols-3 gap-2 border-y border-ink-700/50 py-3 text-center; }
-  .crate-stat strong { @apply block text-xl text-white; }.crate-stat span { @apply text-[.65rem] uppercase tracking-wider text-ink-500; }
+  .crate-stats { @apply grid grid-cols-3 gap-2 border-y border-ink-700/50 py-2.5 text-center; }.crate-stats--four { @apply grid-cols-2 sm:grid-cols-4; }
+  .crate-stat { @apply flex flex-col items-center; }.crate-stat__icon { @apply mb-1 size-3.5 text-cyan-500/80; }.crate-stat strong { @apply block text-xl text-white; }.crate-stat span { @apply text-[.65rem] uppercase tracking-wider text-ink-500; }
+  .crate-activity { @apply pointer-events-none absolute inset-x-0 bottom-0 h-[56%] overflow-hidden; z-index:0; background:linear-gradient(to bottom,transparent 0%,rgba(7,12,25,.18) 42%,rgba(7,12,25,.7) 100%); }.crate-activity::after { content:""; @apply absolute inset-x-0 bottom-0 h-16; background:linear-gradient(to top,rgba(13,18,33,.62),transparent); }.crate-activity__caption { @apply absolute left-4 top-5; }.crate-activity span { @apply block text-[.6rem] font-semibold tracking-wider text-ink-500/70; }.crate-activity strong { @apply block text-xs font-medium text-ink-300/80; }.crate-activity svg { @apply absolute inset-x-4 bottom-3 h-[78%]; width:calc(100% - 2rem); }.crate-activity polyline { fill:none; stroke:rgba(100,116,139,.3); stroke-width:1.2; vector-effect:non-scaling-stroke; }.crate-activity svg.active polyline { stroke:rgba(53,201,194,.6); filter:drop-shadow(0 0 7px rgba(53,201,194,.3)); }
   .crate-card__footer { @apply flex items-center justify-between gap-2 text-xs text-ink-500; }
   .admin-tile { @apply flex items-center gap-4 rounded-xl p-4 text-ink-100 hover:border-cyan-500/50; }
   .wizard-step { @apply rounded-xl border border-ink-700/70 bg-ink-900/88 p-5 shadow-[0_20px_50px_rgba(0,0,0,.18)] sm:p-6; }

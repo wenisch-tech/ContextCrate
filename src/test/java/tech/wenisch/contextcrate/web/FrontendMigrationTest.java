@@ -76,6 +76,16 @@ class FrontendMigrationTest {
   }
 
   @Test
+  void crateOverviewUsesSpacedThreeDimensionalCardsWithStatIcons() throws IOException {
+    assertThat(Files.readString(Path.of("src/main/resources/templates/crates.html")))
+        .contains("crate-grid", "data-lucide=\"files\"", "data-lucide=\"network\"",
+            "data-lucide=\"users-round\"", "data-lucide=\"braces\"", "crate-activity",
+            "card.ingestion.points");
+    assertThat(Files.readString(Path.of("src/main/frontend/contextcrate.css")))
+        .contains(".crate-grid", "perspective(1100px)", ".crate-card::after", ".crate-stat__icon");
+  }
+
+  @Test
   void loginKeepsItsAnimatedNetworkDecorativeAndMotionSafe() throws IOException {
     String login = Files.readString(Path.of("src/main/resources/templates/login.html"));
     String css = Files.readString(Path.of("src/main/frontend/contextcrate.css"));
