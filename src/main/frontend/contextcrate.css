@@ -128,14 +128,6 @@
   .ingestion-wizard[data-current-step="4"] .wizard-fields > div:has(.authentication-heading, [name="authMethod"], [name="loginPageUrl"], [name="username"], [name="password"], [name="directLogin"], [name="usernameField"], [name="passwordField"], [name="submitSelector"], [name="successUrlPattern"], [name="successContentPattern"], [name="authServerUrl"], [name="realm"], [name="clientId"], [name="clientSecret"]),
   .ingestion-wizard[data-current-step="5"] .wizard-fields > div:has([name="rawRetentionDays"], [name="chunkSize"], [name="chunkOverlap"], [name="logicalIndex"], [name="contentSelector"], [name="removeSelectors"], [name="mode"], [name="cronExpression"]) { display:block; }
   .ingestion-wizard[data-current-step="6"] .wizard-fields { display:none; }
-  .settings-wizard[data-current-step] > .settings-fields > div,
-  .settings-wizard[data-current-step] > .settings-fields > h2,
-  .settings-wizard[data-current-step] > .settings-fields > h3,
-  .settings-wizard[data-current-step] > .settings-fields > p { display:none; }
-  .settings-wizard[data-current-step="1"] > .settings-fields > div:has([name="retrievalStrategy"], [name="propositionFailurePolicy"], [name="retrievalMode"], [name="sourceLimit"], [name="embeddingsEnabled"], [name="embeddingProvider"], [name^="embedding"]),
-  .settings-wizard[data-current-step="2"] > .settings-fields > div:has([name="strictGrounding"], [name="allowClientHistory"], [name="inlineCitations"], [name="structuredSources"], [name="rerankingEnabled"], [name="rerankingProvider"], [name^="reranking"]),
-  .settings-wizard[data-current-step="3"] > .settings-fields > div:has([name="gradingEnabled"], [name="answerVerificationEnabled"], [name="answerVerificationFailureAction"], [name="answeringEnabled"], [name^="answering"]) { display:block; }
-  .settings-wizard[data-current-step="4"] > .settings-fields { display:none; }
   .pipeline { @apply grid gap-2 md:grid-cols-5; }
   .pipeline-stage { @apply relative rounded-xl border border-ink-700/70 bg-ink-900 p-4; }
   .pipeline-stage.active { @apply border-brand-500/50 bg-brand-500/8 shadow-[0_0_24px_rgba(113,128,255,.12)]; }

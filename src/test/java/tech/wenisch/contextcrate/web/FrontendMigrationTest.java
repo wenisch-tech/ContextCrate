@@ -17,7 +17,7 @@ class FrontendMigrationTest {
   }
 
   @Test
-  void largeConfigurationFormsExposeAtomicWizardControls() throws IOException {
+  void largeConfigurationFormsExposeConfigurationControls() throws IOException {
     assertThat(Files.readString(Path.of("src/main/resources/templates/ingestion-job-form.html")))
         .contains("x-data=\"wizard(6)\"", "authMethod = $el.elements.authMethod?.value || 'NONE'",
             "4 Authentication", "6 Review", "x-model=\"authMethod\"",
@@ -25,7 +25,8 @@ class FrontendMigrationTest {
             "fragments :: sidebar", "fragments :: overlay", "fragments :: topbar(${job == null ? 'Create ingestion job' : 'Edit ingestion job'})")
         .doesNotContain("fragments :: nav");
     assertThat(Files.readString(Path.of("src/main/resources/templates/settings.html")))
-        .contains("x-data=\"wizard(4)\"", "Retrieval &amp; answers", "Review &amp; save");
+        .contains("General settings", "Save general settings", "x-data=\"wizard(4)\"",
+            "Retrieval &amp; answers", "Review &amp; save");
   }
 
   @Test

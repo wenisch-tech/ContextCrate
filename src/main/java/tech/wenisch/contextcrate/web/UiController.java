@@ -580,6 +580,13 @@ public class UiController {
     return "settings";
   }
 
+  @PostMapping("/settings/general")
+  String saveGeneralSettings(@PathVariable UUID crateId, @RequestParam String name,
+      @RequestParam(defaultValue = "") String description) {
+    crates.update(crateId, name, description);
+    return "redirect:/crates/" + crateId + "/settings?generalSaved";
+  }
+
   @PostMapping("/settings/rag")
   String saveRagSettings(
       @PathVariable UUID crateId,@RequestParam(defaultValue = "false") boolean strictGrounding,
