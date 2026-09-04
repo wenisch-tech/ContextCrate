@@ -18,7 +18,7 @@
         <jsoup.version>1.23.2</jsoup.version>
         <lucene.version>10.5.1</lucene.version>
         <playwright.version>1.62.0</playwright.version>
-        <aws.version>2.54.9</aws.version>
+        <aws.version>2.54.12</aws.version>
         <springdoc.version>3.1.0</springdoc.version>
         <onnxruntime.version>1.29.0</onnxruntime.version>
         <djl.version>0.36.0</djl.version>
@@ -30,7 +30,7 @@
         <!-- Overrides spring-boot-dependencies' tomcat.version (11.0.24). -->
         <tomcat.version>11.0.25</tomcat.version>
         <mcp.version>2.0.1</mcp.version>
-        <mcp.sdk.version>2.0.0</mcp.sdk.version>
+        <mcp.sdk.version>2.0.1</mcp.sdk.version>
     </properties>
     <dependencyManagement>
         <dependencies>
