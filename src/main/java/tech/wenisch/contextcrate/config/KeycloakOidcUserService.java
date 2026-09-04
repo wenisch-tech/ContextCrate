@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.ObjectProvider;
 import tech.wenisch.contextcrate.domain.AppUser;
 import tech.wenisch.contextcrate.repository.AppUserRepository;
 import tech.wenisch.contextcrate.service.OnboardingService;
@@ -20,9 +21,9 @@ import tech.wenisch.contextcrate.service.OnboardingService;
 public class KeycloakOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
   static final String ADMIN_ROLE = "ContextCrate_Admin";
   private final AppUserRepository users;
-  private final OnboardingService onboarding;
+  private final ObjectProvider<OnboardingService> onboarding;
 
-  public KeycloakOidcUserService(AppUserRepository users, OnboardingService onboarding) {
+  public KeycloakOidcUserService(AppUserRepository users, ObjectProvider<OnboardingService> onboarding) {
     this.users = users; this.onboarding = onboarding;
   }
 
@@ -39,7 +40,7 @@ public class KeycloakOidcUserService implements OAuth2UserService<OidcUserReques
     AppUser user = existing.orElseGet(() -> new AppUser(UUID.randomUUID(), identifier, "{noop}oidc", "USER", false));
     user.role(admin ? "ADMIN" : "USER");
     users.save(user);
-    if (existing.isEmpty()) onboarding.applyToNewUser(user);
+    if (existing.isEmpty()) onboarding.ifAvailable(service -> service.applyToNewUser(user));
 
     Set<GrantedAuthority> authorities = new LinkedHashSet<>();
     // The local user model identifies users by its email field. Give the OIDC principal the same
