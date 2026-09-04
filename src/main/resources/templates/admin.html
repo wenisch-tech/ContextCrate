@@ -12,6 +12,7 @@
   <div class="alert alert-success" th:if="${param.userSaved != null}">User updated.</div>
   <div class="alert alert-success" th:if="${param.passwordReset != null}">Temporary password set. The user must change it at the next sign-in.</div>
   <div class="alert alert-success" th:if="${param.policySaved != null}">Policy saved.</div>
+  <div class="alert alert-success" th:if="${param.onboardingPolicySaved != null}">Onboarding policy saved.</div>
   <div class="alert alert-success" th:if="${param.timeZoneSaved != null}">Time zone saved.</div>
   <div class="alert alert-success" th:if="${param.elevationStarted != null}">Elevation started. It expires automatically after 30 minutes.</div>
   <div class="alert alert-success" th:if="${param.elevationEnded != null}">Elevation ended.</div>
@@ -83,6 +84,26 @@
     </section>
 
     <section class="tab-pane fade" id="policies">
+      <form class="card panel p-4 mb-4" method="post" action="/admin/settings/onboarding-policy" th:attr="x-data=|{ policy: '${systemSetting.onboardingPolicy}' }|">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <h2 class="h5">Onboarding policy</h2>
+        <p class="text-secondary small">Applied only when a new local or OIDC account is first provisioned. Existing users are unchanged.</p>
+        <label class="form-label" for="onboarding-policy">Policy</label>
+        <select class="form-select" id="onboarding-policy" name="policy" x-model="policy">
+          <option th:each="value:${onboardingPolicies}" th:value="${value}" th:text="${value}" th:selected="${value == systemSetting.onboardingPolicy}"></option>
+        </select>
+        <div class="form-text mt-2"><strong>ADD_TO_EXISTING_CRATE</strong> — add new users to a selected crate as Viewers.<br>
+          <strong>SHOW_NEW_CRATE_DIALOG</strong> — require the user to create one first crate, even when normal creation policy would deny it.<br>
+          <strong>DO_NOTHING</strong> — leave the user on their crate overview.</div>
+        <div class="mt-3" x-show="policy === 'ADD_TO_EXISTING_CRATE'" x-cloak>
+          <label class="form-label" for="onboarding-crate">Crate</label>
+          <select class="form-select" id="onboarding-crate" name="crateId" :required="policy === 'ADD_TO_EXISTING_CRATE'">
+            <option value="">Select a crate</option>
+            <option th:each="card:${cards}" th:value="${card.crate.id}" th:text="${card.crate.name}" th:selected="${card.crate.id == systemSetting.onboardingCrateId}"></option>
+          </select>
+        </div>
+        <button class="btn btn-primary mt-4">Save onboarding policy</button>
+      </form>
       <form class="card panel p-4" method="post" action="/admin/settings/crate-creation">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <h2 class="h5">Crate creation</h2>

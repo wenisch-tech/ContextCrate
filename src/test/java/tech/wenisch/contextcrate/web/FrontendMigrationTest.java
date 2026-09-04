@@ -64,4 +64,13 @@ class FrontendMigrationTest {
         .contains("name=\"sourceId\"", "id=\"source-filter\"", "availableSources", "source.id == sourceId",
             "All sources", "filteredSource", "Clear source filter", "sourceId=${sourceId}");
   }
+
+  @Test
+  void crateOnboardingDialogIsServerMarkedAndOpenedByTheFrontend() throws IOException {
+    assertThat(Files.readString(Path.of("src/main/resources/templates/crates.html")))
+        .contains("onboardingCrateCreationRequired", "data-onboarding-required",
+            "Create your first crate to continue.");
+    assertThat(Files.readString(Path.of("src/main/frontend/contextcrate.js")))
+        .contains("requiredOnboardingModal", "data-onboarding-required=\"true\"");
+  }
 }

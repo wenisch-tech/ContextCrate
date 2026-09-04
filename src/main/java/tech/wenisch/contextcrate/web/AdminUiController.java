@@ -54,6 +54,7 @@ public class AdminUiController {
     model.addAttribute("cards", overview.all());
     model.addAttribute("systemSetting", administration.systemSetting());
     model.addAttribute("creationModes", SystemSetting.CrateCreationMode.values());
+    model.addAttribute("onboardingPolicies", SystemSetting.OnboardingPolicy.values());
     model.addAttribute("timeZones", List.of("UTC", "Europe/London", "Europe/Berlin", "Europe/Paris",
         "Europe/Moscow", "Africa/Cairo", "Africa/Johannesburg", "America/New_York",
         "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Sao_Paulo",
@@ -109,6 +110,13 @@ public class AdminUiController {
   String timeZone(@RequestParam String timeZone) {
     administration.timeZone(timeZone);
     return "redirect:/admin?timeZoneSaved#policies";
+  }
+
+  @PostMapping("/settings/onboarding-policy")
+  String onboardingPolicy(@RequestParam SystemSetting.OnboardingPolicy policy,
+      @RequestParam(required = false) UUID crateId) {
+    administration.onboardingPolicy(policy, crateId);
+    return "redirect:/admin?onboardingPolicySaved#policies";
   }
 
   @PostMapping("/crates/{crateId}/elevations")

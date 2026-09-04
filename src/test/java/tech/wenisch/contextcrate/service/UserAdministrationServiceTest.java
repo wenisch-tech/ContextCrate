@@ -20,8 +20,9 @@ class UserAdministrationServiceTest {
   private final PasswordEncoder passwords = mock(PasswordEncoder.class);
   private final SystemSettingRepository settings = mock(SystemSettingRepository.class);
   private final CrateAccessService access = mock(CrateAccessService.class);
+  private final OnboardingService onboarding = mock(OnboardingService.class);
   private final UserAdministrationService service =
-      new UserAdministrationService(users, passwords, settings, access);
+      new UserAdministrationService(users, passwords, settings, access, onboarding);
 
   private AppUser admin;
   private AppUser other;
@@ -124,5 +125,6 @@ class UserAdministrationServiceTest {
     assertThat(created.getRole()).isEqualTo("USER");
     assertThat(created.isPasswordChangeRequired()).isTrue();
     assertThat(created.isCanCreateCrates()).isFalse();
+    verify(onboarding).applyToNewUser(created);
   }
 }

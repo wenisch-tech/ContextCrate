@@ -168,5 +168,8 @@ document.addEventListener('click', event => {
   }
 });
 document.addEventListener('click', event => {
-  if (event.target.classList.contains('modal')) event.target.classList.remove('show');
+  if (event.target.classList.contains('modal') && event.target.dataset.onboardingRequired !== 'true') event.target.classList.remove('show');
 });
+
+const requiredOnboardingModal = document.querySelector('.modal[data-onboarding-required="true"]');
+if (requiredOnboardingModal) requiredOnboardingModal.classList.add('show');

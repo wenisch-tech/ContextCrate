@@ -17,6 +17,14 @@ ContextCrate separates installation administration from crate membership. Being 
 
 A crate must always retain at least one Owner.
 
+## Onboarding memberships
+
+An administrator can configure an installation-wide onboarding policy for newly provisioned local
+and OIDC accounts. Automatic assignment adds the account as a `VIEWER`; it never grants editing or
+owner authority. Alternatively, the onboarding flow can require one first crate creation. That
+one-time creation is allowed even when normal crate creation is restricted, and makes the new user
+the crate Owner. See [Administration](operations/administration.md).
+
 ## Administrator elevation
 
 Administrators manage accounts, entitlements, global creation policy, queues, and infrastructure. To inspect or change crate content they must enter a reason and start a temporary elevation.

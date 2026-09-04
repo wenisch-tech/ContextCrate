@@ -53,6 +53,21 @@ Every other runtime setting is **per crate** and lives on that crate's settings 
 (`/crates/{crateId}/settings`) — retrieval policy, grading, answer verification, and model
 providers.
 
+### Onboarding policy
+
+The onboarding policy is applied prospectively when a local account is created from the Users tab
+or an OIDC account signs in for the first time. Changing it never changes existing users or crate
+memberships, and it applies to administrator accounts too.
+
+| Policy | Effect for a new account |
+| --- | --- |
+| `ADD_TO_EXISTING_CRATE` | Adds the account to the selected crate as a `VIEWER`. |
+| `SHOW_NEW_CRATE_DIALOG` | Sends the account to `/crates` and requires creating one crate before continuing. This grants one creation even if the normal crate-creation policy would deny it. The user owns the crate they create. |
+| `DO_NOTHING` | Leaves the account on `/crates` without adding a membership or granting creation rights. |
+
+The selected crate must exist when `ADD_TO_EXISTING_CRATE` is saved. Automatic membership is
+recorded in that crate's audit log as a system onboarding action.
+
 ## Crates
 
 The **Crates** tab lists every crate in the installation with its status and content metrics, not

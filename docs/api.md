@@ -71,6 +71,7 @@ Global endpoints are under `/api/v1/admin`: users, creation policy, infrastructu
 - `PUT /api/v1/admin/users/{id}/role` — `{"role": "ADMIN"}`
 - `POST /api/v1/admin/users/{id}/password-reset` — `{"temporaryPassword": "..."}`
 - `PUT /api/v1/admin/settings/crate-creation` — `{"mode": "ENTITLED_USERS"}`
+- `PUT /api/v1/admin/settings/onboarding-policy` — `{"policy": "ADD_TO_EXISTING_CRATE", "crateId": "<crate UUID>"}`. `crateId` is required only for `ADD_TO_EXISTING_CRATE`; the other policies are `SHOW_NEW_CRATE_DIALOG` and `DO_NOTHING`.
 - `PUT /api/v1/admin/settings/time-zone` — `{"timeZone": "Europe/Berlin"}`
 - `GET /api/v1/admin/crates` — every crate with document, source, and member counts
 - `GET /api/v1/admin/elevations` — the caller's active elevations

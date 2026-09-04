@@ -13,3 +13,4 @@ dependency-reduced-pom.xml
 mvnw
 mvnw.cmd
 /.claude
+scripts/

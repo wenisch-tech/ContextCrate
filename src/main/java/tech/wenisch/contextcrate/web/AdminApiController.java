@@ -28,6 +28,7 @@ public class AdminApiController {
   @PostMapping("/users/{id}/password-reset") public AppUser resetPassword(@PathVariable UUID id,@RequestBody PasswordReset r){return administration.resetPassword(id,r.temporaryPassword());}
   @PutMapping("/settings/crate-creation") public SystemSetting creation(@RequestBody CreationMode r){return administration.crateCreationMode(r.mode());}
   @PutMapping("/settings/time-zone") public SystemSetting timeZone(@RequestBody TimeZoneRequest r){return administration.timeZone(r.timeZone());}
+  @PutMapping("/settings/onboarding-policy") public SystemSetting onboardingPolicy(@RequestBody OnboardingPolicyRequest r){return administration.onboardingPolicy(r.policy(),r.crateId());}
   @GetMapping("/crates") public List<CrateOverviewService.CrateCard> crates(){administration.requireAdmin();return overview.all();}
   @GetMapping("/elevations") public List<AdminElevation> activeElevations(){
     administration.requireAdmin();
@@ -43,5 +44,6 @@ public class AdminApiController {
   public record PasswordReset(String temporaryPassword){}
   public record CreationMode(SystemSetting.CrateCreationMode mode){}
   public record TimeZoneRequest(String timeZone){}
+  public record OnboardingPolicyRequest(SystemSetting.OnboardingPolicy policy,UUID crateId){}
   public record Elevation(String reason){}
 }

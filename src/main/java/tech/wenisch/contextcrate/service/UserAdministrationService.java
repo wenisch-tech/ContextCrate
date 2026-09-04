@@ -27,10 +27,11 @@ public class UserAdministrationService {
   private final PasswordEncoder passwords;
   private final SystemSettingRepository settings;
   private final CrateAccessService access;
+  private final OnboardingService onboarding;
 
   public UserAdministrationService(AppUserRepository users, PasswordEncoder passwords,
-      SystemSettingRepository settings, CrateAccessService access) {
-    this.users = users; this.passwords = passwords; this.settings = settings; this.access = access;
+      SystemSettingRepository settings, CrateAccessService access, OnboardingService onboarding) {
+    this.users = users; this.passwords = passwords; this.settings = settings; this.access = access; this.onboarding = onboarding;
   }
 
   public List<AppUser> users() {
@@ -47,8 +48,10 @@ public class UserAdministrationService {
     requireText(temporaryPassword, "A temporary password is required");
     if (users.findByEmailIgnoreCase(address).isPresent())
       throw new IllegalStateException("A user with this e-mail address already exists");
-    return users.save(
+    AppUser user = users.save(
         new AppUser(UUID.randomUUID(), address, passwords.encode(temporaryPassword), USER, true));
+    onboarding.applyToNewUser(user);
+    return user;
   }
 
   @Transactional
@@ -117,6 +120,12 @@ public class UserAdministrationService {
     SystemSetting setting = settings.findById(1).orElseThrow();
     setting.timeZone(timeZone);
     return settings.save(setting);
+  }
+
+  @Transactional
+  public SystemSetting onboardingPolicy(SystemSetting.OnboardingPolicy policy, UUID crateId) {
+    requireAdmin();
+    return onboarding.updatePolicy(policy, crateId);
   }
 
   public void requireAdmin() {

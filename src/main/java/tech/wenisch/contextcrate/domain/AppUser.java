@@ -28,6 +28,9 @@ public class AppUser {
   @Column(name = "can_create_crates", nullable = false)
   private boolean canCreateCrates;
 
+  @Column(name = "onboarding_crate_creation_required", nullable = false)
+  private boolean onboardingCrateCreationRequired;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -77,6 +80,8 @@ public class AppUser {
     return canCreateCrates;
   }
 
+  public boolean isOnboardingCrateCreationRequired() { return onboardingCrateCreationRequired; }
+
   public Instant getCreatedAt() {
     return createdAt;
   }
@@ -84,6 +89,10 @@ public class AppUser {
   public void canCreateCrates(boolean value) {
     canCreateCrates = value;
   }
+
+  public void requireOnboardingCrateCreation() { onboardingCrateCreationRequired = true; }
+
+  public void completeOnboardingCrateCreation() { onboardingCrateCreationRequired = false; }
 
   public void changePassword(String hash) {
     passwordHash = hash;

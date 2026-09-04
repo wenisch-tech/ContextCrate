@@ -52,7 +52,7 @@ class AdminUiControllerTest {
     assertThat(controller.panel(model)).isEqualTo("admin");
     assertThat(model.asMap())
         .containsKeys("users", "cards", "systemSetting", "creationModes", "properties",
-            "queueDepth", "deadLetters", "currentUserId", "elevations");
+            "onboardingPolicies", "queueDepth", "deadLetters", "currentUserId", "elevations");
     assertThat(model.getAttribute("currentUserId")).isEqualTo(admin.getId());
   }
 
@@ -66,6 +66,8 @@ class AdminUiControllerTest {
     assertThat(controller.enabled(id, false)).isEqualTo("redirect:/admin?userSaved#users");
     assertThat(controller.crateCreation(SystemSetting.CrateCreationMode.ADMINS_ONLY))
         .isEqualTo("redirect:/admin?policySaved#policies");
+    assertThat(controller.onboardingPolicy(SystemSetting.OnboardingPolicy.DO_NOTHING, null))
+        .isEqualTo("redirect:/admin?onboardingPolicySaved#policies");
     assertThat(controller.elevate(id, "incident 42"))
         .isEqualTo("redirect:/admin?elevationStarted#crates");
     assertThat(controller.endElevation(id)).isEqualTo("redirect:/admin?elevationEnded#crates");
@@ -74,6 +76,7 @@ class AdminUiControllerTest {
     verify(administration).role(id, "ADMIN");
     verify(administration).enabled(id, false);
     verify(administration).crateCreationMode(SystemSetting.CrateCreationMode.ADMINS_ONLY);
+    verify(administration).onboardingPolicy(SystemSetting.OnboardingPolicy.DO_NOTHING, null);
     verify(elevations).start(id, "incident 42");
     verify(elevations).end(id);
   }

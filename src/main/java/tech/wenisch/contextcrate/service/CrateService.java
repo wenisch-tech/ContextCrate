@@ -50,7 +50,8 @@ public class CrateService {
   public boolean canCreate() {
     AppUser user = access.currentUser();
     SystemSetting.CrateCreationMode mode = settings.findById(1).orElseThrow().getCrateCreationMode();
-    return mode == SystemSetting.CrateCreationMode.EVERYONE
+    return user.isOnboardingCrateCreationRequired()
+        || mode == SystemSetting.CrateCreationMode.EVERYONE
         || "ADMIN".equals(user.getRole())
         || mode == SystemSetting.CrateCreationMode.ENTITLED_USERS && user.isCanCreateCrates();
   }
@@ -73,6 +74,10 @@ public class CrateService {
     members.save(new CrateMember(crate.getId(), user.getId(), CrateMember.Role.OWNER, user.getId()));
     initializeConfiguration(crate.getId());
     audits.save(new AuditLog(crate.getId(), user.getEmail(), "CRATE_CREATED", crate.getId().toString(), name));
+    if (user.isOnboardingCrateCreationRequired()) {
+      user.completeOnboardingCrateCreation();
+      users.save(user);
+    }
     return crate;
   }
 
