@@ -173,3 +173,88 @@ document.addEventListener('click', event => {
 
 const requiredOnboardingModal = document.querySelector('.modal[data-onboarding-required="true"]');
 if (requiredOnboardingModal) requiredOnboardingModal.classList.add('show');
+
+const loginNetworkCanvas = document.getElementById('login-network-canvas');
+if (loginNetworkCanvas) {
+  const context = loginNetworkCanvas.getContext('2d');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let width = 0, height = 0, frame = 0, nodes = [], packets = [], lastTime = 0;
+  let seed = 0x43c0ffee;
+  const random = () => ((seed = Math.imul(seed ^ seed >>> 15, 1 | seed), seed ^= seed + Math.imul(seed ^ seed >>> 7, 61 | seed), ((seed ^ seed >>> 14) >>> 0) / 4294967296));
+
+  const createScene = () => {
+    seed = 0x43c0ffee;
+    const count = Math.max(14, Math.min(32, Math.round(width / 72)));
+    nodes = Array.from({ length: count }, (_, index) => ({
+      x: random() * width, y: (.14 + random() * .82) * height,
+      vx: (random() - .5) * 7, vy: (random() - .5) * 4,
+      radius: index % 7 === 0 ? 2.8 : 1.7 + random() * .7,
+      accent: index % 4 === 0
+    }));
+    packets = Array.from({ length: Math.max(3, Math.round(width / 380)) }, (_, index) => ({
+      from: index % count, to: (index * 5 + 7) % count, progress: random(), speed: .045 + random() * .035
+    }));
+  };
+
+  const resizeNetwork = () => {
+    const bounds = loginNetworkCanvas.getBoundingClientRect();
+    const ratio = Math.min(devicePixelRatio || 1, 2);
+    width = Math.max(1, bounds.width); height = Math.max(1, bounds.height);
+    loginNetworkCanvas.width = Math.round(width * ratio);
+    loginNetworkCanvas.height = Math.round(height * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    createScene(); drawNetwork(0);
+  };
+
+  const connections = () => {
+    const result = [], reach = Math.min(190, Math.max(115, width / 7));
+    for (let first = 0; first < nodes.length; first++) for (let second = first + 1; second < nodes.length; second++) {
+      const a = nodes[first], b = nodes[second], distance = Math.hypot(a.x - b.x, a.y - b.y);
+      if (distance < reach) result.push({ first, second, strength: 1 - distance / reach });
+    }
+    return result;
+  };
+
+  function drawNetwork(delta) {
+    context.clearRect(0, 0, width, height);
+    if (!reducedMotion.matches) nodes.forEach(node => {
+      node.x += node.vx * delta; node.y += node.vy * delta;
+      if (node.x < -12 || node.x > width + 12) node.vx *= -1;
+      if (node.y < height * .08 || node.y > height + 8) node.vy *= -1;
+    });
+    const edges = connections();
+    edges.forEach(edge => {
+      const a = nodes[edge.first], b = nodes[edge.second];
+      context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y);
+      context.strokeStyle = `rgba(${a.accent || b.accent ? '113,128,255' : '53,201,194'},${.08 + edge.strength * .22})`;
+      context.lineWidth = .65 + edge.strength * .65; context.stroke();
+    });
+    nodes.forEach(node => {
+      context.beginPath(); context.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      context.fillStyle = node.accent ? 'rgba(134,146,255,.82)' : 'rgba(89,222,212,.76)';
+      context.shadowColor = node.accent ? '#7180ff' : '#35c9c2'; context.shadowBlur = 9; context.fill();
+    });
+    context.shadowBlur = 12;
+    if (!reducedMotion.matches && edges.length) packets.forEach(packet => {
+      packet.progress = (packet.progress + packet.speed * delta) % 1;
+      const edge = edges[(packet.from + packet.to) % edges.length], a = nodes[edge.first], b = nodes[edge.second];
+      const x = a.x + (b.x - a.x) * packet.progress, y = a.y + (b.y - a.y) * packet.progress;
+      context.beginPath(); context.arc(x, y, 2.2, 0, Math.PI * 2); context.fillStyle = 'rgba(190,255,250,.95)'; context.shadowColor = '#7debe2'; context.fill();
+    });
+    context.shadowBlur = 0;
+  }
+
+  const animateNetwork = time => {
+    const delta = Math.min((time - lastTime) / 1000 || 0, .04); lastTime = time;
+    drawNetwork(delta);
+    if (!reducedMotion.matches && !document.hidden) frame = requestAnimationFrame(animateNetwork);
+  };
+  const syncNetworkMotion = () => {
+    cancelAnimationFrame(frame); lastTime = 0; drawNetwork(0);
+    if (!reducedMotion.matches && !document.hidden) frame = requestAnimationFrame(animateNetwork);
+  };
+  new ResizeObserver(resizeNetwork).observe(loginNetworkCanvas);
+  reducedMotion.addEventListener('change', syncNetworkMotion);
+  document.addEventListener('visibilitychange', syncNetworkMotion);
+  syncNetworkMotion();
+}

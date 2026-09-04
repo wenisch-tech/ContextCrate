@@ -74,4 +74,18 @@ class FrontendMigrationTest {
     assertThat(Files.readString(Path.of("src/main/frontend/contextcrate.js")))
         .contains("requiredOnboardingModal", "data-onboarding-required=\"true\"");
   }
+
+  @Test
+  void loginKeepsItsAnimatedNetworkDecorativeAndMotionSafe() throws IOException {
+    String login = Files.readString(Path.of("src/main/resources/templates/login.html"));
+    String css = Files.readString(Path.of("src/main/frontend/contextcrate.css"));
+
+    assertThat(login).contains("class=\"login-network\"", "aria-hidden=\"true\"",
+        "id=\"login-network-canvas\"").doesNotContain("login-network__mesh");
+    assertThat(css).contains("place-items-start", "pointer-events-none",
+        "@media (prefers-reduced-motion: reduce)");
+    assertThat(Files.readString(Path.of("src/main/frontend/contextcrate.js")))
+        .contains("loginNetworkCanvas", "ResizeObserver", "prefers-reduced-motion",
+            "requestAnimationFrame", "connections()");
+  }
 }

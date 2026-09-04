@@ -144,8 +144,10 @@
   .prose-answer h1,.prose-answer h2,.prose-answer h3 { @apply mt-5 font-semibold text-white; }
   .prose-answer code { @apply rounded bg-ink-950 px-1.5 py-0.5 font-mono text-xs text-cyan-500; }
   .prose-answer pre { @apply overflow-x-auto rounded-lg border border-ink-700 bg-ink-950 p-4; }
-  .login-body { @apply grid min-h-screen place-items-center p-4; background-image:radial-gradient(circle at 50% 0,rgba(61,79,168,.5),transparent 34rem); }
-  .login-card { @apply w-full max-w-md rounded-2xl border border-ink-700/70 bg-ink-900/95 shadow-2xl; }
+  .login-body { @apply relative grid min-h-screen place-items-start justify-center overflow-hidden px-4 pb-10 pt-[clamp(2rem,8vh,6rem)]; background-image:radial-gradient(circle at 50% 0,rgba(61,79,168,.5),transparent 34rem); }
+  .login-card { @apply relative z-10 w-full max-w-md rounded-2xl border border-ink-700/70 bg-ink-900 shadow-2xl; }
+  .login-network { @apply pointer-events-none absolute inset-x-0 bottom-0 h-[46vh] min-h-72 overflow-hidden; opacity:.72; mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.2) 24%,#000 62%); }
+  .login-network canvas { @apply block h-full w-full; }
 
   /* Transitional semantic mappings keep the secondary Thymeleaf screens coherent while the
      Bootstrap dependency is removed. New and high-traffic views use the native classes above. */
