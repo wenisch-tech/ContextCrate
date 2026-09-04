@@ -1,11 +1,11 @@
 import Alpine from 'alpinejs';
 import { createIcons, X, Menu, LayoutDashboard, Network, Files, ScanSearch, Activity,
   Settings2, KeyRound, Boxes, Shield, ArrowLeftRight, UserRound, LockKeyhole, Braces,
-  LogOut, Plus, Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, MessageSquare } from 'lucide';
+  LogOut, Plus, Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, BookOpen, MessageSquare } from 'lucide';
 
 const icons = { X, Menu, LayoutDashboard, Network, Files, ScanSearch, Activity, Settings2,
   KeyRound, Boxes, Shield, ArrowLeftRight, UserRound, LockKeyhole, Braces, LogOut, Plus,
-  Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, MessageSquare };
+  Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, BookOpen, MessageSquare };
 
 const storedTheme = (() => {
   try { return localStorage.getItem('contextcrate-theme'); } catch { return null; }
