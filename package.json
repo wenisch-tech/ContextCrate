@@ -9,7 +9,7 @@
     "watch:js": "esbuild src/main/frontend/contextcrate.js --bundle --format=iife --outfile=target/classes/static/js/contextcrate.js --watch"
   },
   "dependencies": {
-    "alpinejs": "3.17.1",
+    "alpinejs": "3.17.3",
     "lucide": "0.577.0"
   },
   "devDependencies": {
