@@ -17,12 +17,12 @@
         <java.version>25</java.version>
         <jsoup.version>1.23.2</jsoup.version>
         <lucene.version>10.5.1</lucene.version>
-        <playwright.version>1.62.0</playwright.version>
-        <aws.version>2.54.12</aws.version>
-        <springdoc.version>3.1.0</springdoc.version>
-        <onnxruntime.version>1.29.0</onnxruntime.version>
-        <djl.version>0.36.0</djl.version>
-        <jgit.version>7.7.1.202607240634-r</jgit.version>
+        <playwright.version>1.63.0</playwright.version>
+        <aws.version>2.55.2</aws.version>
+        <springdoc.version>3.1.1</springdoc.version>
+        <onnxruntime.version>1.30.0</onnxruntime.version>
+        <djl.version>0.38.0</djl.version>
+        <jgit.version>7.8.0.202609011348-r</jgit.version>
         <mockito.version>5.23.0</mockito.version>
         <!-- Overrides spring-boot-dependencies' rabbit-amqp-client.version (5.30.0) to clear
              CVE-2026-63337/63335/63336/69219/69220 in the transitive com.rabbitmq:amqp-client. -->
