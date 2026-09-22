@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.26
+# syntax=docker/dockerfile:1.27
 # Directory scaffolding only: cgr.dev/chainguard/jre has no shell or package manager, so the
 # volume mount points are pre-created and chowned here, then copied into the minimal final image.
 FROM cgr.dev/chainguard/wolfi-base:latest AS scaffold
