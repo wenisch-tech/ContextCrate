@@ -7,7 +7,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions: { contents: write, id-token: write }
+    # contents: write creates the source release; packages: write publishes the
+    # chart as an OCI artifact in ghcr.io/wenisch-tech/helm-charts.
+    permissions: { contents: write, packages: write, id-token: write }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -22,5 +24,32 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.2
       - run: |
           for file in release/*; do cosign sign-blob --yes "$file" --bundle "$file.cosign.bundle"; done
+      - name: Publish Helm chart archive to charts repository
+        env:
+          # HELM_CHARTS_TOKEN must be a fine-grained token with Contents: write
+          # on wenisch-tech/helm-charts. GITHUB_TOKEN only has write access to
+          # this source repository, so it is deliberately only a same-repo fallback.
+          GH_TOKEN: ${{ secrets.HELM_CHARTS_TOKEN || secrets.GITHUBTOKEN || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/wenisch-tech/helm-charts.git" charts-repo
+          mkdir -p charts-repo/contextcrate
+          cp release/contextcrate-${{ inputs.version }}.tgz charts-repo/contextcrate/
+          cp release/contextcrate-${{ inputs.version }}.tgz.cosign.bundle charts-repo/contextcrate/
+          cd charts-repo
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add contextcrate/
+          git commit -m "Add contextcrate Helm chart version ${{ inputs.version }}" || exit 0
+          git push origin main
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.HELM_CHARTS_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Publish Helm chart to OCI registry
+        run: helm push release/contextcrate-${{ inputs.version }}.tgz oci://ghcr.io/wenisch-tech/helm-charts
       - uses: softprops/action-gh-release@v3
         with: { tag_name: '${{ inputs.tag }}', generate_release_notes: true, files: 'release/*' }
