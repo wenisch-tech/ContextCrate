@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
     <groupId>tech.wenisch</groupId>
@@ -30,7 +30,7 @@
         <rabbit-amqp-client.version>5.37.0</rabbit-amqp-client.version>
         <!-- Overrides spring-boot-dependencies' tomcat.version (11.0.24). -->
         <tomcat.version>11.0.27</tomcat.version>
-        <mcp.version>2.0.1</mcp.version>
+        <mcp.version>2.0.2</mcp.version>
         <mcp.sdk.version>2.1.0</mcp.sdk.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
