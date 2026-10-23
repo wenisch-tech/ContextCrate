@@ -17,23 +17,24 @@
         <java.version>25</java.version>
         <jsoup.version>1.23.2</jsoup.version>
         <lucene.version>10.5.2</lucene.version>
-        <playwright.version>1.63.0</playwright.version>
-        <aws.version>2.56.0</aws.version>
+        <playwright.version>1.64.0</playwright.version>
+        <aws.version>2.57.3</aws.version>
         <springdoc.version>3.1.1</springdoc.version>
         <onnxruntime.version>1.31.0</onnxruntime.version>
-        <djl.version>0.38.0</djl.version>
+        <djl.version>0.39.0</djl.version>
         <jgit.version>7.8.0.202609011348-r</jgit.version>
-        <mockito.version>5.23.0</mockito.version>
+        <mockito.version>5.24.0</mockito.version>
+        <postgresql.version>42.7.14</postgresql.version>
         <!-- Overrides spring-boot-dependencies' rabbit-amqp-client.version (5.30.0) to clear
              CVE-2026-63337/63335/63336/69219/69220 in the transitive com.rabbitmq:amqp-client. -->
-        <rabbit-amqp-client.version>5.35.0</rabbit-amqp-client.version>
+        <rabbit-amqp-client.version>5.37.0</rabbit-amqp-client.version>
         <!-- Overrides spring-boot-dependencies' tomcat.version (11.0.24). -->
-        <tomcat.version>11.0.26</tomcat.version>
+        <tomcat.version>11.0.27</tomcat.version>
         <mcp.version>2.0.1</mcp.version>
         <mcp.sdk.version>2.1.0</mcp.sdk.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
-        <jackson-2-bom.version>2.22.3</jackson-2-bom.version>
-        <netty.version>4.2.18.Final</netty.version>
+        <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
+        <netty.version>4.2.19.Final</netty.version>
     </properties>
     <dependencyManagement>
         <dependencies>
