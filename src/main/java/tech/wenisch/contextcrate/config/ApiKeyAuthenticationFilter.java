@@ -9,6 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tech.wenisch.contextcrate.metrics.CrateMetrics;
 import tech.wenisch.contextcrate.repository.ApiKeyRepository;
 import tech.wenisch.contextcrate.security.ApiKeyPrincipal;
 import tech.wenisch.contextcrate.storage.Hashing;
@@ -16,9 +17,15 @@ import tech.wenisch.contextcrate.storage.Hashing;
 @Component
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
   private final ApiKeyRepository keys;
+  private CrateMetrics metrics = CrateMetrics.noop();
 
   public ApiKeyAuthenticationFilter(ApiKeyRepository keys) {
     this.keys = keys;
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(CrateMetrics metrics) {
+    this.metrics = metrics;
   }
 
   @Override
@@ -26,23 +33,33 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
     String token = token(request);
-    if (token != null && SecurityContextHolder.getContext().getAuthentication() == null)
-      keys.findByKeyHashAndRevokedFalse(Hashing.sha256(token))
-          .ifPresent(
-              key ->
-                  SecurityContextHolder.getContext()
-                      .setAuthentication(
-                          new UsernamePasswordAuthenticationToken(
-                              new ApiKeyPrincipal(
-                                  "api-key:" + key.getName(),
-                                  key.getUserId(),
-                                  key.getCrateId(),
-                                  key.getCrateRole()),
-                              token,
-                              List.of(
-                                  new SimpleGrantedAuthority(
-                                      key.getKeyType() == tech.wenisch.contextcrate.domain.ApiKey.KeyType.PERSONAL
-                                          ? "ROLE_USER" : "ROLE_CRATE_KEY")))));
+    if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+      String hash = Hashing.sha256(token);
+      var found = keys.findByKeyHashAndRevokedFalse(hash);
+      if (found != null && found.isPresent()) {
+        var key = found.get();
+        String type = key.getKeyType() == null ? "UNKNOWN" : key.getKeyType().name();
+        metrics.countGlobal("apikey.auth", "result", "ok", "key_type", type);
+        metrics.count("apikey.requests", key.getCrateId(), "key", metrics.keyTag(key.getName()), "key_type", type);
+        SecurityContextHolder.getContext()
+            .setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                    new ApiKeyPrincipal(
+                        "api-key:" + key.getName(),
+                        key.getUserId(),
+                        key.getCrateId(),
+                        key.getCrateRole(),
+                        key.getId(),
+                        type),
+                    token,
+                    List.of(
+                        new SimpleGrantedAuthority(
+                            key.getKeyType() == tech.wenisch.contextcrate.domain.ApiKey.KeyType.PERSONAL
+                                ? "ROLE_USER" : "ROLE_CRATE_KEY"))));
+      } else {
+        metrics.countGlobal("apikey.auth", "result", keys.existsByKeyHash(hash) ? "revoked" : "invalid", "key_type", "none");
+      }
+    }
     chain.doFilter(request, response);
   }
 

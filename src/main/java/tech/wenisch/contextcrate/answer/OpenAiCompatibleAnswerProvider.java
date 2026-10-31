@@ -14,6 +14,10 @@ public class OpenAiCompatibleAnswerProvider implements AnswerGenerationProvider 
   private final RuntimeProviderSettings settings;
   private final ObjectMapper mapper;
   private final HttpClient client;
+  private tech.wenisch.contextcrate.metrics.CrateMetrics metrics = tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) { this.metrics = metrics; }
+  private void httpError(int status) { metrics.count("llm.http_errors", tech.wenisch.contextcrate.config.CrateContext.current(), "status", String.valueOf(status)); }
 
   public OpenAiCompatibleAnswerProvider(RuntimeProviderSettings settings, ObjectMapper mapper) {
     this.settings = settings; this.mapper = mapper;
@@ -31,7 +35,7 @@ public class OpenAiCompatibleAnswerProvider implements AnswerGenerationProvider 
     var c=settings.effectiveAnswer();
     var response=client.send(request(c).POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(
         Map.of("model",c.model(),"stream",false,"temperature",temperature,"max_tokens",c.maxOutputTokens(),"messages",messages)))).build(),HttpResponse.BodyHandlers.ofString());
-    if(response.statusCode()/100!=2)throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());
+    if(response.statusCode()/100!=2){httpError(response.statusCode());throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());}
     var content=mapper.readTree(response.body()).path("choices").path(0).path("message").path("content");
     if(content.isMissingNode()||content.isNull())throw new IllegalStateException("Answer provider returned no completion content");
     return content.asText();
@@ -42,7 +46,7 @@ public class OpenAiCompatibleAnswerProvider implements AnswerGenerationProvider 
     var request=request(c);
     var body=Map.of("model",c.model(),"stream",true,"temperature",c.temperature(),"max_tokens",c.maxOutputTokens(),"messages",messages);
     var response=client.send(request.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofLines());
-    if(response.statusCode()/100!=2)throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());
+    if(response.statusCode()/100!=2){httpError(response.statusCode());throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());}
     try(var lines=response.body()) { lines.filter(line->line.startsWith("data:")).map(line->line.substring(5).trim()).takeWhile(data->!data.equals("[DONE]")).forEach(data->{try{var text=mapper.readTree(data).path("choices").path(0).path("delta").path("content");if(!text.isMissingNode()&&!text.isNull())delta.accept(text.asText());}catch(Exception e){throw new IllegalStateException("Invalid streaming response from answer provider",e);}}); }
   }
   private static HttpRequest.Builder request(RuntimeProviderSettings.Answering c) {

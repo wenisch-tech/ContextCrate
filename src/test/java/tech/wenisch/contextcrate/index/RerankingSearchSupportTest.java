@@ -27,6 +27,16 @@ class RerankingSearchSupportTest {
     assertThat(RerankingSearchSupport.candidateLimit(request,new Scores(true,List.of()),100)).isEqualTo(30);
     assertThat(RerankingSearchSupport.candidateLimit(request,new Scores(false,List.of()),100)).isEqualTo(5);
   }
+  @Test void countsFallbacksAndTopHitMovement() {
+    var registry=new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    var metrics=new tech.wenisch.contextcrate.metrics.CrateMetrics(registry,null,10);
+    var request=new SearchIndex.SearchRequest(crate,"question",2,null,"chunk","lexical");
+    var hits=List.of(hit("first",1),hit("second",2));
+    RerankingSearchSupport.apply(request,hits,new Scores(true,List.of(0.1f,0.9f)),metrics);
+    assertThat(registry.get("contextcrate.rerank.original_top_hit_position").summary().totalAmount()).isEqualTo(1.0);
+    RerankingSearchSupport.apply(request,hits,new Scores(true,null),metrics);
+    assertThat(registry.find("contextcrate.rerank.fallbacks").counter().count()).isEqualTo(1.0);
+  }
   private SearchIndex.SearchHit hit(String content,float score){UUID id=UUID.randomUUID();return new SearchIndex.SearchHit(id,UUID.randomUUID(),UUID.randomUUID(),"chunk",null,"https://example.test",0,content,score,score,null,null,content);}
   private static final class Scores implements RerankingProvider {
     private final boolean available;private final List<Float> scores; Scores(boolean available,List<Float> scores){this.available=available;this.scores=scores;}

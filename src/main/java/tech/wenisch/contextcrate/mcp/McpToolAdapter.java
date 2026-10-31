@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import tech.wenisch.contextcrate.domain.Crate;
+import tech.wenisch.contextcrate.metrics.CrateMetrics;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -40,6 +41,12 @@ public class McpToolAdapter {
   private final McpCrateResolver crates;
   private final McpToolCatalog catalog;
   private final JsonMapper mapper = JsonMapper.builder().build();
+  private CrateMetrics metrics = CrateMetrics.noop();
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(CrateMetrics metrics) {
+    this.metrics = metrics;
+  }
 
   public McpToolAdapter(McpTools tools, McpCrateResolver crates, McpToolCatalog catalog) {
     this.tools = tools;
@@ -74,23 +81,38 @@ public class McpToolAdapter {
 
     var previous = SecurityContextHolder.getContext().getAuthentication();
     if (authentication != null) SecurityContextHolder.getContext().setAuthentication(authentication);
+    long started = System.nanoTime();
+    String outcome = "ok";
+    UUID[] crateSeen = {pathCrateId};
     try {
-      return result(run(name, pathCrateId, request));
+      var result = result(run(name, pathCrateId, request, crateSeen));
+      if (Boolean.TRUE.equals(result.isError())) outcome = "tool_error";
+      return result;
     } catch (AccessDeniedException denied) {
+      outcome = "denied";
       return result(McpProtocol.toolFailure(
           denied.getMessage() == null ? "Access denied." : denied.getMessage()));
     } catch (McpCrateResolver.UnresolvedCrateException unresolved) {
+      outcome = "unresolved_crate";
       return result(McpProtocol.toolFailure(unresolved.getMessage()));
     } catch (Exception failure) {
+      outcome = "error";
       return result(McpProtocol.toolFailure(
           failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
     } finally {
       SecurityContextHolder.getContext().setAuthentication(previous);
+      try {
+        metrics.count("mcp.tool.calls", crateSeen[0], "tool", name, "outcome", outcome);
+        metrics.time("mcp.tool.duration", crateSeen[0], System.nanoTime() - started, "tool", name);
+      } catch (RuntimeException ignored) {
+        // metrics must never break a tool call
+      }
     }
   }
 
   private Map<String, Object> run(
-      String name, UUID pathCrateId, McpSchema.CallToolRequest request) throws Exception {
+      String name, UUID pathCrateId, McpSchema.CallToolRequest request, UUID[] crateSeen)
+      throws Exception {
     JsonNode arguments = mapper.valueToTree(
         request.arguments() == null ? Map.of() : request.arguments());
 
@@ -98,6 +120,7 @@ public class McpToolAdapter {
 
     String requested = arguments.hasNonNull("crate") ? arguments.get("crate").asString() : null;
     Crate crate = crates.resolve(pathCrateId, requested);
+    crateSeen[0] = crate.getId();
 
     return switch (name) {
       case "search_crate" -> tools.search(crate, arguments);

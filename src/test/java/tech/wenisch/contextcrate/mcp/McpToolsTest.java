@@ -63,6 +63,24 @@ class McpToolsTest {
   }
 
   @Test
+  void searchRecordsHitCountsAndHotContent() throws Exception {
+    var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    var hot = mock(tech.wenisch.contextcrate.metrics.HotContentTracker.class);
+    tools.setMetrics(new tech.wenisch.contextcrate.metrics.CrateMetrics(registry, null, 10), hot);
+    var found = hit("s", "body");
+    when(index.search(any())).thenReturn(new SearchIndex.SearchResults("q", "hybrid", List.of(found)));
+
+    tools.search(crate, arguments("{\"query\":\"q\"}"));
+
+    assertThat(registry.get("contextcrate.mcp.search.hits").summary().totalAmount()).isEqualTo(1.0);
+    verify(hot).record(crate.getId(), found.documentId(), found.id());
+
+    when(index.search(any())).thenReturn(new SearchIndex.SearchResults("q", "hybrid", List.of()));
+    tools.search(crate, arguments("{\"query\":\"q\"}"));
+    assertThat(registry.find("contextcrate.mcp.search.empty").counter().count()).isEqualTo(1.0);
+  }
+
+  @Test
   void searchStatesThatResultsAreRankedAndNotExhaustive() throws Exception {
     when(index.search(any())).thenReturn(
         new SearchIndex.SearchResults("install", "hybrid", List.of(hit("s", "body"))));

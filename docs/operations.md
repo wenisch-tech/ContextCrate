@@ -13,13 +13,69 @@ Failures are intentionally contained:
 
 ## Metrics
 
-Pipeline metrics use the `contextcrate.*` prefix:
+ContextCrate exposes Prometheus metrics at `/actuator/prometheus`. All business metrics use the `contextcrate.*` prefix (`contextcrate_*` in Prometheus). Metrics that belong to a crate carry a `crate` tag with the **crate name**; installation-wide metrics have no `crate` tag.
 
-- `contextcrate.pipeline.completed`
-- `contextcrate.pipeline.failed`
-- `contextcrate.pipeline.duration`
+### Scraping
 
-Stage is a low-cardinality tag. Crate IDs are deliberately not metric tags; use crate-scoped audit and generation endpoints for per-crate investigation.
+The endpoint requires an administrator (it exposes crate names and document titles across all crates). Use HTTP Basic with an admin account:
+
+```yaml
+scrape_configs:
+  - job_name: contextcrate
+    metrics_path: /actuator/prometheus
+    basic_auth:
+      username: admin@example.com
+      password_file: /etc/prometheus/contextcrate-password
+    static_configs:
+      - targets: ["contextcrate:8080"]
+```
+
+### Global metrics
+
+| Metric | Type | Tags | Meaning |
+| --- | --- | --- | --- |
+| `contextcrate_pipeline_queue_depth` | gauge | `stage` | Pending work items per stage |
+| `contextcrate_pipeline_dead_letters` | gauge | | Work that exhausted its retries |
+| `contextcrate_index_documents` | gauge | | Current document versions |
+| `contextcrate_crates` | gauge | `status` | Crates by lifecycle status |
+| `contextcrate_apikey_auth_total` | counter | `result` (`ok`, `invalid`, `revoked`), `key_type` | API key authentication outcomes |
+| `contextcrate_apikey_created_total`, `contextcrate_apikey_revoked_total` | counter | `key_type` | Key lifecycle |
+
+### Per-crate metrics
+
+All carry `crate`. Timers are published as histograms (`*_seconds_bucket`) so quantiles can be computed.
+
+| Area | Metrics |
+| --- | --- |
+| API keys | `apikey_requests_total{key,key_type}` |
+| Pipeline | `pipeline_completed_total`, `pipeline_failed_total`, `pipeline_retries_total`, `pipeline_dead_lettered_total`, `pipeline_duration_seconds` (all `stage`) |
+| Ingestion | `ingestion_runs_started_total{connector}`, `ingestion_runs_total{status}`, `ingestion_run_duration_seconds{status}`, `ingestion_documents_total{result=new\|updated\|unchanged}`, `ingestion_documents_indexed_total`, `ingestion_chunks_per_document`, `ingestion_document_characters`, `ingestion_index_duration_seconds`, `ingestion_embedding_rechunks_total` |
+| MCP | `mcp_tool_calls_total{tool,outcome}`, `mcp_tool_duration_seconds{tool}`, `mcp_search_hits{mode}`, `mcp_search_empty_total`, `mcp_search_truncated_total`, `mcp_fetch_not_found_total` |
+| Search | `search_requests_total{backend,mode,kind,outcome}`, `search_duration_seconds`, `search_hits` |
+| Embeddings | `embedding_requests_total{provider,op,outcome}`, `embedding_duration_seconds`, `embedding_batch_size` |
+| Reranking | `rerank_requests_total{provider,outcome}`, `rerank_duration_seconds`, `rerank_candidates`, `rerank_fallbacks_total`, `rerank_original_top_hit_position` |
+| LLM | `llm_requests_total{purpose,outcome}`, `llm_duration_seconds{purpose}`, `llm_time_to_first_token_seconds`, `llm_http_errors_total{status}` |
+| Answers | `answer_verification_total{status}`, `answer_sources`, `answer_grading_kept_ratio` |
+
+`purpose` is `grade`, `answer`, `verify` or `revise`. `rerank_original_top_hit_position` is the position the reranker gave the hit that retrieval ranked first (0 means it agreed).
+
+### Most requested documents, chunks and sources
+
+Every document and chunk returned by `search_crate`, `ask_crate` (and the REST and OpenAI-compatible answer endpoints) and every `fetch_document` call is counted. Counts are kept in memory, flushed to the `content_hit` table every 15 seconds, and survive restarts. To avoid unbounded label cardinality only the top *N* per crate (default 20) are published as gauges:
+
+- `contextcrate_content_document_hits{crate,document_id,title,uri}`
+- `contextcrate_content_chunk_hits{crate,chunk_id,title,ordinal}`
+- `contextcrate_content_source_hits{crate,source_id,source}`
+
+These are cumulative counts; series disappear when they drop out of the top *N*.
+
+### Cardinality
+
+The `crate` label is the crate name, so cardinality grows with the number of crates (fine for tens or hundreds). API key names are free text: at most `contextcrate.metrics.key-tag-limit` (default 100) distinct names are used and further keys are reported as `other`. See [Configuration](configuration.md#metrics) for the settings.
+
+### Grafana dashboard
+
+Import `grafana/contextcrate-dashboard.json` (Dashboards → New → Import). The dashboard has a **Data source** selector and a **Crate** selector at the top, links to the repository and to the documentation, and two sections: **Global** (installation-wide) and **Crate** (filtered by the selected crates, including the most requested documents, chunks and sources, reranker behaviour and LLM latency).
 
 ## Index rebuild runbook
 

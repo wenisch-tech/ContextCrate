@@ -59,6 +59,9 @@ public class SecurityConfig {
             a ->
                 a.requestMatchers("/css/**", "/js/**", "/img/**", "/actuator/health/**")
                     .permitAll()
+                    // Metrics carry crate names, document titles and URIs across all crates.
+                    .requestMatchers("/actuator/prometheus", "/actuator/metrics/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(apiKeys, UsernamePasswordAuthenticationFilter.class)

@@ -87,3 +87,14 @@ Each crate Settings page can override embedding and answer-provider values such 
 Reranking is disabled by default and can rescore the retrieval candidate pool before results are
 shown or used for RAG. Configure a local ONNX cross-encoder or Cohere-compatible endpoint with
 `CONTEXTCRATE_RERANKING_*`, or override every setting per crate in the UI. See [Reranking](reranking.md).
+
+## Metrics
+
+Prometheus metrics are described under [Operations](operations.md#metrics).
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `contextcrate.metrics.top-n` (`CONTEXTCRATE_METRICS_TOP_N`) | `20` | Hottest documents, chunks and sources published per crate |
+| `contextcrate.metrics.flush-interval-ms` | `15000` | How often retrieval hit counters are written to the database |
+| `contextcrate.metrics.refresh-interval-ms` | `30000` | How often database-backed gauges are refreshed |
+| `contextcrate.metrics.key-tag-limit` | `100` | Distinct API key names used as a label; further keys are reported as `other` |

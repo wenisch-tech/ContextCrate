@@ -6,6 +6,7 @@ import tech.wenisch.contextcrate.domain.ApiKey;
 
 public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
   Optional<ApiKey> findByKeyHashAndRevokedFalse(String hash);
+  boolean existsByKeyHash(String hash);
   java.util.List<ApiKey> findByUserIdOrderByCreatedAtDesc(UUID userId);
   java.util.List<ApiKey> findByCrateIdOrderByCreatedAtDesc(UUID crateId);
 }

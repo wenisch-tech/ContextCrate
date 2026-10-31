@@ -12,6 +12,10 @@ import tech.wenisch.contextcrate.repository.*;
 
 @Service
 public class IngestionService {
+  private tech.wenisch.contextcrate.metrics.CrateMetrics cm = tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) { this.cm = metrics; }
+
   private final SourceRepository sources;
   private final IngestionJobRepository jobs;
   private final IngestionRunRepository runs;
@@ -113,6 +117,7 @@ public class IngestionService {
     queue.publish(PipelineMessage.create(crateId, stage,
         payload(crateId, run.getId(), item.getId()), run.getId(),
         crateId + ":" + stage.name().toLowerCase(Locale.ROOT) + ":" + item.getId(), 100));
+    cm.count("ingestion.runs.started", crateId, "connector", type.name());
     return run;
   }
 

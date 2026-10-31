@@ -34,6 +34,9 @@ public class DocumentParser {
   private final ExtractionService extraction;
   private final ObjectMapper mapper;
   private final RuntimeProviderSettings providers;
+  private tech.wenisch.contextcrate.metrics.CrateMetrics cm = tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) { this.cm = metrics; }
 
   public DocumentParser(AcquisitionRecordRepository acquisitions, IngestionRunRepository runs,
       NormalizedDocumentRepository documents, DocumentChunkRepository chunks,
@@ -146,7 +149,10 @@ public class DocumentParser {
         ? acquisition.getRequestedLocator() : sourceUri;
     var current = documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
         run.getCrateId(), run.getSourceId(), identityUri);
-    if (current.filter(document -> document.getContentHash().equals(hash)).isPresent()) return;
+    if (current.filter(document -> document.getContentHash().equals(hash)).isPresent()) {
+      cm.count("ingestion.documents", run.getCrateId(), "result", "unchanged");
+      return;
+    }
     UUID documentId = stable("document:" + run.getId() + ":" + sourceUri);
     NormalizedDocument value = new NormalizedDocument(documentId, run.getId(),
         acquisition.getId(), sourceUri, title, language, description, author, body,
@@ -158,7 +164,11 @@ public class DocumentParser {
     NormalizedDocument document = documents.save(value);
     int chunkSize = effectiveChunkSize(run, output.chunkSize());
     int chunkOverlap = Math.min(output.chunkOverlap(), Math.max(0, chunkSize - 1));
-    chunks.saveAll(chunk(document, sections, chunkSize, chunkOverlap));
+    var produced = chunk(document, sections, chunkSize, chunkOverlap);
+    chunks.saveAll(produced);
+    cm.count("ingestion.documents", run.getCrateId(), "result", current.isPresent() ? "updated" : "new");
+    cm.summary("ingestion.chunks_per_document", run.getCrateId(), produced.size());
+    cm.summary("ingestion.document_characters", run.getCrateId(), body.length());
     extraction.publish(document, false);
     queue.publish(PipelineMessage.create(run.getCrateId(), WorkStage.INDEX,
         IngestionService.payload(run.getCrateId(), run.getId(), document.getId()), run.getId(),

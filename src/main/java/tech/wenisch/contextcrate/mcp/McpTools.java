@@ -15,6 +15,8 @@ import tech.wenisch.contextcrate.domain.NormalizedDocument;
 import tech.wenisch.contextcrate.domain.Source;
 import tech.wenisch.contextcrate.domain.SourceConfiguration;
 import tech.wenisch.contextcrate.index.SearchIndex;
+import tech.wenisch.contextcrate.metrics.CrateMetrics;
+import tech.wenisch.contextcrate.metrics.HotContentTracker;
 import tech.wenisch.contextcrate.repository.DocumentListRow;
 import tech.wenisch.contextcrate.repository.DocumentSort;
 import tech.wenisch.contextcrate.repository.NormalizedDocumentRepository;
@@ -45,6 +47,14 @@ public class McpTools {
   private final NormalizedDocumentRepository documents;
   private final SourceService sources;
   private final SourceConfigurationCodec sourceCodec;
+  private CrateMetrics metrics = CrateMetrics.noop();
+  private HotContentTracker hot = HotContentTracker.noop();
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(CrateMetrics metrics, HotContentTracker hot) {
+    this.metrics = metrics;
+    this.hot = hot;
+  }
 
   public McpTools(SearchIndex index, AnswerService answers, NormalizedDocumentRepository documents,
       SourceService sources, SourceConfigurationCodec sourceCodec) {
@@ -69,6 +79,8 @@ public class McpTools {
     SearchIndex.SearchResults results =
         index.search(new SearchIndex.SearchRequest(crate.getId(), query, limit, null, "chunk", mode));
     List<SearchIndex.SearchHit> hits = results.hits();
+    metrics.summary("mcp.search.hits", crate.getId(), hits.size(), "mode", String.valueOf(results.mode()));
+    if (hits.isEmpty()) metrics.count("mcp.search.empty", crate.getId());
     if (hits.isEmpty())
       return McpProtocol.toolResult(
           "No passages in \"" + crate.getName() + "\" matched \"" + query + "\".",
@@ -105,7 +117,9 @@ public class McpTools {
           .append(body)
           .append('\n');
       structured.add(hitEntry(included, hit));
+      hot.record(crate.getId(), hit.documentId(), hit.id());
       if (truncated || remaining <= 0) {
+        metrics.count("mcp.search.truncated", crate.getId());
         if (included < hits.size())
           rendered
               .append("\n(Character budget reached; ")
@@ -159,8 +173,11 @@ public class McpTools {
           "The \"documentId\" argument must be a UUID as returned by search_crate or list_documents.");
     }
     NormalizedDocument document = documents.findByIdAndCrateId(documentId, crate.getId()).orElse(null);
-    if (document == null)
+    if (document == null) {
+      metrics.count("mcp.fetch.not_found", crate.getId());
       return McpProtocol.toolFailure("No document " + documentId + " exists in \"" + crate.getName() + "\".");
+    }
+    hot.record(crate.getId(), document.getId(), null);
 
     String body = document.getBody() == null ? "" : document.getBody();
     int offset = Math.max(0, integer(arguments, "offset", 0));

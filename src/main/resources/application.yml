@@ -37,6 +37,15 @@ springdoc:
 contextcrate:
   profile: standalone
   role: all
+  metrics:
+    # Number of hottest documents / chunks / sources published per crate as gauges.
+    top-n: ${CONTEXTCRATE_METRICS_TOP_N:20}
+    # How often retrieval hit counters are written to the database.
+    flush-interval-ms: 15000
+    # How often database-backed gauges (crate counts, top-N content) are refreshed.
+    refresh-interval-ms: 30000
+    # Distinct API key names used as a metric label; further keys are reported as "other".
+    key-tag-limit: 100
   queue:
     backend: local
   database:

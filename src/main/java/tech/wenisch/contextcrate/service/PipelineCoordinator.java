@@ -30,6 +30,12 @@ public class PipelineCoordinator {
   private final MeterRegistry metrics;
   private final IngestionRunRepository runs;
   private final ThreadPoolExecutor executor;
+  private tech.wenisch.contextcrate.metrics.CrateMetrics cm;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) {
+    this.cm = metrics;
+  }
 
   @org.springframework.beans.factory.annotation.Autowired
   public PipelineCoordinator(
@@ -52,6 +58,7 @@ public class PipelineCoordinator {
     this.indexer = indexer;
     this.properties = properties;
     this.metrics = metrics;
+    this.cm = new tech.wenisch.contextcrate.metrics.CrateMetrics(metrics, null, 100);
     this.runs = runs;
     int concurrency = properties.worker().concurrency();
     var sequence = new java.util.concurrent.atomic.AtomicInteger();
@@ -133,14 +140,16 @@ public class PipelineCoordinator {
       queue.acknowledge(message.id());
       log.info("Pipeline work completed: id={}, stage={}, run={}, crate={}, attempt={}",
           message.id(), message.stage(), message.correlationId(), crateId, message.attempts());
-      metrics.counter("contextcrate.pipeline.completed", "stage", message.stage().name()).increment();
+      cm.count("pipeline.completed", message.crateId(), "stage", message.stage().name());
     } catch (Exception e) {
       String error = safe(e);
       queue.retry(
           message.id(),
           Duration.ofSeconds(Math.min(300, 1L << Math.min(message.attempts(), 8))),
           error);
-      if (message.attempts() >= properties.worker().maxAttempts()) {
+      boolean dead = message.attempts() >= properties.worker().maxAttempts();
+      cm.count(dead ? "pipeline.dead_lettered" : "pipeline.retries", message.crateId(), "stage", message.stage().name());
+      if (dead) {
         log.error("Pipeline work dead-lettered: id={}, stage={}, run={}, crate={}, attempts={}, error={}",
             message.id(), message.stage(), message.correlationId(), message.crateId(),
             message.attempts(), error);
@@ -149,11 +158,10 @@ public class PipelineCoordinator {
             message.id(), message.stage(), message.correlationId(), message.crateId(),
             message.attempts(), error);
       }
-      metrics.counter("contextcrate.pipeline.failed", "stage", message.stage().name()).increment();
+      cm.count("pipeline.failed", message.crateId(), "stage", message.stage().name());
     } finally {
-      metrics
-          .timer("contextcrate.pipeline.duration", "stage", message.stage().name())
-          .record(Duration.ofNanos(System.nanoTime() - started));
+      cm.time("pipeline.duration", message.crateId(), System.nanoTime() - started,
+          "stage", message.stage().name());
     }
   }
 

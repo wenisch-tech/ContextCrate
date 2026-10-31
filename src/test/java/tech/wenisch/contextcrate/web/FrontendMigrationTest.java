@@ -33,7 +33,7 @@ class FrontendMigrationTest {
   void sidebarProvidesThemeAndProjectMetadata() throws IOException {
     assertThat(Files.readString(Path.of("src/main/resources/templates/fragments.html")))
         .contains("$store.theme.toggle()", "applicationVersion", "AGPL-3.0",
-            "github.com/wenisch-tech/contextcrate", "issues/new", ">Chat</a>",
+            "github.com/wenisch-tech/ContextCrate", "https://contextcrate.eu/docs/", "issues/new", ">Chat</a>",
             "aria-label=\"Switch crate\"", ">Switch crate</span>", "Available crates", "Manage crates")
         .doesNotContain(">Switch crate</a>");
   }

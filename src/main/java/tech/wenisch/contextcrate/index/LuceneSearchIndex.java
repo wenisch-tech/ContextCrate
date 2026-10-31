@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.NormalizedDocument;
+import tech.wenisch.contextcrate.metrics.CrateMetrics;
 import tech.wenisch.contextcrate.embedding.EmbeddingProvider;
 import tech.wenisch.contextcrate.reranking.RerankingProvider;
 import tech.wenisch.contextcrate.reranking.DisabledRerankingProvider;
@@ -28,6 +29,9 @@ public class LuceneSearchIndex implements SearchIndex {
   private final EmbeddingProvider embeddings; private final RerankingProvider reranking; private final ContextCrateProperties.Retrieval retrieval;
   private final Map<String, IndexWriter> writers = new LinkedHashMap<>();
   private final CrateRepository crates;
+  private CrateMetrics metrics = CrateMetrics.noop();
+  @Autowired(required = false)
+  public void setMetrics(CrateMetrics metrics) { this.metrics = metrics; }
   @Autowired
   public LuceneSearchIndex(ContextCrateProperties properties, EmbeddingProvider embeddings,RerankingProvider reranking,CrateRepository crates) {
     root = properties.index().path().toAbsolutePath().normalize(); this.embeddings=embeddings;this.reranking=reranking;this.crates=crates; retrieval=properties.retrieval();
@@ -93,16 +97,18 @@ public class LuceneSearchIndex implements SearchIndex {
   private static void common(org.apache.lucene.document.Document doc,NormalizedDocument d) { doc.add(new StringField("parent_id",d.getId().toString(),Field.Store.YES)); doc.add(new StringField("run_id",d.getRunId().toString(),Field.Store.YES)); doc.add(new StringField("url",d.getSourceUri(),Field.Store.YES)); doc.add(new TextField("url_text",d.getSourceUri(),Field.Store.NO)); if(d.getTitle()!=null)doc.add(new TextField("title",d.getTitle(),Field.Store.YES)); if(d.getLanguage()!=null)doc.add(new StringField("language",d.getLanguage(),Field.Store.YES)); doc.add(new StringField("content_hash",d.getContentHash(),Field.Store.YES)); }
   @Override public synchronized void delete(UUID crateId,UUID id)throws IOException { var writer=writer(crateId,generation(crateId));writer.deleteDocuments(new Term("parent_id",id.toString()));writer.commit(); }
   @Override public synchronized SearchResults search(SearchRequest request)throws IOException {
+    long started=System.nanoTime();String outcome="ok";SearchResults results=null;
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(request.crateId())){
-      return searchScoped(request);
-    }
+      results=searchScoped(request);return results;
+    } catch(IOException|RuntimeException e) { outcome="error";throw e; }
+    finally { metrics.search("lucene",request,results,outcome,System.nanoTime()-started); }
   }
   private SearchResults searchScoped(SearchRequest request)throws IOException{
     var writer=writer(request.crateId(),generation(request.crateId())); if(request.query().isBlank())return new SearchResults(request.query(),mode(request),List.of()); writer.commit();
     String mode=mode(request); try(var reader=DirectoryReader.open(writer)) { var searcher=new IndexSearcher(reader); List<SearchHit> lexical=mode.equals("semantic")?List.of():lexical(searcher,request); List<SearchHit> semantic=mode.equals("lexical")?List.of():semantic(searcher,request);
       int candidates=RerankingSearchSupport.candidateLimit(request,reranking,retrieval.candidateLimit());
       List<SearchHit> found=mode.equals("hybrid") ? fuse(lexical,semantic,candidates) : limit(mode.equals("lexical")?lexical:semantic,candidates);
-      return new SearchResults(request.query(),mode,RerankingSearchSupport.apply(request,found,reranking));
+      return new SearchResults(request.query(),mode,RerankingSearchSupport.apply(request,found,reranking,metrics));
     } catch(Exception e) { if(e instanceof IOException io)throw io; throw new IOException("Search failed",e); }
   }
   private String mode(SearchRequest r) { return r.mode()!=null?r.mode():(embeddings.available()?retrieval.defaultMode():"lexical"); }

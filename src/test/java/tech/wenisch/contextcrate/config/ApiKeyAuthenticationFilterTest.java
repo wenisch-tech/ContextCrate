@@ -118,4 +118,20 @@ class ApiKeyAuthenticationFilterTest {
     assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     verify(chain).doFilter(request, response);
   }
+
+  @Test
+  void countsAuthenticationOutcomes() throws Exception {
+    var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    filter.setMetrics(new tech.wenisch.contextcrate.metrics.CrateMetrics(registry, null, 10));
+    when(request.getHeader("X-API-KEY")).thenReturn(TOKEN);
+    keyExists();
+    filter.doFilter(request, response, chain);
+    assertThat(registry.counter("contextcrate.apikey.auth", "result", "ok", "key_type", "CRATE").count()).isEqualTo(1);
+
+    SecurityContextHolder.clearContext();
+    when(keys.findByKeyHashAndRevokedFalse(anyString())).thenReturn(Optional.empty());
+    when(keys.existsByKeyHash(Hashing.sha256(TOKEN))).thenReturn(true);
+    filter.doFilter(request, response, chain);
+    assertThat(registry.counter("contextcrate.apikey.auth", "result", "revoked", "key_type", "none").count()).isEqualTo(1);
+  }
 }

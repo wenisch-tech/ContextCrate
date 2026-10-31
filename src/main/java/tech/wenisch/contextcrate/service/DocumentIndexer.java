@@ -30,9 +30,22 @@ public class DocumentIndexer {
     this.retrieval = retrieval;
   }
 
+  private tech.wenisch.contextcrate.metrics.CrateMetrics cm = tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) { this.cm = metrics; }
+
   @Transactional
   public void index(PipelinePayload payload) throws Exception {
+    long started = System.nanoTime();
     var document = documents.findById(payload.entityId()).orElseThrow();
+    try {
+      indexDocument(payload, document);
+    } finally {
+      cm.time("ingestion.index.duration", document.getCrateId(), System.nanoTime() - started);
+    }
+  }
+
+  private void indexDocument(PipelinePayload payload, tech.wenisch.contextcrate.domain.NormalizedDocument document) throws Exception {
     if (payload.crateId() != null && !payload.crateId().equals(document.getCrateId()))
       throw new IllegalArgumentException("Pipeline message crosses crate boundary");
     for (var previous : documents.findByCrateIdAndSourceIdAndIdentityUriAndCurrentVersionFalse(
@@ -49,10 +62,12 @@ public class DocumentIndexer {
     } catch (Exception error) {
       EmbeddingInputTooLargeException limit=findLimit(error);
       if(limit==null || attempt>=8) throw error;
+      cm.count("ingestion.embedding.rechunks", document.getCrateId());
       rechunk(document, limit.suggestedMaximumCharacters());
     }
     document.indexed();
     documents.save(document);
+    cm.count("ingestion.documents.indexed", document.getCrateId());
   }
   private void rechunk(tech.wenisch.contextcrate.domain.NormalizedDocument document,int size) {
     List<DocumentChunk> replacement=new ArrayList<>();int ordinal=0;

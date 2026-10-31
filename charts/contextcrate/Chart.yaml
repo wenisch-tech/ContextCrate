@@ -14,3 +14,6 @@ annotations:
   artifacthub.io/license: AGPL-3.0
   # Lets GitHub associate the OCI chart package with this source repository.
   org.opencontainers.image.source: https://github.com/wenisch-tech/ContextCrate
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://contextcrate.eu/docs/

@@ -14,6 +14,8 @@ import tech.wenisch.contextcrate.storage.Hashing;
 /** Shared token generation/listing/revocation logic for both the JSON API and the web UI. */
 @Service
 public class ApiKeyService {
+  private tech.wenisch.contextcrate.metrics.CrateMetrics metrics =
+      tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
   private final ApiKeyRepository keys;
   private final SecureRandom random = new SecureRandom();
 
@@ -51,6 +53,7 @@ public class ApiKeyService {
             new ApiKey(
                 UUID.randomUUID(), name, token.substring(0, 12), Hashing.sha256(token), type,
                 userId, crateId, role));
+    metrics.countGlobal("apikey.created", "key_type", type.name());
     return new CreatedKey(key.getId(), key.getName(), token);
   }
 
@@ -60,6 +63,7 @@ public class ApiKeyService {
       throw new AccessDeniedException("Key belongs to another principal");
     key.revoke();
     keys.save(key);
+    metrics.countGlobal("apikey.revoked", "key_type", "PERSONAL");
   }
 
   public void revokeCrate(UUID crateId, UUID id) {
@@ -68,6 +72,12 @@ public class ApiKeyService {
       throw new AccessDeniedException("Key belongs to another crate");
     key.revoke();
     keys.save(key);
+    metrics.countGlobal("apikey.revoked", "key_type", "CRATE");
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) {
+    this.metrics = metrics;
   }
 
   public record CreatedKey(UUID id, String name, String token) {}

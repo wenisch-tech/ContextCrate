@@ -1,6 +1,7 @@
 site_name: ContextCrate
 site_description: Self-hosted crawling and indexing platform
 repo_url: https://github.com/wenisch-tech/ContextCrate
+site_url: https://contextcrate.eu/docs/
 theme:
   name: material
   palette:
