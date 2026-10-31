@@ -121,6 +121,29 @@
   .crate-stat { @apply flex flex-col items-center; }.crate-stat__icon { @apply mb-1 size-3.5 text-cyan-500/80; }.crate-stat strong { @apply block text-xl text-white; }.crate-stat span { @apply text-[.65rem] uppercase tracking-wider text-ink-500; }
   .crate-activity { @apply pointer-events-none absolute inset-x-0 bottom-0 h-[56%] overflow-hidden; z-index:0; background:linear-gradient(to bottom,transparent 0%,rgba(7,12,25,.18) 42%,rgba(7,12,25,.7) 100%); }.crate-activity::after { content:""; @apply absolute inset-x-0 bottom-0 h-16; background:linear-gradient(to top,rgba(13,18,33,.62),transparent); }.crate-activity__caption { @apply absolute left-4 top-5; }.crate-activity span { @apply block text-[.6rem] font-semibold tracking-wider text-ink-500/70; }.crate-activity strong { @apply block text-xs font-medium text-ink-300/80; }.crate-activity svg { @apply absolute inset-x-4 bottom-3 h-[78%]; width:calc(100% - 2rem); }.crate-activity polyline { fill:none; stroke:rgba(100,116,139,.3); stroke-width:1.2; vector-effect:non-scaling-stroke; }.crate-activity svg.active polyline { stroke:rgba(53,201,194,.6); filter:drop-shadow(0 0 7px rgba(53,201,194,.3)); }
   .crate-card__footer { @apply flex items-center justify-between gap-2 text-xs text-ink-500; }
+  /* Settings pages: section nav + stacked cards + toggle switches + sticky save bar. */
+  .settings-layout { @apply grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]; }
+  .settings-nav { @apply flex gap-1 overflow-x-auto pb-1 lg:sticky lg:top-24 lg:flex-col lg:self-start lg:overflow-visible; }
+  .settings-nav__group { @apply hidden px-3 pb-1 pt-4 text-[.66rem] font-bold uppercase tracking-[.16em] text-ink-500 first:pt-0 lg:block; }
+  .settings-nav a { @apply shrink-0 whitespace-nowrap rounded-lg border-l-2 border-transparent px-3 py-1.5 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white; }
+  .settings-nav a.active { @apply border-brand-400 bg-brand-500/10 text-brand-400; }
+  .settings-title { @apply text-base font-semibold text-white; }
+  .settings-hint { @apply mt-0.5 text-xs font-normal text-ink-500; }
+  .panel-footer { @apply flex items-center gap-3 border-t border-ink-700/60 px-4 py-3; }
+  .setting-row { @apply flex items-start justify-between gap-6 border-b border-ink-700/40 py-3 first:pt-0 last:border-0 last:pb-0; }
+  .setting-row > label { @apply min-w-0 flex-1 cursor-pointer text-sm text-ink-100; }
+  .setting-row > label strong { @apply block font-semibold text-white; }
+  .setting-row > label > span { @apply mt-0.5 block text-xs leading-relaxed text-ink-500; }
+  .switch { @apply relative inline-block h-6 w-11 shrink-0; }
+  .switch > input { @apply absolute inset-0 z-10 m-0 size-full cursor-pointer opacity-0; }
+  .switch > span { @apply pointer-events-none absolute inset-0 rounded-full border border-ink-700 bg-ink-800 transition-colors; }
+  .switch > span::after { content:""; @apply absolute left-0.5 top-0.5 size-4 rounded-full bg-ink-300 transition-transform; }
+  .switch > input:checked + span { @apply border-transparent bg-brand-600; }
+  .switch > input:checked + span::after { @apply bg-white; transform:translateX(1.25rem); }
+  .switch > input:focus-visible + span { @apply outline-2 outline-offset-2 outline-brand-400; }
+  .switch-labelled { @apply flex cursor-pointer items-center gap-2 text-xs font-medium text-ink-300; }
+  .save-bar { @apply sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink-700/80 bg-ink-900/95 px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,.35)] backdrop-blur; }
+  .save-bar > p { @apply min-w-0 flex-1; }
   .admin-tile { @apply flex items-center gap-4 rounded-xl p-4 text-ink-100 hover:border-cyan-500/50; }
   .wizard-step { @apply rounded-xl border border-ink-700/70 bg-ink-900/88 p-5 shadow-[0_20px_50px_rgba(0,0,0,.18)] sm:p-6; }
   .wizard-nav { @apply mb-6 grid gap-2 sm:grid-cols-5; }

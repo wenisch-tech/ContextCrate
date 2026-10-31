@@ -25,8 +25,9 @@ class FrontendMigrationTest {
             "fragments :: sidebar", "fragments :: overlay", "fragments :: topbar(${job == null ? 'Create ingestion job' : 'Edit ingestion job'})")
         .doesNotContain("fragments :: nav");
     assertThat(Files.readString(Path.of("src/main/resources/templates/settings.html")))
-        .contains("General settings", "Save general settings", "x-data=\"wizard(4)\"",
-            "Retrieval &amp; answers", "Review &amp; save");
+        .contains("Save general settings", "Save retrieval settings", "Save provider settings",
+            "Retrieval &amp; answers", "settings-nav")
+        .doesNotContain("wizard", "Review &amp; save");
   }
 
   @Test
