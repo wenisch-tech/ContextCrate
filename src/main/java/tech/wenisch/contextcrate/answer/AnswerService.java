@@ -42,6 +42,7 @@ public class AnswerService {
   }
   public boolean available(UUID crateId){try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){return provider.available();}}
   public Prepared prepare(Request request) throws Exception {
+    long prepareStarted=System.nanoTime();
     if(request.question()==null||request.question().isBlank())throw new IllegalArgumentException("question is required");
     if(request.kind()!=null&&!request.kind().isBlank()&&!"chunk".equalsIgnoreCase(request.kind()))throw new IllegalArgumentException("answers support kind=chunk only");
     if(request.question().length()>8_000)throw new IllegalArgumentException("question must not exceed 8000 characters");
@@ -52,13 +53,15 @@ public class AnswerService {
     for(var m:history)if(m.content()==null||m.content().isBlank()||m.content().length()>8_000||!("user".equals(m.role())||"assistant".equals(m.role())))throw new IllegalArgumentException("history accepts non-empty user and assistant messages only");
     int limit=Math.min(request.maxSources()==null?policy.getSourceLimit():request.maxSources(),policy.getSourceLimit());if(limit<1)throw new IllegalArgumentException("maxSources must be positive");
     String mode=request.retrievalMode()==null||request.retrievalMode().isBlank()?policy.getRetrievalMode():request.retrievalMode();
-    var retrieved=retrieve(request,history,policy,limit,mode);var found=retrieved.results();
+    var retrieved=retrieve(request,history,policy,limit,mode);var found=retrieved.results();String transformed=retrieved.applied().isEmpty()?"false":"true";
     List<Source> candidates=new ArrayList<>();Set<UUID> seen=new HashSet<>();
     for(var hit:found.hits()) { if(!seen.add(hit.id()))continue;var chunk=chunks.findByIdAndCrateId(hit.id(),request.crateId()).orElse(null);String content=chunk==null?hit.snippet():chunk.getContent();candidates.add(new Source(candidates.size()+1,hit.id(),hit.documentId(),hit.runId(),hit.title(),hit.sourceUri(),hit.chunkOrdinal(),hit.snippet(),hit.score(),content));if(candidates.size()==limit)break; }
     if(policy.isGradingEnabled()){int before=candidates.size();candidates=grade(request.crateId(),request.question(),candidates);if(before>0)metrics.summary("answer.grading.kept_ratio",request.crateId(),(double)candidates.size()/before);}
     List<Source> sources=new ArrayList<>();int remaining=config.contextTokenBudget()*4;
     for(var candidate:candidates) { if(remaining<=0)break;String content=candidate.content();content=content.length()>remaining?content.substring(0,remaining):content;remaining-=content.length();sources.add(new Source(sources.size()+1,candidate.chunkId(),candidate.documentId(),candidate.runId(),candidate.title(),candidate.sourceUri(),candidate.chunkOrdinal(),candidate.snippet(),candidate.score(),content)); }
     metrics.summary("answer.sources",request.crateId(),sources.size());
+    metrics.count("answer.requests",request.crateId(),"transformed",transformed);
+    metrics.time("answer.prepare.duration",request.crateId(),System.nanoTime()-prepareStarted,"transformed",transformed);
     for(var source:sources)hot.record(request.crateId(),source.documentId(),source.chunkId());
     return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied());
   }
@@ -73,9 +76,12 @@ public class AnswerService {
       var plan=transformation.plan(request.crateId(),request.question(),history,policy.getQueryTransformationStrategies());
       if(!plan.applied().isEmpty()){queries=plan.queries();applied=plan.applied();}
     } else if(policy.isQueryTransformationEnabled()) metrics.count("answer.query_transformation",request.crateId(),"strategy","none","outcome","skipped");
+    long searchStarted=System.nanoTime();
     List<SearchIndex.SearchResults> lists=new ArrayList<>();
     for(String query:queries)lists.add(index.search(new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode)));
-    return new Retrieved(lists.size()==1?lists.getFirst():fuse(request.question(),lists,limit),queries,applied);
+    var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,limit);
+    metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted,"transformed",applied.isEmpty()?"false":"true");
+    return new Retrieved(results,queries,applied);
   }
   /** Reciprocal rank fusion across the result lists of several queries, deduplicated by hit id. */
   private SearchIndex.SearchResults fuse(String query,List<SearchIndex.SearchResults> lists,int limit) {
@@ -102,16 +108,16 @@ public class AnswerService {
     return accepted;
   }
   public Result generate(Prepared prepared) throws Exception {
-    Instant started=Instant.now();boolean success=false;String verification="disabled";
+    Instant started=Instant.now();long totalStarted=System.nanoTime();boolean success=false;String verification="disabled";String transformed=prepared.transformations().isEmpty()?"false":"true";
     try (var ignored=tech.wenisch.contextcrate.config.CrateContext.use(prepared.crateId())) {
       var answer=new StringBuilder();long streamStart=System.nanoTime();boolean[] first={true};String streamOutcome="ok";
       try { provider.stream(messages(prepared),delta->{if(first[0]){first[0]=false;metrics.time("llm.time_to_first_token",prepared.crateId(),System.nanoTime()-streamStart);}answer.append(delta);}); }
       catch(Exception e) { streamOutcome="error";throw e; }
-      finally { metrics.count("llm.requests",prepared.crateId(),"purpose","answer","outcome",streamOutcome);metrics.time("llm.duration",prepared.crateId(),System.nanoTime()-streamStart,"purpose","answer"); }
+      finally { metrics.count("llm.requests",prepared.crateId(),"purpose","answer","outcome",streamOutcome);metrics.time("llm.duration",prepared.crateId(),System.nanoTime()-streamStart,"purpose","answer");metrics.time("answer.generation.duration",prepared.crateId(),System.nanoTime()-streamStart,"transformed",transformed); }
       success=true;
       Result result=prepared.answerVerificationEnabled()?verify(prepared,answer.toString()):new Result(answer.toString(),null);
       verification=result.verificationStatus()==null?"disabled":result.verificationStatus();return result;
-    } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", transform="+(prepared.transformations().isEmpty()?"none":String.join("+",prepared.transformations()))+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
+    } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);metrics.time("answer.duration",prepared.crateId(),System.nanoTime()-totalStarted,"transformed",transformed,"success",String.valueOf(success));audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", transform="+(prepared.transformations().isEmpty()?"none":String.join("+",prepared.transformations()))+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
   }
   /** Compatibility method; verified answers are now delivered as one completed delta. */
   public void stream(Prepared prepared, java.util.function.Consumer<String> delta) throws Exception { delta.accept(generate(prepared).text()); }

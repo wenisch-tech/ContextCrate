@@ -95,4 +95,21 @@ class AnswerServiceQueryTransformationTest {
 
     verify(index, times(1)).search(any());
   }
+
+  @Test
+  void recordsRetrievalAndPrepareTimingsTaggedByTransformation() throws Exception {
+    settings(true, false);
+    var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    when(transformation.plan(any(), any(), any(), any()))
+        .thenReturn(new QueryTransformationService.Plan(List.of("a", "b"), List.of("sub-queries")));
+    when(index.search(any())).thenReturn(new SearchIndex.SearchResults("q", "hybrid", List.of(hit("x"))));
+    var service = service();
+    service.setMetrics(new tech.wenisch.contextcrate.metrics.CrateMetrics(registry, null, 10), tech.wenisch.contextcrate.metrics.HotContentTracker.noop());
+
+    service.prepare(new AnswerService.Request(crateId, "Original question", null, "chunk", null, null, List.of()));
+
+    assertThat(registry.get("contextcrate.answer.retrieval.duration").tag("transformed", "true").timer().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.answer.prepare.duration").tag("transformed", "true").timer().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.answer.requests").tag("transformed", "true").counter().count()).isEqualTo(1);
+  }
 }

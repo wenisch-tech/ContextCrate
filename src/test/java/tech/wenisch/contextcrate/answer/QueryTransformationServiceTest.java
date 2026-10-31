@@ -115,4 +115,26 @@ class QueryTransformationServiceTest {
     assertThatThrownBy(() -> QueryTransformationService.normalize(List.of("bogus"))).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> QueryTransformationService.normalize(List.of(" "))).isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void recordsPerStrategyTimingGeneratedQueriesAndTheSelection() throws Exception {
+    when(provider.complete(any())).thenReturn("rewritten", "p1\np2\np3");
+    service.plan(crate, "q", List.of(), "rewrite,sub-queries");
+
+    assertThat(registry.get("contextcrate.answer.query_transformation.duration").tag("strategy", "rewrite").timer().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.answer.query_transformation.duration").tag("strategy", "sub-queries").timer().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.answer.query_transformation.generated").tag("strategy", "sub-queries").summary().totalAmount()).isEqualTo(3.0);
+    assertThat(registry.get("contextcrate.answer.query_transformation.selection").tag("selection", "fixed").tag("applied", "rewrite+sub-queries").counter().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.answer.query_transformation.overhead").timer().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.llm.duration").tag("purpose", "transform").timer().count()).isEqualTo(2);
+  }
+
+  @Test
+  void autoClassificationIsTimedAsItsOwnStrategyAndMarkedAsAuto() throws Exception {
+    when(provider.complete(any())).thenReturn("{\"strategies\": []}");
+    service.plan(crate, "q", List.of(), "auto");
+
+    assertThat(registry.get("contextcrate.answer.query_transformation.duration").tag("strategy", "auto").timer().count()).isEqualTo(1);
+    assertThat(registry.get("contextcrate.answer.query_transformation.selection").tag("selection", "auto").tag("applied", "none").counter().count()).isEqualTo(1);
+  }
 }

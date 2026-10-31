@@ -55,7 +55,7 @@ All carry `crate`. Timers are published as histograms (`*_seconds_bucket`) so qu
 | Embeddings | `embedding_requests_total{provider,op,outcome}`, `embedding_duration_seconds`, `embedding_batch_size` |
 | Reranking | `rerank_requests_total{provider,outcome}`, `rerank_duration_seconds`, `rerank_candidates`, `rerank_fallbacks_total`, `rerank_original_top_hit_position` |
 | LLM | `llm_requests_total{purpose,outcome}`, `llm_duration_seconds{purpose}`, `llm_time_to_first_token_seconds`, `llm_http_errors_total{status}` |
-| Answers | `answer_query_transformation_total{strategy,outcome}`, `answer_query_transformation_queries`, `answer_verification_total{status}`, `answer_sources`, `answer_grading_kept_ratio` |
+| Answers | `answer_requests_total{transformed}`, `answer_prepare_duration_seconds`, `answer_retrieval_duration_seconds`, `answer_generation_duration_seconds`, `answer_duration_seconds`, `answer_query_transformation_total{strategy,outcome}`, `answer_query_transformation_selection_total{selection,applied}`, `answer_query_transformation_duration_seconds{strategy}`, `answer_query_transformation_overhead_seconds`, `answer_query_transformation_generated{strategy}`, `answer_query_transformation_queries` (details in [Query transformation](features/query-transformation.md#observability)), `answer_verification_total{status}`, `answer_sources`, `answer_grading_kept_ratio` |
 
 `purpose` is `grade`, `answer`, `verify`, `revise` or `transform` (query transformation, see [Query transformation](features/query-transformation.md#observability)). `rerank_original_top_hit_position` is the position the reranker gave the hit that retrieval ranked first (0 means it agreed).
 

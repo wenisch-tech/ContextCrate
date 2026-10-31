@@ -107,15 +107,35 @@ restore; bundles from older versions restore with the feature off.
 
 ## Observability
 
-- `contextcrate_answer_query_transformation_total{crate,strategy,outcome}` — `outcome` is `ok`,
-  `failed` or `skipped` (`strategy="none"` + `skipped` means the feature was on but the answer model
-  was unavailable); `auto` is reported as its own strategy for the classification call.
-- `contextcrate_answer_query_transformation_queries` — queries searched per question (a count near 1
-  means the transformation rarely changes anything).
-- `contextcrate_llm_requests_total{purpose="transform"}` and `llm_duration_seconds{purpose="transform"}`
-  — the extra model calls.
-- The `ANSWER_GENERATED` audit entry contains `transform=rewrite+sub-queries` (or `none`).
-- The Grafana dashboard's crate section has a *Query transformation* panel.
+All metrics carry the `crate` tag (see [Operations → Metrics](../operations.md#metrics)).
+
+| Metric | Meaning |
+| --- | --- |
+| `contextcrate_answer_query_transformation_total{strategy,outcome}` | Strategy calls. `outcome` is `ok`, `failed` or `skipped` (`strategy="none"`, `skipped`: feature on but the answer model unavailable). Auto's classification call is reported as strategy `auto`. |
+| `contextcrate_answer_query_transformation_selection_total{selection,applied}` | One count per question: `selection` is `auto` or `fixed`; `applied` is the strategies that changed the query set, e.g. `rewrite+sub-queries`, or `none`. |
+| `contextcrate_answer_query_transformation_duration_seconds{strategy}` | Duration of the single model call of each strategy (histogram). |
+| `contextcrate_answer_query_transformation_overhead_seconds` | All strategy calls of one question together — the wait before retrieval starts (histogram). |
+| `contextcrate_answer_query_transformation_generated{strategy}` | Queries a strategy produced (1 for rewrite/step-back, 2–4 for sub-queries). |
+| `contextcrate_answer_query_transformation_queries` | Queries finally searched per question (1 = unchanged, max 6). |
+| `contextcrate_answer_requests_total{transformed}` | Prepared answers; `transformed` says whether any strategy changed the query set. |
+| `contextcrate_answer_retrieval_duration_seconds{transformed}` | Searching all queries plus fusion (and per-query reranking). |
+| `contextcrate_answer_prepare_duration_seconds{transformed}` | Everything before the model answers: transformation, retrieval, grading. |
+| `contextcrate_answer_generation_duration_seconds{transformed}` | Streaming the answer from the model. |
+| `contextcrate_answer_duration_seconds{transformed,success}` | Answer generation plus verification/revision. |
+| `contextcrate_llm_requests_total` / `llm_duration_seconds` with `purpose="transform"` | The extra model calls, next to grade/answer/verify/revise. |
+
+The `ANSWER_GENERATED` audit entry contains `transform=rewrite+sub-queries` (or `none`).
+
+### Grafana: “Query transformation & answer timing” section
+
+The dashboard's third section (filtered by the **Crate** variable) shows:
+
+- **Headline numbers (1 h):** share of answers using transformation, average transformation overhead, average queries searched, step failure rate, average answer generation time and average total answer time.
+- **Which strategies were used:** bars for strategies used, applied combinations and auto-vs-fixed over the selected time range; the same over time, plus ok/failed/skipped outcomes.
+- **Strategy statistics table:** per strategy the calls, OK, failed, average and p95 model-call time and average queries produced.
+- **Timing of the strategies:** p50/p95 and average call time per strategy, overhead per question, queries generated per strategy, queries searched per question.
+- **Where the time goes:** stacked average seconds per answer for transformation, retrieval, chunk grading, answer generation and verification — the quickest way to see what the feature costs.
+- **Answer timings, transformed vs. unchanged:** p50/p95 of retrieval, prepare, answer generation, time to first token and total answer time, and answers per minute.
 
 ## Recommendations
 

@@ -59,11 +59,13 @@ public class QueryTransformationService {
   }
 
   public Plan plan(UUID crateId, String question, List<AnswerService.HistoryMessage> history, String strategies) {
+    long planStarted = System.nanoTime();
     String original = question.strip();
     List<AnswerService.HistoryMessage> context = history == null ? List.of()
         : history.subList(Math.max(0, history.size() - HISTORY_MESSAGES), history.size());
     try (var ignored = CrateContext.use(crateId)) {
-      List<String> selected = AUTO.equals(strategies) ? classify(crateId, original, context) : parse(strategies);
+      boolean auto = AUTO.equals(strategies);
+      List<String> selected = auto ? classify(crateId, original, context) : parse(strategies);
       String current = original;
       List<String> queries = new ArrayList<>(), applied = new ArrayList<>();
       for (String strategy : STRATEGIES) {
@@ -71,18 +73,21 @@ public class QueryTransformationService {
         try {
           switch (strategy) {
             case REWRITE -> {
-              String rewritten = single(call(crateId, REWRITE_PROMPT, block(context) + "QUESTION:\n" + current));
+              String rewritten = single(call(crateId, strategy, REWRITE_PROMPT, block(context) + "QUESTION:\n" + current));
               if (rewritten == null) { outcome(crateId, strategy, "failed"); continue; }
+              generated(crateId, strategy, 1);
               current = rewritten; queries = new ArrayList<>(List.of(rewritten));
             }
             case STEP_BACK -> {
-              String general = single(call(crateId, STEP_BACK_PROMPT, "QUESTION:\n" + current));
+              String general = single(call(crateId, strategy, STEP_BACK_PROMPT, "QUESTION:\n" + current));
               if (general == null) { outcome(crateId, strategy, "failed"); continue; }
+              generated(crateId, strategy, 1);
               queries = new ArrayList<>(List.of(current, general));
             }
             default -> {
-              List<String> parts = lines(call(crateId, SUB_QUERY_PROMPT, "QUESTION:\n" + current));
+              List<String> parts = lines(call(crateId, strategy, SUB_QUERY_PROMPT, "QUESTION:\n" + current));
               if (parts.isEmpty()) { outcome(crateId, strategy, "failed"); continue; }
+              generated(crateId, strategy, parts.size());
               if (applied.isEmpty()) queries = new ArrayList<>(parts);
               else { queries.addAll(parts); }
             }
@@ -97,6 +102,9 @@ public class QueryTransformationService {
       if (applied.isEmpty()) queries = new ArrayList<>(List.of(original));
       List<String> finalQueries = dedupe(queries);
       metrics.summary("answer.query_transformation.queries", crateId, finalQueries.size());
+      metrics.count("answer.query_transformation.selection", crateId, "selection", auto ? "auto" : "fixed",
+          "applied", applied.isEmpty() ? "none" : String.join("+", applied));
+      metrics.time("answer.query_transformation.overhead", crateId, System.nanoTime() - planStarted);
       return new Plan(finalQueries, List.copyOf(applied));
     }
   }
@@ -110,7 +118,7 @@ public class QueryTransformationService {
   /** Auto mode: asks the model which strategies fit this question. Anything unparseable means none. */
   private List<String> classify(UUID crateId, String question, List<AnswerService.HistoryMessage> history) {
     try {
-      String reply = call(crateId, AUTO_PROMPT, block(history) + "QUESTION:\n" + question);
+      String reply = call(crateId, AUTO, AUTO_PROMPT, block(history) + "QUESTION:\n" + question);
       int from = reply.indexOf('{'), to = reply.lastIndexOf('}');
       if (from < 0 || to <= from) { outcome(crateId, AUTO, "failed"); return List.of(); }
       JsonNode node = mapper.readTree(reply.substring(from, to + 1)).path("strategies");
@@ -125,12 +133,16 @@ public class QueryTransformationService {
     }
   }
 
-  private String call(UUID crateId, String system, String user) throws Exception {
+  private void generated(UUID crateId, String strategy, int count) { metrics.summary("answer.query_transformation.generated", crateId, count, "strategy", strategy); }
+
+  /** One model call for a strategy (or the auto classifier); timed per strategy. */
+  private String call(UUID crateId, String strategy, String system, String user) throws Exception {
     long started = System.nanoTime(); String outcome = "ok";
     try {
       return provider.complete(List.of(new AnswerGenerationProvider.Message("system", system), new AnswerGenerationProvider.Message("user", user)));
     } catch (Exception e) { outcome = "error"; throw e; }
-    finally { metrics.count("llm.requests", crateId, "purpose", "transform", "outcome", outcome); metrics.time("llm.duration", crateId, System.nanoTime() - started, "purpose", "transform"); }
+    finally { metrics.count("llm.requests", crateId, "purpose", "transform", "outcome", outcome); metrics.time("llm.duration", crateId, System.nanoTime() - started, "purpose", "transform");
+      metrics.time("answer.query_transformation.duration", crateId, System.nanoTime() - started, "strategy", strategy); }
   }
 
   private void outcome(UUID crateId, String strategy, String outcome) { metrics.count("answer.query_transformation", crateId, "strategy", strategy, "outcome", outcome); }
