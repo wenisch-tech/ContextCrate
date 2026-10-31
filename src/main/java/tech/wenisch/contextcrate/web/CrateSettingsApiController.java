@@ -24,7 +24,11 @@ public class CrateSettingsApiController {
     var current=rag.current(crateId);
     String oldStrategy=current.getRetrievalStrategy(),oldPolicy=current.getPropositionFailurePolicy();
     String strategy=r.retrievalStrategy()==null?oldStrategy:r.retrievalStrategy(),policy=r.propositionFailurePolicy()==null?oldPolicy:r.propositionFailurePolicy();
-    var updated=rag.update(crateId,r.strictGrounding(),r.allowClientHistory(),r.inlineCitations(),r.structuredSources(),r.gradingEnabled()==null?current.isGradingEnabled():r.gradingEnabled(),r.answerVerificationEnabled()==null?current.isAnswerVerificationEnabled():r.answerVerificationEnabled(),r.answerVerificationFailureAction()==null?current.getAnswerVerificationFailureAction():r.answerVerificationFailureAction(),r.retrievalMode(),strategy,policy,r.sourceLimit());
+    RagSettings updated=rag.update(crateId,r.strictGrounding(),r.allowClientHistory(),r.inlineCitations(),r.structuredSources(),r.gradingEnabled()==null?current.isGradingEnabled():r.gradingEnabled(),r.answerVerificationEnabled()==null?current.isAnswerVerificationEnabled():r.answerVerificationEnabled(),r.answerVerificationFailureAction()==null?current.getAnswerVerificationFailureAction():r.answerVerificationFailureAction(),r.retrievalMode(),strategy,policy,r.sourceLimit());
+    if(r.queryTransformationEnabled()!=null||r.queryTransformationStrategies()!=null){
+      boolean enabled=r.queryTransformationEnabled()==null?current.isQueryTransformationEnabled():r.queryTransformationEnabled();
+      updated=rag.updateQueryTransformation(crateId,enabled,r.queryTransformationStrategies()==null?java.util.List.of(current.getQueryTransformationStrategies()):r.queryTransformationStrategies());
+    }
     if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy))rebuild.rebuildAsync(crateId);return updated;
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
@@ -42,7 +46,7 @@ public class CrateSettingsApiController {
     return providers(crateId);
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
-      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit){}
+      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

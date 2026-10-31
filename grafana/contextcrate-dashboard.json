@@ -3758,8 +3758,71 @@
     },
     {
       "type": "timeseries",
-      "title": "Grading: share of candidate chunks kept",
+      "title": "Query transformation",
       "id": 66,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Strategy outcomes (ok / failed / skipped) and the average number of queries searched per question. A value near 1 means the transformation rarely changes anything.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 212
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (crate,strategy,outcome) (rate(contextcrate_answer_query_transformation_total{crate=~\"$crate\"}[$__rate_interval]))",
+          "legendFormat": "{{crate}} · {{strategy}} {{outcome}}",
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (crate) (rate(contextcrate_answer_query_transformation_queries_sum{crate=~\"$crate\"}[$__rate_interval])) / clamp_min(sum by (crate) (rate(contextcrate_answer_query_transformation_queries_count{crate=~\"$crate\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{crate}} avg queries searched",
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Grading: share of candidate chunks kept",
+      "id": 67,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -3768,8 +3831,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 212
+        "x": 0,
+        "y": 220
       },
       "targets": [
         {
@@ -3812,7 +3875,7 @@
     {
       "type": "timeseries",
       "title": "Sources per answer (avg)",
-      "id": 67,
+      "id": 68,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -3821,7 +3884,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 220
       },
       "targets": [

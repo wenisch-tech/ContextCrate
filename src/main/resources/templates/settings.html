@@ -13,6 +13,7 @@
       <a href="#general" :class="{'active':active==='general'}">General</a>
       <p class="settings-nav__group">Retrieval &amp; answers</p>
       <a href="#retrieval" :class="{'active':active==='retrieval'}">Retrieval</a>
+      <a href="#query-transformation" :class="{'active':active==='query-transformation'}">Query transformation</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
       <a href="#quality" :class="{'active':active==='quality'}">Answer quality</a>
       <p class="settings-nav__group">Model providers</p>
@@ -36,7 +37,7 @@
       </form>
 
       <!-- Retrieval & answers -->
-      <form method="post" class="space-y-4" th:action="@{/crates/{id}/settings/rag(id=${crate.id})}" x-data="{dirty:false}" @input="dirty=true" @change="dirty=true">
+      <form method="post" class="space-y-4" th:action="@{/crates/{id}/settings/rag(id=${crate.id})}" x-data="{dirty:false,qt:false}" x-init="qt=$el.querySelector('#query-transformation-enabled').checked" @input="dirty=true" @change="dirty=true; if($event.target.id==='query-transformation-enabled') qt=$event.target.checked; if($event.target.name==='queryTransformationStrategies' && $event.target.checked){ $el.querySelectorAll('[name=queryTransformationStrategies]').forEach(c=>{ if(c!==$event.target && ($event.target.value==='auto' || c.value==='auto')) c.checked=false }) }">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <section id="retrieval" class="panel scroll-mt-24">
           <div class="panel-header"><div><h2 class="settings-title">Retrieval</h2><p class="settings-hint">How passages are found for searches and answers.</p></div></div>
@@ -46,6 +47,17 @@
             <div class="field"><label class="field-label" for="mode">Default retrieval mode</label><select class="input" id="mode" name="retrievalMode"><option value="hybrid" th:selected="${rag.retrievalMode == 'hybrid'}">Hybrid</option><option value="semantic" th:selected="${rag.retrievalMode == 'semantic'}">Semantic</option><option value="lexical" th:selected="${rag.retrievalMode == 'lexical'}">Lexical</option></select></div>
             <div class="field"><label class="field-label" for="limit">Maximum sources per answer</label><input class="input" id="limit" name="sourceLimit" type="number" min="1" th:max="${answering.sourceLimit}" th:value="${rag.sourceLimit}"></div>
           </div>
+        </section>
+
+        <section id="query-transformation" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Query transformation</h2><p class="settings-hint">Reshapes the question before retrieval so answers find better passages. The original question is still what the model answers.</p></div><label class="switch-labelled" for="query-transformation-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="query-transformation-enabled" name="queryTransformationEnabled" th:checked="${rag.queryTransformationEnabled}"><span></span></span></label></div>
+          <fieldset class="panel-body space-y-1" :disabled="!qt" :class="{'opacity-50':!qt}">
+            <div class="setting-row"><label for="qt-auto"><strong>Auto</strong><span>The answer model looks at each question and picks the strategies that fit: vague questions get rewritten, very specific ones get a step-back question, multi-part ones are split. Costs one extra model call per question.</span></label><span class="switch"><input type="checkbox" id="qt-auto" name="queryTransformationStrategies" value="auto" th:checked="${rag.queryTransformationStrategies == 'auto'}"><span></span></span></div>
+            <div class="setting-row"><label for="qt-rewrite"><strong>Query rewriting</strong><span>Rewrites the question into a more precise one that spells out what was only implied. Best for vague or very short questions and follow-ups in a chat. Only the rewritten query is searched.</span></label><span class="switch"><input type="checkbox" id="qt-rewrite" name="queryTransformationStrategies" value="rewrite" th:checked="${#strings.contains(rag.queryTransformationStrategies, 'rewrite')}"><span></span></span></div>
+            <div class="setting-row"><label for="qt-step-back"><strong>Step-back</strong><span>Adds a more general version of the question and searches both. Best when questions are very specific (a version, an error code) and the answer depends on background documentation.</span></label><span class="switch"><input type="checkbox" id="qt-step-back" name="queryTransformationStrategies" value="step-back" th:checked="${#strings.contains(rag.queryTransformationStrategies, 'step-back')}"><span></span></span></div>
+            <div class="setting-row"><label for="qt-sub-queries"><strong>Sub-query composition</strong><span>Splits the question into 2–4 sub-questions and searches each one independently. Best for multi-part questions such as “How do I install X and configure Y?”.</span></label><span class="switch"><input type="checkbox" id="qt-sub-queries" name="queryTransformationStrategies" value="sub-queries" th:checked="${#strings.contains(rag.queryTransformationStrategies, 'sub-queries')}"><span></span></span></div>
+            <p class="field-help pt-3">Selected strategies run in this order: rewriting → step-back → sub-queries, each building on the previous result. Every active strategy adds one answer-model call before retrieval. Requires an enabled answer model.</p>
+          </fieldset>
         </section>
 
         <section id="grounding" class="panel scroll-mt-24">

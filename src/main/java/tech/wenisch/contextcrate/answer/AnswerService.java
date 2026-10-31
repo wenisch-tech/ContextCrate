@@ -22,10 +22,14 @@ public class AnswerService {
   private final SearchIndex index; private final DocumentChunkRepository chunks; private final AnswerGenerationProvider provider;
   private final AuditLogRepository audits; private final ContextCrateProperties.Answering config;
   private final RagSettingsService settings;
+  private int rrfConstant = 60;
+  private QueryTransformationService transformation;
   private CrateMetrics metrics = CrateMetrics.noop();
   private HotContentTracker hot = HotContentTracker.noop();
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setMetrics(CrateMetrics metrics, HotContentTracker hot) { this.metrics=metrics; this.hot=hot; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setQueryTransformation(QueryTransformationService transformation) { this.transformation=transformation; }
   /** Runs a non-streaming completion and records its latency and outcome per purpose. */
   private String completeTimed(UUID crateId,String purpose,List<AnswerGenerationProvider.Message> messages) throws Exception {
     long started=System.nanoTime();String outcome="ok";
@@ -34,6 +38,7 @@ public class AnswerService {
   }
   public AnswerService(SearchIndex index, DocumentChunkRepository chunks, AnswerGenerationProvider provider, AuditLogRepository audits, ContextCrateProperties properties, RagSettingsService settings) {
     this.index=index;this.chunks=chunks;this.provider=provider;this.audits=audits;this.config=properties.answering();this.settings=settings;
+    var retrieval=properties.retrieval();if(retrieval!=null)this.rrfConstant=retrieval.rrfConstant();
   }
   public boolean available(UUID crateId){try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){return provider.available();}}
   public Prepared prepare(Request request) throws Exception {
@@ -47,7 +52,7 @@ public class AnswerService {
     for(var m:history)if(m.content()==null||m.content().isBlank()||m.content().length()>8_000||!("user".equals(m.role())||"assistant".equals(m.role())))throw new IllegalArgumentException("history accepts non-empty user and assistant messages only");
     int limit=Math.min(request.maxSources()==null?policy.getSourceLimit():request.maxSources(),policy.getSourceLimit());if(limit<1)throw new IllegalArgumentException("maxSources must be positive");
     String mode=request.retrievalMode()==null||request.retrievalMode().isBlank()?policy.getRetrievalMode():request.retrievalMode();
-    var found=index.search(new SearchIndex.SearchRequest(request.crateId(),request.question(),limit,request.runId(),"chunk",mode));
+    var retrieved=retrieve(request,history,policy,limit,mode);var found=retrieved.results();
     List<Source> candidates=new ArrayList<>();Set<UUID> seen=new HashSet<>();
     for(var hit:found.hits()) { if(!seen.add(hit.id()))continue;var chunk=chunks.findByIdAndCrateId(hit.id(),request.crateId()).orElse(null);String content=chunk==null?hit.snippet():chunk.getContent();candidates.add(new Source(candidates.size()+1,hit.id(),hit.documentId(),hit.runId(),hit.title(),hit.sourceUri(),hit.chunkOrdinal(),hit.snippet(),hit.score(),content));if(candidates.size()==limit)break; }
     if(policy.isGradingEnabled()){int before=candidates.size();candidates=grade(request.crateId(),request.question(),candidates);if(before>0)metrics.summary("answer.grading.kept_ratio",request.crateId(),(double)candidates.size()/before);}
@@ -55,8 +60,32 @@ public class AnswerService {
     for(var candidate:candidates) { if(remaining<=0)break;String content=candidate.content();content=content.length()>remaining?content.substring(0,remaining):content;remaining-=content.length();sources.add(new Source(sources.size()+1,candidate.chunkId(),candidate.documentId(),candidate.runId(),candidate.title(),candidate.sourceUri(),candidate.chunkOrdinal(),candidate.snippet(),candidate.score(),content)); }
     metrics.summary("answer.sources",request.crateId(),sources.size());
     for(var source:sources)hot.record(request.crateId(),source.documentId(),source.chunkId());
-    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction());
+    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied());
   }
+  /**
+   * Retrieves chunks for the question. With query transformation enabled the question is turned into
+   * one or more search queries; each is searched and the ranked lists are fused. Only retrieval sees
+   * the transformed queries; grading, generation and verification keep the original question.
+   */
+  private Retrieved retrieve(Request request,List<HistoryMessage> history,RagSettings policy,int limit,String mode) throws Exception {
+    List<String> queries=List.of(request.question());List<String> applied=List.of();
+    if(transformation!=null&&policy.isQueryTransformationEnabled()&&available(request.crateId())) {
+      var plan=transformation.plan(request.crateId(),request.question(),history,policy.getQueryTransformationStrategies());
+      if(!plan.applied().isEmpty()){queries=plan.queries();applied=plan.applied();}
+    } else if(policy.isQueryTransformationEnabled()) metrics.count("answer.query_transformation",request.crateId(),"strategy","none","outcome","skipped");
+    List<SearchIndex.SearchResults> lists=new ArrayList<>();
+    for(String query:queries)lists.add(index.search(new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode)));
+    return new Retrieved(lists.size()==1?lists.getFirst():fuse(request.question(),lists,limit),queries,applied);
+  }
+  /** Reciprocal rank fusion across the result lists of several queries, deduplicated by hit id. */
+  private SearchIndex.SearchResults fuse(String query,List<SearchIndex.SearchResults> lists,int limit) {
+    Map<UUID,SearchIndex.SearchHit> first=new LinkedHashMap<>();Map<UUID,Double> score=new HashMap<>();
+    for(var list:lists)for(int rank=0;rank<list.hits().size();rank++){var hit=list.hits().get(rank);first.putIfAbsent(hit.id(),hit);score.merge(hit.id(),1.0/(rrfConstant+rank+1),Double::sum);}
+    List<SearchIndex.SearchHit> fused=first.values().stream().sorted(Comparator.comparingDouble((SearchIndex.SearchHit h)->score.get(h.id())).reversed()).limit(limit)
+        .map(h->new SearchIndex.SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),score.get(h.id()).floatValue(),h.lexicalScore(),h.semanticScore(),h.rerankScore(),h.content(),h.retrievalContent())).toList();
+    return new SearchIndex.SearchResults(query,lists.getFirst().mode(),fused);
+  }
+  private record Retrieved(SearchIndex.SearchResults results,List<String> queries,List<String> applied) {}
   private List<Source> grade(UUID crateId,String question,List<Source> candidates) {
     List<Source> accepted=new ArrayList<>();
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)) {
@@ -82,7 +111,7 @@ public class AnswerService {
       success=true;
       Result result=prepared.answerVerificationEnabled()?verify(prepared,answer.toString()):new Result(answer.toString(),null);
       verification=result.verificationStatus()==null?"disabled":result.verificationStatus();return result;
-    } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
+    } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", transform="+(prepared.transformations().isEmpty()?"none":String.join("+",prepared.transformations()))+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
   }
   /** Compatibility method; verified answers are now delivered as one completed delta. */
   public void stream(Prepared prepared, java.util.function.Consumer<String> delta) throws Exception { delta.accept(generate(prepared).text()); }
@@ -130,6 +159,9 @@ public class AnswerService {
   }
   public record HistoryMessage(String role,String content) {}
   public record Source(int citation,UUID chunkId,UUID documentId,UUID runId,String title,String sourceUri,Integer chunkOrdinal,String snippet,float score,@JsonIgnore String content) {}
-  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction) {}
+  /** @param searchQueries what retrieval searched for; @param transformations strategies that changed the query set */
+  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations) {
+    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,List.of(question),List.of()); }
+  }
   public record Result(String text,String verificationStatus) {}
 }

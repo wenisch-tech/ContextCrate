@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Per-crate **query transformation** for answers: query rewriting, step-back prompting and sub-query composition, applied in that order when several are selected, or chosen automatically by the answer model (Auto). Retrieval searches the transformed queries and fuses the results with reciprocal rank fusion; the original question is still what is answered, graded and verified. Off by default; configured under Crate settings → Retrieval & answers and `PUT …/settings/rag`. See Features → Query transformation.
 - Prometheus metrics for the whole installation and per crate (tag `crate` carries the crate name): API key authentication and usage, ingestion runs/documents/chunks, MCP tool calls and latency, search, embedding, reranking (including fallbacks) and LLM behaviour (latency, time to first token, purpose, HTTP errors, answer verification). The most requested documents, chunks and sources are counted in the database (`content_hit`) and published as bounded top-N gauges. A ready-made Grafana dashboard with a data source selector, a global section and a crate section ships in `grafana/contextcrate-dashboard.json`; see Operations → Metrics.
 - `/actuator/prometheus` and `/actuator/metrics` now require the `ADMIN` role (scrape with HTTP Basic), because the metrics expose crate names and document titles across crates.
 - The in-app “Documentation” link now points to https://contextcrate.eu/docs/ instead of a CI run.

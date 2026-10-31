@@ -26,7 +26,8 @@ class FrontendMigrationTest {
         .doesNotContain("fragments :: nav");
     assertThat(Files.readString(Path.of("src/main/resources/templates/settings.html")))
         .contains("Save general settings", "Save retrieval settings", "Save provider settings",
-            "Retrieval &amp; answers", "settings-nav")
+            "Retrieval &amp; answers", "settings-nav", "Query transformation",
+            "name=\"queryTransformationStrategies\" value=\"sub-queries\"")
         .doesNotContain("wizard", "Review &amp; save");
   }
 

@@ -89,6 +89,37 @@ class AnswerServiceGradingTest {
     assertThat(value.getAnswerVerificationFailureAction()).isEqualTo("revise-once");
   }
 
+  @Test
+  void queryTransformationIsOffByDefaultAndStrategiesAreValidatedAndOrdered() {
+    var repository = mock(RagSettingsRepository.class);
+    var properties = mock(ContextCrateProperties.class);
+    var answering = mock(ContextCrateProperties.Answering.class);
+    when(properties.answering()).thenReturn(answering);
+    when(answering.retrievalMode()).thenReturn("hybrid");
+    when(answering.sourceLimit()).thenReturn(8);
+    var stored = new RagSettings(crateId, false, true, true, true, true, true, "revise-once", "hybrid", 8);
+    when(repository.findById(crateId)).thenReturn(java.util.Optional.of(stored));
+    when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    var service = new RagSettingsService(repository, properties);
+
+    assertThat(stored.isQueryTransformationEnabled()).isFalse();
+    assertThat(stored.getQueryTransformationStrategies()).isEqualTo("auto");
+
+    service.updateQueryTransformation(crateId, true, List.of("sub-queries", "rewrite"));
+    assertThat(stored.isQueryTransformationEnabled()).isTrue();
+    assertThat(stored.getQueryTransformationStrategies()).isEqualTo("rewrite,sub-queries");
+
+    // Switching off without a selection keeps the previous strategies.
+    service.updateQueryTransformation(crateId, false, null);
+    assertThat(stored.isQueryTransformationEnabled()).isFalse();
+    assertThat(stored.getQueryTransformationStrategies()).isEqualTo("rewrite,sub-queries");
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.updateQueryTransformation(crateId, true, List.of()))
+        .isInstanceOf(IllegalArgumentException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.updateQueryTransformation(crateId, true, List.of("bogus")))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
   private void setup(boolean grading, boolean strict) throws Exception {
     var first = new SearchIndex.SearchHit(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "chunk",
         "Backups", "https://example.test/backups", 0, "backup chunk", 1f);
