@@ -10,7 +10,7 @@
     </parent>
     <groupId>tech.wenisch</groupId>
     <artifactId>contextcrate</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.10.0</version>
     <name>ContextCrate</name>
     <description>Self-hosted crawling and indexing platform</description>
     <properties>

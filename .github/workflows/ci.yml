@@ -39,7 +39,10 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
   test:
+    needs: versioning
     uses: ./.github/workflows/_test.yml
+    with:
+      version: ${{ needs.versioning.outputs.version }}
   docker:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     needs: [test, versioning]

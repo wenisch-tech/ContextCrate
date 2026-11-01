@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 public class UiModelAdvice {
   private final String applicationVersion;
 
-  UiModelAdvice(@Value("${contextcrate.version:0.1.0-SNAPSHOT}") String applicationVersion) {
+  UiModelAdvice(@Value("${contextcrate.version:dev}") String applicationVersion) {
     this.applicationVersion = applicationVersion;
   }
 

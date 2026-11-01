@@ -35,6 +35,8 @@ springdoc:
   swagger-ui:
     path: /api
 contextcrate:
+  # Filled from <version> in pom.xml at build time; CI sets that before packaging.
+  version: ${CONTEXTCRATE_VERSION:@project.version@}
   profile: standalone
   role: all
   metrics:
