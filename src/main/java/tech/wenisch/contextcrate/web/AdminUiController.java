@@ -122,6 +122,13 @@ public class AdminUiController {
     return "redirect:/admin?timeZoneSaved#policies";
   }
 
+  @PostMapping("/settings/model-policy")
+  String modelPolicy(@RequestParam(defaultValue = "false") boolean allowCustomEndpoints,
+      @RequestParam(defaultValue = "false") boolean allowLocalModels) {
+    administration.modelPolicy(allowCustomEndpoints, allowLocalModels);
+    return "redirect:/admin?modelPolicySaved#policies";
+  }
+
   @PostMapping("/settings/onboarding-policy")
   String onboardingPolicy(@RequestParam SystemSetting.OnboardingPolicy policy,
       @RequestParam(required = false) UUID crateId) {
@@ -134,8 +141,9 @@ public class AdminUiController {
       @RequestParam String model, @RequestParam(required = false) String apiKey,
       @RequestParam(required = false) Integer dimensions, @RequestParam(required = false) Integer maxInputCharacters,
       @RequestParam(required = false) Integer timeoutSeconds,
-      @RequestParam(defaultValue = "false") boolean availableToUsers) {
-    sharedModels.create(kind, name, baseUrl, model, apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers);
+      @RequestParam(defaultValue = "false") boolean availableToUsers,
+      @RequestParam(defaultValue = "false") boolean defaultForNewCrates) {
+    sharedModels.create(kind, name, baseUrl, model, apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers, defaultForNewCrates);
     return "redirect:/admin?modelSaved#models";
   }
 
@@ -144,10 +152,11 @@ public class AdminUiController {
       @RequestParam String model, @RequestParam(required = false) String apiKey,
       @RequestParam(required = false) Integer dimensions, @RequestParam(required = false) Integer maxInputCharacters,
       @RequestParam(required = false) Integer timeoutSeconds,
-      @RequestParam(defaultValue = "false") boolean availableToUsers) {
+      @RequestParam(defaultValue = "false") boolean availableToUsers,
+      @RequestParam(defaultValue = "false") boolean defaultForNewCrates) {
     var kind = sharedModels.all().stream().filter(m -> m.getId().equals(id)).map(SharedModel::getKind).findFirst()
         .orElseThrow(() -> new IllegalArgumentException("Unknown shared model"));
-    boolean material = sharedModels.update(id, name, baseUrl, model, apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers);
+    boolean material = sharedModels.update(id, name, baseUrl, model, apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers, defaultForNewCrates);
     if (material) for (UUID crateId : sharedModels.crateIdsUsing(id)) {
       // Changed vectors invalidate the index; a changed answer model invalidates proposition indexes.
       boolean stale = kind == SharedModel.Kind.EMBEDDING

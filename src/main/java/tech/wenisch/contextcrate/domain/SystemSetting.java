@@ -18,6 +18,10 @@ public class SystemSetting {
   private java.util.UUID onboardingCrateId;
   @Column(name = "time_zone", nullable = false, length = 64)
   private String timeZone;
+  @Column(name = "allow_custom_endpoints", nullable = false)
+  private boolean allowCustomEndpoints = true;
+  @Column(name = "allow_local_models", nullable = false)
+  private boolean allowLocalModels = true;
   protected SystemSetting() {}
   public CrateCreationMode getCrateCreationMode() { return crateCreationMode; }
   public void crateCreationMode(CrateCreationMode mode) { this.crateCreationMode = mode; }
@@ -25,6 +29,11 @@ public class SystemSetting {
   public java.util.UUID getOnboardingCrateId() { return onboardingCrateId; }
   public void onboardingPolicy(OnboardingPolicy policy, java.util.UUID crateId) {
     this.onboardingPolicy = policy; this.onboardingCrateId = crateId;
+  }
+  public boolean isAllowCustomEndpoints() { return allowCustomEndpoints; }
+  public boolean isAllowLocalModels() { return allowLocalModels; }
+  public void modelPolicy(boolean allowCustomEndpoints, boolean allowLocalModels) {
+    this.allowCustomEndpoints = allowCustomEndpoints; this.allowLocalModels = allowLocalModels;
   }
   public String getTimeZone() { return timeZone; }
   public void timeZone(String value) { this.timeZone = value; }

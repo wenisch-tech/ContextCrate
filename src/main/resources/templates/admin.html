@@ -14,6 +14,7 @@
   <div class="alert alert-success" th:if="${param.policySaved != null}">Policy saved.</div>
   <div class="alert alert-success" th:if="${param.onboardingPolicySaved != null}">Onboarding policy saved.</div>
   <div class="alert alert-success" th:if="${param.timeZoneSaved != null}">Time zone saved.</div>
+  <div class="alert alert-success" th:if="${param.modelPolicySaved != null}">Model policy saved.</div>
   <div class="alert alert-success" th:if="${param.modelSaved != null}">Shared model saved.</div>
   <div class="alert alert-success" th:if="${param.modelDeleted != null}">Shared model deleted.</div>
   <div class="alert alert-success" th:if="${param.elevationStarted != null}">Elevation started. It expires automatically after 30 minutes.</div>
@@ -107,6 +108,14 @@
         </div>
         <button class="btn btn-primary mt-4">Save onboarding policy</button>
       </form>
+      <form class="card panel p-4 mb-4" method="post" action="/admin/settings/model-policy">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <h2 class="h5">Model policy</h2>
+        <p class="text-secondary small">What crate owners may configure themselves. Shared models (see the Models tab) are always selectable. Crates that already use a custom setup keep working; they just can no longer change it.</p>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="allow-custom" name="allowCustomEndpoints" value="true" th:checked="${systemSetting.allowCustomEndpoints}"><label class="form-check-label" for="allow-custom">Users may add their own OpenAI-compatible / Cohere-compatible endpoints</label></div>
+        <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-local" name="allowLocalModels" value="true" th:checked="${systemSetting.allowLocalModels}"><label class="form-check-label" for="allow-local">Users may configure their own local ONNX models (model id, revision, download URL, paths)</label></div>
+        <button class="btn btn-primary mt-4">Save model policy</button>
+      </form>
       <form class="card panel p-4" method="post" action="/admin/settings/crate-creation">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <h2 class="h5">Crate creation</h2>
@@ -143,7 +152,7 @@
       </div>
 
       <div class="card panel p-4 mb-4" th:each="row:${sharedModelRows}" th:with="m=${row.model}">
-        <form method="post" th:action="@{/admin/models/{id}(id=${m.id})}" class="row g-3">
+        <form method="post" th:action="@{/admin/models/{id}(id=${m.id})}" class="row g-3" th:attr="x-data=|{ avail: ${m.availableToUsers}, def: ${m.defaultForNewCrates} }|">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <div class="col-12 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h3 class="h6 mb-0"><span class="badge text-bg-secondary me-2" th:text="${m.kind}"></span><span th:text="${m.name}"></span></h3>
@@ -158,7 +167,8 @@
           <div class="col-md-4" th:if="${m.kind.name() != 'ANSWER'}"><label class="form-label" th:for="'max-' + ${m.id}">Maximum input characters</label><input class="form-control" th:id="'max-' + ${m.id}" type="number" min="256" name="maxInputCharacters" th:value="${m.maxInputCharacters}" required></div>
           <div class="col-md-4" th:if="${m.kind.name() != 'EMBEDDING'}"><label class="form-label" th:for="'timeout-' + ${m.id}">Timeout (seconds)</label><input class="form-control" th:id="'timeout-' + ${m.id}" type="number" min="5" name="timeoutSeconds" th:value="${m.timeoutSeconds}"></div>
           <div class="col-12 d-flex flex-wrap align-items-center gap-3">
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="availableToUsers" value="true" th:id="'avail-' + ${m.id}" th:checked="${m.availableToUsers}"><label class="form-check-label" th:for="'avail-' + ${m.id}">Available to all users</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="availableToUsers" value="true" th:id="'avail-' + ${m.id}" th:checked="${m.availableToUsers}" x-model="avail" @change="if (!avail) def = false"><label class="form-check-label" th:for="'avail-' + ${m.id}">Available to all users</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="defaultForNewCrates" value="true" th:id="'def-' + ${m.id}" th:checked="${m.defaultForNewCrates}" x-model="def" :disabled="!avail"><label class="form-check-label" th:for="'def-' + ${m.id}">Make default for new crates</label></div>
             <button class="btn btn-primary btn-sm">Save</button>
             <button class="btn btn-outline-danger btn-sm ms-auto" type="submit" th:formaction="@{/admin/models/{id}/delete(id=${m.id})}" formnovalidate>Delete</button>
           </div>
@@ -166,7 +176,7 @@
       </div>
       <p class="text-secondary" th:if="${#lists.isEmpty(sharedModelRows)}">No shared models yet.</p>
 
-      <form class="card panel p-4" method="post" action="/admin/models" th:attr="x-data=|{ kind: 'EMBEDDING' }|">
+      <form class="card panel p-4" method="post" action="/admin/models" th:attr="x-data=|{ kind: 'EMBEDDING', avail: true, def: false }|">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <h2 class="h5">Add a shared model</h2>
         <div class="row g-3 mt-1">
@@ -183,7 +193,8 @@
           <div class="col-md-4" x-show="kind === 'EMBEDDING'"><label class="form-label" for="new-model-dim">Vector dimensions</label><input class="form-control" id="new-model-dim" type="number" min="1" name="dimensions" value="1536" :disabled="kind !== 'EMBEDDING'"></div>
           <div class="col-md-4" x-show="kind !== 'ANSWER'"><label class="form-label" for="new-model-max">Maximum input characters</label><input class="form-control" id="new-model-max" type="number" min="256" name="maxInputCharacters" value="4000" :disabled="kind === 'ANSWER'"></div>
           <div class="col-md-4" x-show="kind !== 'EMBEDDING'"><label class="form-label" for="new-model-timeout">Timeout (seconds)</label><input class="form-control" id="new-model-timeout" type="number" min="5" name="timeoutSeconds" value="60" :disabled="kind === 'EMBEDDING'"></div>
-          <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="availableToUsers" value="true" id="new-model-avail" checked><label class="form-check-label" for="new-model-avail">Available to all users</label></div></div>
+          <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="availableToUsers" value="true" id="new-model-avail" x-model="avail" @change="if (!avail) def = false"><label class="form-check-label" for="new-model-avail">Available to all users</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="defaultForNewCrates" value="true" id="new-model-def" x-model="def" :disabled="!avail"><label class="form-check-label" for="new-model-def">Make default for new crates</label></div></div>
         </div>
         <div><button class="btn btn-primary mt-4">Add model</button></div>
       </form>

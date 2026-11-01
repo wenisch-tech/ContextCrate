@@ -18,18 +18,19 @@ class RuntimeProviderSharedModelTest {
   private final UUID crateId = UUID.randomUUID();
   private final ProviderSettingsRepository repository = mock(ProviderSettingsRepository.class);
   private final SharedModelRepository shared = mock(SharedModelRepository.class);
+  private final tech.wenisch.contextcrate.repository.SystemSettingRepository system = mock(tech.wenisch.contextcrate.repository.SystemSettingRepository.class);
   private final ProviderSettings settings = new ProviderSettings(crateId);
   private RuntimeProviderSettings providers;
   private SharedModel embedding, answer;
 
   @BeforeEach
   void setUp() {
-    providers = new RuntimeProviderSettings(repository, mock(ContextCrateProperties.class, RETURNS_DEEP_STUBS), null, shared);
+    providers = new RuntimeProviderSettings(repository, mock(ContextCrateProperties.class, RETURNS_DEEP_STUBS), null, shared, system);
     when(repository.findById(crateId)).thenReturn(Optional.of(settings));
     embedding = new SharedModel(SharedModel.Kind.EMBEDDING);
-    embedding.update("Company embeddings", SECRET_URL, "secret-model", SECRET_KEY, 768, 2000, null, true);
+    embedding.update("Company embeddings", SECRET_URL, "secret-model", SECRET_KEY, 768, 2000, null, true, false);
     answer = new SharedModel(SharedModel.Kind.ANSWER);
-    answer.update("Company chat", SECRET_URL, "secret-chat", SECRET_KEY, null, null, 90, true);
+    answer.update("Company chat", SECRET_URL, "secret-chat", SECRET_KEY, null, null, 90, true, false);
     when(shared.findById(embedding.getId())).thenReturn(Optional.of(embedding));
     when(shared.findById(answer.getId())).thenReturn(Optional.of(answer));
     settings.selectSharedModels(embedding.getId(), null, answer.getId());
@@ -66,7 +67,7 @@ class RuntimeProviderSharedModelTest {
 
   @Test
   void aWithdrawnModelCannotBeSelectedAnew() {
-    embedding.update("Company embeddings", SECRET_URL, "secret-model", null, 768, 2000, null, false);
+    embedding.update("Company embeddings", SECRET_URL, "secret-model", null, 768, 2000, null, false, false);
     var other = new ProviderSettings(UUID.randomUUID());
     when(repository.findById(other.getCrateId())).thenReturn(Optional.of(other));
     var form = new RuntimeProviderSettings.ProviderForm(true, "openai-compatible", null, null, null, "cache", null,
@@ -85,5 +86,42 @@ class RuntimeProviderSharedModelTest {
 
     assertThatThrownBy(() -> providers.update(crateId, form))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown shared model");
+  }
+
+  private RuntimeProviderSettings.ProviderForm customForm(String baseUrl, String localModel) {
+    return new RuntimeProviderSettings.ProviderForm(true, "openai-compatible", localModel, null, null, "cache", null,
+        baseUrl, "m", null, 768, 2000, false, false, "local", 30, null, null, null, "cache", null, null, null, null,
+        4000, 30, false, null, null, null, null, null, null);
+  }
+
+  private void policy(boolean custom, boolean local) {
+    var setting = mock(tech.wenisch.contextcrate.domain.SystemSetting.class);
+    when(setting.isAllowCustomEndpoints()).thenReturn(custom);
+    when(setting.isAllowLocalModels()).thenReturn(local);
+    when(system.findById(1)).thenReturn(Optional.of(setting));
+  }
+
+  @Test
+  void customEndpointsCanBeForbiddenButSharedModelsStillWork() {
+    policy(false, true);
+    settings.selectSharedModels(null, null, null);
+
+    assertThatThrownBy(() -> providers.update(crateId, customForm("https://mine.example/v1", null)))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Custom endpoints are disabled");
+
+    var shared = customForm(null, null);
+    var selecting = new RuntimeProviderSettings.ProviderForm(true, "openai-compatible", null, null, null, "cache", null,
+        null, null, null, 768, 2000, false, false, "local", 30, null, null, null, "cache", null, null, null, null,
+        4000, 30, false, null, null, null, embedding.getId().toString(), null, null);
+    assertThatCode(() -> providers.update(crateId, selecting)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void localModelSettingsCanBeFrozen() {
+    policy(true, false);
+    settings.selectSharedModels(null, null, null);
+
+    assertThatThrownBy(() -> providers.update(crateId, customForm("x", "my/own-model")))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("local models");
   }
 }

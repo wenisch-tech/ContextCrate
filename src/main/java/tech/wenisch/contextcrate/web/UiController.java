@@ -582,6 +582,8 @@ public class UiController {
     model.addAttribute("answering", properties.answering());
     var sharedSelection = providerSettings.selection(crateId);
     model.addAttribute("sharedSelection", sharedSelection);
+    model.addAttribute("allowCustomEndpoints", providerSettings.allowCustomEndpoints());
+    model.addAttribute("allowLocalModels", providerSettings.allowLocalModels());
     model.addAttribute("sharedEmbeddings", sharedModels.options(SharedModel.Kind.EMBEDDING, sharedSelection.embedding()));
     model.addAttribute("sharedRerankings", sharedModels.options(SharedModel.Kind.RERANKING, sharedSelection.reranking()));
     model.addAttribute("sharedAnswers", sharedModels.options(SharedModel.Kind.ANSWER, sharedSelection.answering()));

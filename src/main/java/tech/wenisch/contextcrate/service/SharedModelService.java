@@ -46,20 +46,26 @@ public class SharedModelService {
 
   @Transactional
   public SharedModel create(SharedModel.Kind kind, String name, String baseUrl, String model, String apiKey,
-      Integer dimensions, Integer maxInputCharacters, Integer timeoutSeconds, boolean availableToUsers) {
+      Integer dimensions, Integer maxInputCharacters, Integer timeoutSeconds, boolean availableToUsers,
+      boolean defaultForNewCrates) {
+    requireDefaultAllowed(availableToUsers, defaultForNewCrates);
     String cleanName = name == null ? "" : name.trim();
     validate(kind, cleanName, baseUrl, model, dimensions, maxInputCharacters, timeoutSeconds);
     if (models.existsByKindAndNameIgnoreCase(kind, cleanName))
       throw new IllegalArgumentException("A " + label(kind) + " model named \"" + cleanName + "\" already exists");
     var entity = new SharedModel(kind);
-    entity.update(cleanName, baseUrl.trim(), model.trim(), apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers);
-    return models.save(entity);
+    entity.update(cleanName, baseUrl.trim(), model.trim(), apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers, defaultForNewCrates);
+    var saved = models.save(entity);
+    if (saved.isDefaultForNewCrates()) clearOtherDefaults(saved);
+    return saved;
   }
 
   /** @return {@code true} when the endpoint, model or vector size changed, so dependent crates need re-indexing. */
   @Transactional
   public boolean update(UUID id, String name, String baseUrl, String model, String apiKey,
-      Integer dimensions, Integer maxInputCharacters, Integer timeoutSeconds, boolean availableToUsers) {
+      Integer dimensions, Integer maxInputCharacters, Integer timeoutSeconds, boolean availableToUsers,
+      boolean defaultForNewCrates) {
+    requireDefaultAllowed(availableToUsers, defaultForNewCrates);
     var entity = models.findById(id).orElseThrow(() -> new IllegalArgumentException("Unknown shared model"));
     String cleanName = name == null ? "" : name.trim();
     validate(entity.getKind(), cleanName, baseUrl, model, dimensions, maxInputCharacters, timeoutSeconds);
@@ -68,7 +74,8 @@ public class SharedModelService {
     boolean material = !entity.getBaseUrl().equals(baseUrl.trim()) || !entity.getModel().equals(model.trim())
         || !java.util.Objects.equals(entity.getDimensions(), dimensions)
         || (apiKey != null && !apiKey.isBlank() && !apiKey.equals(entity.getApiKey()));
-    entity.update(cleanName, baseUrl.trim(), model.trim(), apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers);
+    entity.update(cleanName, baseUrl.trim(), model.trim(), apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers, defaultForNewCrates);
+    if (entity.isDefaultForNewCrates()) clearOtherDefaults(entity);
     return material;
   }
 
@@ -96,6 +103,17 @@ public class SharedModelService {
       case ANSWER -> providerSettings.findByAnsweringSharedModelId(model.getId());
     };
     return rows.stream().map(p -> p.getCrateId()).toList();
+  }
+
+  /** Only one default per type; setting a new one retires the previous one. */
+  private void clearOtherDefaults(SharedModel keep) {
+    for (var other : models.findByKindAndDefaultForNewCratesTrue(keep.getKind()))
+      if (!other.getId().equals(keep.getId())) other.clearDefault();
+  }
+
+  private static void requireDefaultAllowed(boolean availableToUsers, boolean defaultForNewCrates) {
+    if (defaultForNewCrates && !availableToUsers)
+      throw new IllegalArgumentException("A default model must be available to users");
   }
 
   private static void validate(SharedModel.Kind kind, String name, String baseUrl, String model,

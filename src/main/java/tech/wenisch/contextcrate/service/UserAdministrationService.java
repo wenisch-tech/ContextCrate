@@ -113,6 +113,14 @@ public class UserAdministrationService {
   }
 
   @Transactional
+  public SystemSetting modelPolicy(boolean allowCustomEndpoints, boolean allowLocalModels) {
+    requireAdmin();
+    SystemSetting setting = settings.findById(1).orElseThrow();
+    setting.modelPolicy(allowCustomEndpoints, allowLocalModels);
+    return settings.save(setting);
+  }
+
+  @Transactional
   public SystemSetting timeZone(String timeZone) {
     requireAdmin();
     try { java.time.ZoneId.of(timeZone); }

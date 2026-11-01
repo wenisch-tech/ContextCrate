@@ -83,6 +83,14 @@ Archive, restore, and purge are deliberately **not** offered from this panel. Th
 `OWNER` role on the crate, so the correct order is: start an elevation, then perform the operation
 inside the crate. See [Authorization](../authorization.md).
 
+## Model policy
+
+Under **Policies → Model policy**, two switches (both on by default) control what crate owners may
+configure themselves: adding their own OpenAI-/Cohere-compatible endpoints, and changing local
+ONNX model settings (model id, revision, download URL, paths). Shared models are always selectable.
+Turning a switch off does not break crates that already use such a setup; it only makes that part
+of their provider settings read-only. Downloading the already-configured local model stays possible.
+
 ## Models
 
 The **Models** tab manages **shared models**: named embedding, reranking and answer endpoints that
@@ -98,6 +106,9 @@ model identifier, optional API key, and an **Available to all users** switch.
 - Changing the endpoint, model identifier, key or vector size of an embedding model re-indexes
   every crate using it in the background (answer models do so for crates with proposition
   retrieval).
+- **Make default for new crates** (only possible while the model is available to users) preselects
+  and enables the model for every crate created afterwards. There is one default per type; setting
+  a new one replaces the old. Existing crates are not changed.
 - API keys are stored in the database like the per-crate ones; restrict database access accordingly.
 
 ## System

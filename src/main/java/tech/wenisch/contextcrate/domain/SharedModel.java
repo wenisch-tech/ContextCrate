@@ -24,6 +24,7 @@ public class SharedModel {
   @Column(name = "max_input_characters") private Integer maxInputCharacters;
   @Column(name = "timeout_seconds") private Integer timeoutSeconds;
   @Column(name = "available_to_users", nullable = false) private boolean availableToUsers;
+  @Column(name = "default_for_new_crates", nullable = false) private boolean defaultForNewCrates;
   @Column(name = "created_at", nullable = false) private Instant createdAt;
   @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
@@ -35,11 +36,12 @@ public class SharedModel {
 
   /** A blank {@code apiKey} keeps the stored key, matching the per-crate provider forms. */
   public void update(String name, String baseUrl, String model, String apiKey, Integer dimensions,
-      Integer maxInputCharacters, Integer timeoutSeconds, boolean availableToUsers) {
+      Integer maxInputCharacters, Integer timeoutSeconds, boolean availableToUsers, boolean defaultForNewCrates) {
     this.name = name; this.baseUrl = baseUrl; this.model = model;
     if (apiKey != null && !apiKey.isBlank()) this.apiKey = apiKey;
     this.dimensions = dimensions; this.maxInputCharacters = maxInputCharacters;
     this.timeoutSeconds = timeoutSeconds; this.availableToUsers = availableToUsers;
+    this.defaultForNewCrates = availableToUsers && defaultForNewCrates;
     this.updatedAt = Instant.now();
   }
 
@@ -54,4 +56,6 @@ public class SharedModel {
   public Integer getMaxInputCharacters() { return maxInputCharacters; }
   public Integer getTimeoutSeconds() { return timeoutSeconds; }
   public boolean isAvailableToUsers() { return availableToUsers; }
+  public boolean isDefaultForNewCrates() { return defaultForNewCrates; }
+  public void clearDefault() { this.defaultForNewCrates = false; }
 }

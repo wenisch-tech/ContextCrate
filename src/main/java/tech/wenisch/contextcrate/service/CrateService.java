@@ -18,11 +18,14 @@ public class CrateService {
   private final CrateAccessService access;
   private final JdbcTemplate jdbc;
   private final ContextCrateProperties properties;
+  private final tech.wenisch.contextcrate.repository.SharedModelRepository sharedModels;
 
   public CrateService(
       CrateRepository crates, CrateMemberRepository members, AppUserRepository users,
       SystemSettingRepository settings, AuditLogRepository audits, CrateAccessService access,
-      JdbcTemplate jdbc, ContextCrateProperties properties) {
+      JdbcTemplate jdbc, ContextCrateProperties properties,
+      tech.wenisch.contextcrate.repository.SharedModelRepository sharedModels) {
+    this.sharedModels = sharedModels;
     this.crates = crates; this.members = members; this.users = users; this.settings = settings;
     this.audits = audits; this.access = access; this.jdbc = jdbc; this.properties = properties;
   }
@@ -119,15 +122,28 @@ public class CrateService {
           proposition_failure_policy, source_limit)
         values (?, false, true, true, true, 'hybrid', 'standard', 'fail-indexing', ?)
         """, crateId, properties.answering().sourceLimit());
+    // A model the administrator marked as default is preselected, and switched on, for new crates.
+    UUID embedding = defaultModel(tech.wenisch.contextcrate.domain.SharedModel.Kind.EMBEDDING);
+    UUID reranking = defaultModel(tech.wenisch.contextcrate.domain.SharedModel.Kind.RERANKING);
+    UUID answer = defaultModel(tech.wenisch.contextcrate.domain.SharedModel.Kind.ANSWER);
     jdbc.update("""
         insert into crate_provider_settings(crate_id, embeddings_enabled, embeddings_provider,
-          answering_enabled) values (?, true, 'local', false)
-        """, crateId);
+          answering_enabled, reranking_enabled, embedding_shared_model_id, reranking_shared_model_id,
+          answering_shared_model_id)
+        values (?, true, ?, ?, ?, ?, ?, ?)
+        """, crateId, embedding == null ? "local" : "openai-compatible", answer != null,
+        reranking != null ? Boolean.TRUE : null, embedding, reranking, answer);
     jdbc.update("""
         insert into crate_index_generation(crate_id, generation, status,
           configuration_fingerprint, document_count, created_at, activated_at)
         values (?, 1, 'ACTIVE', 'initial', 0, current_timestamp, current_timestamp)
         """, crateId);
+  }
+
+  private UUID defaultModel(tech.wenisch.contextcrate.domain.SharedModel.Kind kind) {
+    return sharedModels.findByKindAndDefaultForNewCratesTrue(kind).stream()
+        .filter(tech.wenisch.contextcrate.domain.SharedModel::isAvailableToUsers)
+        .map(tech.wenisch.contextcrate.domain.SharedModel::getId).findFirst().orElse(null);
   }
 
   public record MemberView(CrateMember member, String email) { }
