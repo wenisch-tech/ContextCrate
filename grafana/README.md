@@ -10,10 +10,26 @@
 
 ## Layout
 
-- **Data source** and **Crate** selectors at the top (the crate selector supports several crates or *All*).
-- **Global** section: queue depth, pipeline throughput and latency, API key authentication, MCP, search, embeddings, reranking, LLM, answer verification, JVM and HTTP.
-- **Crate** section (follows the Crate selector): the most requested documents, chunks and sources, MCP usage and empty-result rate, API key usage per key, ingestion, embeddings, reranker fallbacks and effect, LLM latency, time to first token and grading/verification behaviour.
-- **Query transformation & answer timing** section (also filtered by the Crate selector): which strategies ran and in which combinations, per-strategy call statistics and timing, and a stacked breakdown of where answer time goes.
+The dashboard is grouped by topic, one row per topic, ordered from overview to detail. Each row leads with its key numbers and the most important graphs (larger), followed by supporting graphs.
+
+| Row | Contents |
+|---|---|
+| Overview | Health stats: indexed documents, active crates, dead letters, MCP calls, auth failures, LLM error rate |
+| MCP | Calls by tool and outcome, latency, empty/truncated searches |
+| Search | Latency, passages per search, request modes |
+| Embeddings | Requests and latency per provider |
+| Reranking | Requests, fallbacks, latency, effect on ranking, candidates |
+| LLM | Requests by purpose, latency, time to first token, provider HTTP errors |
+| Answers | Grading, sources per answer, verification |
+| Query transformation | Strategies used, combinations, per-strategy statistics and timing |
+| Answer timing | Stacked breakdown of where answer time goes, p50/p95 per phase |
+| Ingestion & pipeline | Queue depth, throughput, stage duration, retries, ingestion runs |
+| API keys | Authentication and requests per key |
+| Content popularity | Most requested documents, chunks and sources |
+| Runtime (collapsed) | JVM heap, HTTP server requests, CPU |
+
+Panels marked **(selected crates)** follow the **Crate** selector (several crates or *All*); their twins marked **(all crates)** always cover the whole installation.
+- **Data source** and **Crate** selectors at the top.
 - Links to the [repository](https://github.com/wenisch-tech/ContextCrate) and the [documentation](https://contextcrate.eu/docs/).
 
-Grafana dashboards have no native tabs before Grafana 12, so the two sections are collapsible rows; collapse one to work in the other.
+Rows are collapsible, so collapse the topics you are not looking at.
