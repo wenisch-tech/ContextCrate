@@ -142,7 +142,12 @@ public class PipelineCoordinator {
           message.id(), message.stage(), message.correlationId(), crateId, message.attempts());
       cm.count("pipeline.completed", message.crateId(), "stage", message.stage().name());
     } catch (Exception e) {
-      String error = safe(e);
+      String error =
+          switch (message.stage()) {
+            case WEB_FETCH, GIT_FETCH, BROWSER_FETCH ->
+                tech.wenisch.contextcrate.util.FetchErrors.explain(e);
+            default -> safe(e);
+          };
       queue.retry(
           message.id(),
           Duration.ofSeconds(Math.min(300, 1L << Math.min(message.attempts(), 8))),

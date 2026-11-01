@@ -33,7 +33,7 @@
           </div>
           <div class="backend-row">
             <span>Status</span>
-            <span class="status-pill" x-text="state?.run?.summary?.status ?? $el.dataset.initial" th:data-initial="${run.status}" th:text="${run.status}"></span>
+            <span class="status-pill" :class="{'status-pill--warn':(state?.run?.summary?.status ?? $el.dataset.initial)==='COMPLETED_WITH_WARNINGS'}" x-text="(state?.run?.summary?.status ?? $el.dataset.initial).replace(/_/g,' ')" th:data-initial="${run.status}" th:classappend="${run.status.name()=='COMPLETED_WITH_WARNINGS'} ? 'status-pill--warn'" th:text="${#strings.replace(run.status.name(),'_',' ')}"></span>
           </div>
           <div class="backend-row">
             <span>Started at</span>

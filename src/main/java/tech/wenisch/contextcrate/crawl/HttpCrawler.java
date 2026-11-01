@@ -535,8 +535,6 @@ public class HttpCrawler {
   }
 
   private static String safeMessage(Exception exception) {
-    String message = exception.getMessage();
-    if (message == null || message.isBlank()) return exception.getClass().getSimpleName();
-    return message.length() > 1000 ? message.substring(0, 1000) : message;
+    return tech.wenisch.contextcrate.util.FetchErrors.explain(exception);
   }
 }

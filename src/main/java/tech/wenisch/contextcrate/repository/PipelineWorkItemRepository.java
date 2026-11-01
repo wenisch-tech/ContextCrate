@@ -39,6 +39,9 @@ public interface PipelineWorkItemRepository extends JpaRepository<PipelineWorkIt
 
   long countByCorrelationIdAndStatus(UUID correlationId, WorkStatus status);
 
+  long countByCorrelationIdAndStatusAndStageNotIn(
+      UUID correlationId, WorkStatus status, Collection<WorkStage> stages);
+
   List<PipelineWorkItem> findTop100ByCorrelationIdOrderByUpdatedAtDesc(UUID correlationId);
   List<PipelineWorkItem> findByCrateIdAndCorrelationIdInOrderByUpdatedAtDesc(
       UUID crateId, Collection<UUID> correlationIds);

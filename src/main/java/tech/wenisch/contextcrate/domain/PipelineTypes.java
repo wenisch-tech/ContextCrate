@@ -7,6 +7,8 @@ public final class PipelineTypes {
     RUNNING,
     PAUSED,
     COMPLETED,
+    /** Finished, but some sources could not be fetched (for example an unreachable site). */
+    COMPLETED_WITH_WARNINGS,
     FAILED,
     CANCELLED
   }

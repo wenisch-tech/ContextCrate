@@ -51,7 +51,7 @@ public class IngestionRun {
   public void resolvedRevision(String value) { this.resolvedRevision = value; }
   public void status(RunStatus value) {
     this.status = value;
-    if (value == RunStatus.COMPLETED || value == RunStatus.FAILED || value == RunStatus.CANCELLED)
+    if (value == RunStatus.COMPLETED || value == RunStatus.COMPLETED_WITH_WARNINGS || value == RunStatus.FAILED || value == RunStatus.CANCELLED)
       finishedAt = Instant.now();
   }
 }

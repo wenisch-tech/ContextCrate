@@ -9,6 +9,9 @@ import tech.wenisch.contextcrate.repository.*;
 
 @Component
 public class RunCompletionMonitor {
+  private static final List<WorkStage> FETCH_STAGES =
+      List.of(WorkStage.WEB_FETCH, WorkStage.GIT_FETCH, WorkStage.BROWSER_FETCH);
+
   private final IngestionRunRepository runs;
   private final SourceItemRepository frontier;
   private final PipelineWorkItemRepository work;
@@ -40,9 +43,12 @@ public class RunCompletionMonitor {
   public void completeFinishedRuns() {
     for (var run : runs.findTop20ByOrderByStartedAtDesc())
       if (run.getStatus() == RunStatus.RUNNING && frontier.countByRunId(run.getId()) > 0) {
-        if (work.countByCorrelationIdAndStatus(run.getId(), WorkStatus.DEAD_LETTERED) > 0) {
-          // A dead-lettered parse/index task used to be treated as "no remaining work", causing
-          // a run with unindexed documents to be shown as successfully completed.
+        // A fetch that keeps failing (site down, TLS error, ...) is the remote site's problem, so
+        // it only degrades the run to a warning. A dead-lettered parse/index task means documents
+        // were lost, which stays a failure.
+        if (work.countByCorrelationIdAndStatusAndStageNotIn(
+                run.getId(), WorkStatus.DEAD_LETTERED, FETCH_STAGES)
+            > 0) {
           run.status(RunStatus.FAILED);
           runs.save(run);
           finished(run, "FAILED");
@@ -50,9 +56,17 @@ public class RunCompletionMonitor {
                 run.getId(),
                 List.of(WorkStatus.PENDING, WorkStatus.PROCESSING, WorkStatus.RETRY_WAITING))
             == 0) {
-          run.status(RunStatus.COMPLETED);
+          boolean fetchFailures =
+              work.countByCorrelationIdAndStatus(run.getId(), WorkStatus.DEAD_LETTERED) > 0;
+          boolean anythingFetched =
+              frontier.countByRunIdAndStatus(run.getId(), FrontierStatus.FETCHED) > 0;
+          RunStatus result =
+              !fetchFailures
+                  ? RunStatus.COMPLETED
+                  : anythingFetched ? RunStatus.COMPLETED_WITH_WARNINGS : RunStatus.FAILED;
+          run.status(result);
           runs.save(run);
-          finished(run, "COMPLETED");
+          finished(run, result.name());
         }
       }
   }

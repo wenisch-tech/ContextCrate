@@ -111,6 +111,7 @@
   .backend-row { @apply flex items-start justify-between gap-4 border-b border-ink-700/40 py-2.5 text-sm last:border-0; }
   .backend-row > :first-child { @apply text-ink-500; }
   .status-pill { @apply inline-flex rounded-full border border-ink-700 bg-ink-800 px-2 py-1 text-[.68rem] font-bold uppercase tracking-wide text-ink-300; }
+  .status-pill--warn { @apply border-warn-500/25 bg-warn-500/10 text-warn-500; }
   .health-dot { @apply size-3 rounded-full bg-bad-500; }.health-dot.healthy { @apply bg-good-500; }
   .crate-grid { @apply grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3; }
   .crate-card { @apply relative h-full rounded-xl border-ink-700/80 transition-colors hover:border-brand-500/60 hover:bg-ink-850; }
