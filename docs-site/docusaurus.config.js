@@ -6,8 +6,10 @@ const config = {
   title: 'ContextCrate',
   tagline: 'Self-hosted crawling and indexing platform',
   favicon: 'img/favicon.png',
-  url: 'https://contextcrate.eu',
-  baseUrl: '/docs/',
+  // Served at https://contextcrate.eu/docs/ (FTP) and https://wenisch-tech.github.io/ContextCrate/
+  // (GitHub Pages); the Pages build overrides these through the environment.
+  url: process.env.DOCS_URL || 'https://contextcrate.eu',
+  baseUrl: process.env.DOCS_BASE_URL || '/docs/',
   organizationName: 'wenisch-tech',
   projectName: 'ContextCrate',
   onBrokenLinks: 'throw',

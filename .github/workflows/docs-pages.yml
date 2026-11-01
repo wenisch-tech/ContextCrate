@@ -16,14 +16,23 @@ jobs:
       - name: Install
         working-directory: docs-site
         run: npm ci
-      - name: Build (fails on broken links)
+      - name: Build for GitHub Pages (fails on broken links)
         working-directory: docs-site
-        run: npm run build
+        env:
+          DOCS_URL: https://wenisch-tech.github.io
+          DOCS_BASE_URL: /ContextCrate/
+        run: npm run build -- --out-dir build-pages
+      - name: Build for contextcrate.eu/docs
+        working-directory: docs-site
+        env:
+          DOCS_URL: https://contextcrate.eu
+          DOCS_BASE_URL: /docs/
+        run: npm run build -- --out-dir build-ftp
       - uses: actions/upload-pages-artifact@v5
-        with: { path: docs-site/build }
+        with: { path: docs-site/build-pages }
       - name: Keep the rendered HTML for the FTP upload
         uses: actions/upload-artifact@v7
-        with: { name: docs-html, path: docs-site/build, if-no-files-found: error }
+        with: { name: docs-html, path: docs-site/build-ftp, if-no-files-found: error }
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -36,7 +45,7 @@ jobs:
   #   FTP_USERNAME
   #   FTP_PASSWORD
   # Optional:
-  #   FTP_SERVER_DIR  target directory on the server, default ./docs/ (relative to the FTP login root)
+  #   FTP_SERVER_DIR  target directory on the server, default ./ (the FTP login folder itself is the docs folder)
   #   FTP_PROTOCOL    ftp | ftps | ftps-legacy, default ftps
   #   FTP_PORT        default 21
   # The step is skipped (not failed) while FTP_SERVER is not set.
@@ -61,7 +70,7 @@ jobs:
           protocol: ${{ secrets.FTP_PROTOCOL || 'ftps' }}
           port: ${{ secrets.FTP_PORT || '21' }}
           local-dir: ./html/
-          server-dir: ${{ secrets.FTP_SERVER_DIR || './docs/' }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR || './' }}
           # Changed files are overwritten and pages removed from the docs are deleted again,
           # tracked through .ftp-deploy-sync-state.json on the server.
           state-name: .ftp-deploy-sync-state.json
