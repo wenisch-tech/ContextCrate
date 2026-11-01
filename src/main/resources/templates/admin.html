@@ -14,6 +14,8 @@
   <div class="alert alert-success" th:if="${param.policySaved != null}">Policy saved.</div>
   <div class="alert alert-success" th:if="${param.onboardingPolicySaved != null}">Onboarding policy saved.</div>
   <div class="alert alert-success" th:if="${param.timeZoneSaved != null}">Time zone saved.</div>
+  <div class="alert alert-success" th:if="${param.modelSaved != null}">Shared model saved.</div>
+  <div class="alert alert-success" th:if="${param.modelDeleted != null}">Shared model deleted.</div>
   <div class="alert alert-success" th:if="${param.elevationStarted != null}">Elevation started. It expires automatically after 30 minutes.</div>
   <div class="alert alert-success" th:if="${param.elevationEnded != null}">Elevation ended.</div>
   <div class="alert alert-success" th:if="${param.requeued != null}">Message requeued.</div>
@@ -22,6 +24,7 @@
   <ul class="nav nav-pills mb-4 gap-2" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-ui-toggle="pill" data-ui-target="#users" type="button">Users</button></li>
     <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#policies" type="button">Policies</button></li>
+    <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#models" type="button">Models</button></li>
     <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#crates" type="button">Crates</button></li>
     <li class="nav-item"><button class="nav-link" data-ui-toggle="pill" data-ui-target="#system" type="button">System</button></li>
   </ul>
@@ -128,6 +131,61 @@
           <option th:each="value:${timeZones}" th:value="${value}" th:text="${value}" th:selected="${value == systemSetting.timeZone}"></option>
         </select>
         <button class="btn btn-primary mt-4">Save time zone</button>
+      </form>
+    </section>
+
+    <section class="tab-pane fade" id="models">
+      <div class="card panel p-4 mb-4">
+        <h2 class="h5">Shared models</h2>
+        <p class="text-secondary small mb-0">Embedding, reranking and answer models that crate owners can pick by name in their crate's provider settings.
+          The endpoint URL and API key stay on the server: crate owners only ever see the name given here.
+          Models marked <em>available to users</em> appear in every owner's list; others stay hidden. Changing the endpoint, model or vector size of an embedding model re-indexes every crate that uses it.</p>
+      </div>
+
+      <div class="card panel p-4 mb-4" th:each="row:${sharedModelRows}" th:with="m=${row.model}">
+        <form method="post" th:action="@{/admin/models/{id}(id=${m.id})}" class="row g-3">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <div class="col-12 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h3 class="h6 mb-0"><span class="badge text-bg-secondary me-2" th:text="${m.kind}"></span><span th:text="${m.name}"></span></h3>
+            <span class="small text-secondary" th:text="${row.uses == 1 ? 'Used by 1 crate' : 'Used by ' + row.uses + ' crates'}"></span>
+          </div>
+          <div class="col-md-4"><label class="form-label" th:for="'name-' + ${m.id}">Name shown to users</label><input class="form-control" th:id="'name-' + ${m.id}" name="name" th:value="${m.name}" required maxlength="120"></div>
+          <div class="col-md-8"><label class="form-label" th:for="'url-' + ${m.id}">Endpoint URL</label><input class="form-control" th:id="'url-' + ${m.id}" name="baseUrl" th:value="${m.baseUrl}" required>
+            <div class="form-text" th:text="${m.kind.name() == 'RERANKING' ? 'The application appends /v2/rerank.' : (m.kind.name() == 'EMBEDDING' ? 'The application appends /embeddings.' : 'The application appends /chat/completions.')}"></div></div>
+          <div class="col-md-4"><label class="form-label" th:for="'model-' + ${m.id}">Model identifier</label><input class="form-control" th:id="'model-' + ${m.id}" name="model" th:value="${m.model}" required></div>
+          <div class="col-md-4"><label class="form-label" th:for="'key-' + ${m.id}">API key</label><input class="form-control" th:id="'key-' + ${m.id}" type="password" name="apiKey" autocomplete="new-password" th:placeholder="${m.hasApiKey() ? 'Unchanged' : 'None set'}"></div>
+          <div class="col-md-4" th:if="${m.kind.name() == 'EMBEDDING'}"><label class="form-label" th:for="'dim-' + ${m.id}">Vector dimensions</label><input class="form-control" th:id="'dim-' + ${m.id}" type="number" min="1" name="dimensions" th:value="${m.dimensions}" required></div>
+          <div class="col-md-4" th:if="${m.kind.name() != 'ANSWER'}"><label class="form-label" th:for="'max-' + ${m.id}">Maximum input characters</label><input class="form-control" th:id="'max-' + ${m.id}" type="number" min="256" name="maxInputCharacters" th:value="${m.maxInputCharacters}" required></div>
+          <div class="col-md-4" th:if="${m.kind.name() != 'EMBEDDING'}"><label class="form-label" th:for="'timeout-' + ${m.id}">Timeout (seconds)</label><input class="form-control" th:id="'timeout-' + ${m.id}" type="number" min="5" name="timeoutSeconds" th:value="${m.timeoutSeconds}"></div>
+          <div class="col-12 d-flex flex-wrap align-items-center gap-3">
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="availableToUsers" value="true" th:id="'avail-' + ${m.id}" th:checked="${m.availableToUsers}"><label class="form-check-label" th:for="'avail-' + ${m.id}">Available to all users</label></div>
+            <button class="btn btn-primary btn-sm">Save</button>
+            <button class="btn btn-outline-danger btn-sm ms-auto" type="submit" th:formaction="@{/admin/models/{id}/delete(id=${m.id})}" formnovalidate>Delete</button>
+          </div>
+        </form>
+      </div>
+      <p class="text-secondary" th:if="${#lists.isEmpty(sharedModelRows)}">No shared models yet.</p>
+
+      <form class="card panel p-4" method="post" action="/admin/models" th:attr="x-data=|{ kind: 'EMBEDDING' }|">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <h2 class="h5">Add a shared model</h2>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4"><label class="form-label" for="new-model-kind">Type</label>
+            <select class="form-select" id="new-model-kind" name="kind" x-model="kind">
+              <option value="EMBEDDING">Embedding (OpenAI-compatible)</option>
+              <option value="RERANKING">Reranking (Cohere-compatible)</option>
+              <option value="ANSWER">Answer (OpenAI-compatible chat)</option>
+            </select></div>
+          <div class="col-md-8"><label class="form-label" for="new-model-name">Name shown to users</label><input class="form-control" id="new-model-name" name="name" required maxlength="120" placeholder="e.g. Company embeddings"></div>
+          <div class="col-md-8"><label class="form-label" for="new-model-url">Endpoint URL</label><input class="form-control" id="new-model-url" name="baseUrl" required placeholder="https://models.example.com/v1"></div>
+          <div class="col-md-4"><label class="form-label" for="new-model-id">Model identifier</label><input class="form-control" id="new-model-id" name="model" required></div>
+          <div class="col-md-4"><label class="form-label" for="new-model-key">API key</label><input class="form-control" id="new-model-key" type="password" name="apiKey" autocomplete="new-password"></div>
+          <div class="col-md-4" x-show="kind === 'EMBEDDING'"><label class="form-label" for="new-model-dim">Vector dimensions</label><input class="form-control" id="new-model-dim" type="number" min="1" name="dimensions" value="1536" :disabled="kind !== 'EMBEDDING'"></div>
+          <div class="col-md-4" x-show="kind !== 'ANSWER'"><label class="form-label" for="new-model-max">Maximum input characters</label><input class="form-control" id="new-model-max" type="number" min="256" name="maxInputCharacters" value="4000" :disabled="kind === 'ANSWER'"></div>
+          <div class="col-md-4" x-show="kind !== 'EMBEDDING'"><label class="form-label" for="new-model-timeout">Timeout (seconds)</label><input class="form-control" id="new-model-timeout" type="number" min="5" name="timeoutSeconds" value="60" :disabled="kind === 'EMBEDDING'"></div>
+          <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="availableToUsers" value="true" id="new-model-avail" checked><label class="form-check-label" for="new-model-avail">Available to all users</label></div></div>
+        </div>
+        <div><button class="btn btn-primary mt-4">Add model</button></div>
       </form>
     </section>
 

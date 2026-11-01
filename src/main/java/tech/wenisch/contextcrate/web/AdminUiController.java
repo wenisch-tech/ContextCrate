@@ -9,7 +9,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.PipelineTypes.WorkStage;
+import tech.wenisch.contextcrate.domain.SharedModel;
 import tech.wenisch.contextcrate.domain.SystemSetting;
+import tech.wenisch.contextcrate.answer.RagSettingsService;
 import tech.wenisch.contextcrate.queue.PipelineQueue;
 import tech.wenisch.contextcrate.repository.AdminElevationRepository;
 import tech.wenisch.contextcrate.service.*;
@@ -29,11 +31,16 @@ public class AdminUiController {
   private final AdminElevationRepository elevationRecords;
   private final PipelineQueue queue;
   private final ContextCrateProperties properties;
+  private final SharedModelService sharedModels;
+  private final IndexRebuildService rebuild;
+  private final RagSettingsService rag;
 
   public AdminUiController(UserAdministrationService administration, CrateOverviewService overview,
       CrateAccessService access, AdminElevationService elevations,
       AdminElevationRepository elevationRecords, PipelineQueue queue,
-      ContextCrateProperties properties) {
+      ContextCrateProperties properties, SharedModelService sharedModels, IndexRebuildService rebuild,
+      RagSettingsService rag) {
+    this.sharedModels = sharedModels; this.rebuild = rebuild; this.rag = rag;
     this.administration = administration; this.overview = overview; this.access = access;
     this.elevations = elevations; this.elevationRecords = elevationRecords; this.queue = queue;
     this.properties = properties;
@@ -60,6 +67,9 @@ public class AdminUiController {
         "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Sao_Paulo",
         "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Tokyo", "Asia/Shanghai",
         "Australia/Sydney", "Pacific/Auckland"));
+    model.addAttribute("sharedModelRows", sharedModels.all().stream()
+        .map(m -> new SharedModelRow(m, sharedModels.usageCount(m))).toList());
+    model.addAttribute("modelKinds", SharedModel.Kind.values());
     model.addAttribute("properties", properties);
     model.addAttribute("queueDepth", depths);
     model.addAttribute("deadLetters", queue.deadLetters());
@@ -118,6 +128,42 @@ public class AdminUiController {
     administration.onboardingPolicy(policy, crateId);
     return "redirect:/admin?onboardingPolicySaved#policies";
   }
+
+  @PostMapping("/models")
+  String createModel(@RequestParam SharedModel.Kind kind, @RequestParam String name, @RequestParam String baseUrl,
+      @RequestParam String model, @RequestParam(required = false) String apiKey,
+      @RequestParam(required = false) Integer dimensions, @RequestParam(required = false) Integer maxInputCharacters,
+      @RequestParam(required = false) Integer timeoutSeconds,
+      @RequestParam(defaultValue = "false") boolean availableToUsers) {
+    sharedModels.create(kind, name, baseUrl, model, apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers);
+    return "redirect:/admin?modelSaved#models";
+  }
+
+  @PostMapping("/models/{id}")
+  String updateModel(@PathVariable UUID id, @RequestParam String name, @RequestParam String baseUrl,
+      @RequestParam String model, @RequestParam(required = false) String apiKey,
+      @RequestParam(required = false) Integer dimensions, @RequestParam(required = false) Integer maxInputCharacters,
+      @RequestParam(required = false) Integer timeoutSeconds,
+      @RequestParam(defaultValue = "false") boolean availableToUsers) {
+    var kind = sharedModels.all().stream().filter(m -> m.getId().equals(id)).map(SharedModel::getKind).findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("Unknown shared model"));
+    boolean material = sharedModels.update(id, name, baseUrl, model, apiKey, dimensions, maxInputCharacters, timeoutSeconds, availableToUsers);
+    if (material) for (UUID crateId : sharedModels.crateIdsUsing(id)) {
+      // Changed vectors invalidate the index; a changed answer model invalidates proposition indexes.
+      boolean stale = kind == SharedModel.Kind.EMBEDDING
+          || (kind == SharedModel.Kind.ANSWER && "proposition".equals(rag.current(crateId).getRetrievalStrategy()));
+      if (stale) rebuild.rebuildAsync(crateId);
+    }
+    return "redirect:/admin?modelSaved#models";
+  }
+
+  @PostMapping("/models/{id}/delete")
+  String deleteModel(@PathVariable UUID id) {
+    sharedModels.delete(id);
+    return "redirect:/admin?modelDeleted#models";
+  }
+
+  public record SharedModelRow(SharedModel model, int uses) {}
 
   @PostMapping("/crates/{crateId}/elevations")
   String elevate(@PathVariable UUID crateId, @RequestParam String reason) {

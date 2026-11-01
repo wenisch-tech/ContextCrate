@@ -35,6 +35,7 @@ class OpenAiChatCompletionsMappingTest {
     when(answers.available(crateId)).thenReturn(true);
     when(settings.effectiveAnswer(crateId)).thenReturn(
         new RuntimeProviderSettings.Answering(true, "http://provider", "the-model", null, null, 60, 0.2, 800));
+    when(settings.publicAnswerModel(crateId)).thenReturn("the-model");
     when(answers.prepare(any())).thenReturn(prepared());
     when(answers.generate(any())).thenReturn(new AnswerService.Result("answer", null));
   }

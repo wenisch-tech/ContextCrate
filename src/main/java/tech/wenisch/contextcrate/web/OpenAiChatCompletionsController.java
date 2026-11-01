@@ -146,7 +146,7 @@ public class OpenAiChatCompletionsController {
   }
 
   private String configuredModel(UUID crateId) {
-    return settings.effectiveAnswer(crateId).model();
+    return settings.publicAnswerModel(crateId);
   }
 
   /**

@@ -11,9 +11,9 @@ import tech.wenisch.contextcrate.service.*;
 @RequestMapping("/api/v1/crates/{crateId}/settings")
 public class CrateSettingsApiController {
   private final CrateAccessService access;private final RagSettingsService rag;
-  private final RuntimeProviderSettings providers;private final IndexRebuildService rebuild;
+  private final RuntimeProviderSettings providers;private final IndexRebuildService rebuild;private final SharedModelService sharedModels;
   public CrateSettingsApiController(CrateAccessService access,RagSettingsService rag,
-      RuntimeProviderSettings providers,IndexRebuildService rebuild){
+      RuntimeProviderSettings providers,IndexRebuildService rebuild,SharedModelService sharedModels){this.sharedModels=sharedModels;
     this.access=access;this.rag=rag;this.providers=providers;this.rebuild=rebuild;
   }
   @GetMapping("/rag") public RagSettings rag(@PathVariable UUID crateId){
@@ -33,10 +33,14 @@ public class CrateSettingsApiController {
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var e=providers.effectiveEmbedding(crateId);var r=providers.effectiveReranking(crateId);var a=providers.effectiveAnswer(crateId);
+    var e=providers.displayEmbedding(crateId);var r=providers.displayReranking(crateId);var a=providers.displayAnswer(crateId);var sel=providers.selection(crateId);
     return new ProviderView(e.enabled(),e.provider(),e.localModelId(),e.localRevision(),
         e.localDownloadUrl(),e.localCachePath().toString(),e.localModelPath()==null?null:e.localModelPath().toString(),
-        e.openaiBaseUrl(),e.openaiModel(),e.openaiDimensions(),e.openaiMaxInputCharacters(),e.automaticLimitRecovery(),e.effectiveOpenaiMaxInputCharacters(),r.enabled(),r.provider(),r.candidateLimit(),r.localModelId(),r.localRevision(),r.localDownloadUrl(),r.localCachePath().toString(),r.localModelPath()==null?null:r.localModelPath().toString(),r.cohereBaseUrl(),r.cohereModel(),r.cohereMaxInputCharacters(),r.cohereTimeoutSeconds(),a.enabled(),a.baseUrl(),a.model());
+        e.openaiBaseUrl(),e.openaiModel(),e.openaiDimensions(),e.openaiMaxInputCharacters(),e.automaticLimitRecovery(),e.effectiveOpenaiMaxInputCharacters(),r.enabled(),r.provider(),r.candidateLimit(),r.localModelId(),r.localRevision(),r.localDownloadUrl(),r.localCachePath().toString(),r.localModelPath()==null?null:r.localModelPath().toString(),r.cohereBaseUrl(),r.cohereModel(),r.cohereMaxInputCharacters(),r.cohereTimeoutSeconds(),a.enabled(),a.baseUrl(),a.model(),sel.embedding(),sel.reranking(),sel.answering());
+  }
+  @GetMapping("/shared-models") public SharedModelOptions sharedModels(@PathVariable UUID crateId){
+    access.requireMutable(crateId,CrateMember.Role.OWNER);var sel=providers.selection(crateId);
+    return new SharedModelOptions(sharedModels.options(SharedModel.Kind.EMBEDDING,sel.embedding()),sharedModels.options(SharedModel.Kind.RERANKING,sel.reranking()),sharedModels.options(SharedModel.Kind.ANSWER,sel.answering()));
   }
   @PutMapping("/providers") public ProviderView providers(@PathVariable UUID crateId,@RequestBody RuntimeProviderSettings.ProviderForm form){
     access.require(crateId,CrateMember.Role.OWNER);
@@ -50,5 +54,7 @@ public class CrateSettingsApiController {
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,
-      String answeringBaseUrl,String answeringModel){}
+      String answeringBaseUrl,String answeringModel,UUID embeddingSharedModelId,UUID rerankingSharedModelId,UUID answeringSharedModelId){}
+  /** Administrator-managed models this crate may select. Only id and name — never endpoints or keys. */
+  public record SharedModelOptions(java.util.List<SharedModelService.Option> embedding,java.util.List<SharedModelService.Option> reranking,java.util.List<SharedModelService.Option> answer){}
 }

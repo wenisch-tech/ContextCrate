@@ -84,9 +84,10 @@ public class CratePortableService {
     data.set("propositionEvaluations",mapper.valueToTree(propositionEvaluations.findByCrateId(crateId)));
     data.set("propositions",mapper.valueToTree(propositions.findByCrateId(crateId)));
     data.set("rag", mapper.valueToTree(rag.current(crateId)));
-    var embedding = providers.effectiveEmbedding(crateId);
-    var reranking = providers.effectiveReranking(crateId);
-    var answering = providers.effectiveAnswer(crateId);
+    // Display variants: a crate on an administrator-managed model must not leak its endpoint into an export.
+    var embedding = providers.displayEmbedding(crateId);
+    var reranking = providers.displayReranking(crateId);
+    var answering = providers.displayAnswer(crateId);
     data.set("providers", mapper.valueToTree(new ProviderExport(
         embedding.enabled(), embedding.provider(), embedding.localModelId(),
         embedding.localRevision(), embedding.localDownloadUrl(),

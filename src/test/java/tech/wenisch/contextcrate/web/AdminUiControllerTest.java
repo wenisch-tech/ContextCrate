@@ -26,8 +26,10 @@ class AdminUiControllerTest {
   private final AdminElevationRepository elevationRecords = mock(AdminElevationRepository.class);
   private final PipelineQueue queue = mock(PipelineQueue.class);
   private final ContextCrateProperties properties = mock(ContextCrateProperties.class);
+  private final SharedModelService sharedModels = mock(SharedModelService.class);
   private final AdminUiController controller = new AdminUiController(
-      administration, overview, access, elevations, elevationRecords, queue, properties);
+      administration, overview, access, elevations, elevationRecords, queue, properties,
+      sharedModels, mock(IndexRebuildService.class), mock(tech.wenisch.contextcrate.answer.RagSettingsService.class));
 
   @Test
   void theModelAttributeRejectsNonAdministrators() {
@@ -52,7 +54,7 @@ class AdminUiControllerTest {
     assertThat(controller.panel(model)).isEqualTo("admin");
     assertThat(model.asMap())
         .containsKeys("users", "cards", "systemSetting", "creationModes", "properties",
-            "onboardingPolicies", "queueDepth", "deadLetters", "currentUserId", "elevations");
+            "onboardingPolicies", "sharedModelRows", "queueDepth", "deadLetters", "currentUserId", "elevations");
     assertThat(model.getAttribute("currentUserId")).isEqualTo(admin.getId());
   }
 

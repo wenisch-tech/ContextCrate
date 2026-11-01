@@ -83,6 +83,23 @@ Archive, restore, and purge are deliberately **not** offered from this panel. Th
 `OWNER` role on the crate, so the correct order is: start an elevation, then perform the operation
 inside the crate. See [Authorization](../authorization.md).
 
+## Models
+
+The **Models** tab manages **shared models**: named embedding, reranking and answer endpoints that
+crate owners can select instead of configuring their own. Each entry has a name, endpoint URL,
+model identifier, optional API key, and an **Available to all users** switch.
+
+- Crate owners see the shared models in the Embeddings, Reranking and Answer model sections of
+  their crate settings, listed by name. The endpoint URL, model identifier and API key are never
+  sent to them — not in the settings page, the settings API, crate exports, or the model name
+  reported by the OpenAI-compatible endpoint (which shows the shared name).
+- Unticking *Available to all users* hides the model from new selections; crates already using it
+  keep working. A model that is still used by a crate cannot be deleted.
+- Changing the endpoint, model identifier, key or vector size of an embedding model re-indexes
+  every crate using it in the background (answer models do so for crates with proposition
+  retrieval).
+- API keys are stored in the database like the per-crate ones; restrict database access accordingly.
+
 ## System
 
 The **System** tab shows the deployment profile and node role, the configured backends (queue,

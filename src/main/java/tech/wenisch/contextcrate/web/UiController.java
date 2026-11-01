@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
 import tech.wenisch.contextcrate.domain.CrawlConfiguration;
+import tech.wenisch.contextcrate.domain.SharedModel;
 import tech.wenisch.contextcrate.domain.PipelineTypes.ExtractionType;
 import tech.wenisch.contextcrate.index.SearchIndex;
 import tech.wenisch.contextcrate.queue.PipelineQueue;
@@ -39,6 +40,7 @@ public class UiController {
   private final ExtractionService extraction;
   private final RagSettingsService ragSettings;
   private final RuntimeProviderSettings providerSettings;
+  private final SharedModelService sharedModels;
   private final LocalOnnxEmbeddingProvider localEmbeddings;
   private final ConfigurableRerankingProvider reranking;
   private final AcquisitionRecordRepository acquisitionRecords;
@@ -73,7 +75,8 @@ public class UiController {
       IndexRebuildService rebuild, DocumentIndexRecoveryService indexRecovery,
       PipelineWorkItemRepository pipelineWork, DocumentDiffService documentDiffs,
       ChunkPropositionRepository chunkPropositions, ApiKeyService apiKeys,
-      CrateLiveViewService liveView) {
+      CrateLiveViewService liveView, SharedModelService sharedModels) {
+    this.sharedModels = sharedModels;
     this.sources = sources;
     this.ingestion = ingestion;
     this.sourceCodec = sourceCodec;
@@ -577,9 +580,14 @@ public class UiController {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     model.addAttribute("rag", ragSettings.current(crateId));
     model.addAttribute("answering", properties.answering());
-    model.addAttribute("embeddingProvider", providerSettings.effectiveEmbedding(crateId));
-    model.addAttribute("rerankingProvider", providerSettings.effectiveReranking(crateId));
-    model.addAttribute("answerProvider", providerSettings.effectiveAnswer(crateId));
+    var sharedSelection = providerSettings.selection(crateId);
+    model.addAttribute("sharedSelection", sharedSelection);
+    model.addAttribute("sharedEmbeddings", sharedModels.options(SharedModel.Kind.EMBEDDING, sharedSelection.embedding()));
+    model.addAttribute("sharedRerankings", sharedModels.options(SharedModel.Kind.RERANKING, sharedSelection.reranking()));
+    model.addAttribute("sharedAnswers", sharedModels.options(SharedModel.Kind.ANSWER, sharedSelection.answering()));
+    model.addAttribute("embeddingProvider", providerSettings.displayEmbedding(crateId));
+    model.addAttribute("rerankingProvider", providerSettings.displayReranking(crateId));
+    model.addAttribute("answerProvider", providerSettings.displayAnswer(crateId));
     return "settings";
   }
 
@@ -646,6 +654,10 @@ public class UiController {
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 
+  private static String sharedId(String providerChoice) {
+    return providerChoice != null && providerChoice.startsWith("shared:") ? providerChoice.substring("shared:".length()) : null;
+  }
+
   @PostMapping("/settings/providers")
   String saveProviderSettings(
       @PathVariable UUID crateId,@RequestParam(defaultValue="false") boolean embeddingsEnabled, @RequestParam String embeddingProvider,
@@ -663,10 +675,15 @@ public class UiController {
       @RequestParam(required=false) String rerankingApiKey, @RequestParam int rerankingMaxInputCharacters,
       @RequestParam int rerankingTimeoutSeconds,
       @RequestParam(defaultValue="false") boolean answeringEnabled, @RequestParam(required=false) String answeringBaseUrl,
-      @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey) {
+      @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey,
+      @RequestParam(required=false) String answeringSharedModelId) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
+    // The provider drop-downs offer administrator-managed models as "shared:<id>".
+    String embeddingSharedModelId=sharedId(embeddingProvider),rerankingSharedModelId=sharedId(rerankingProvider);
+    if(embeddingSharedModelId!=null)embeddingProvider="openai-compatible";
+    if(rerankingSharedModelId!=null)rerankingProvider="cohere-compatible";
     var previous = providerSettings.effectiveEmbedding(crateId);var previousAnswer=providerSettings.effectiveAnswer(crateId);
-    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey));
+    providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey,embeddingSharedModelId,rerankingSharedModelId,answeringSharedModelId));
     if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";
