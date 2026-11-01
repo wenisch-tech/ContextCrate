@@ -16,3 +16,8 @@ mvnw.cmd
 /.claude
 scripts/
 skills-lock.json
+
+# Documentation site (Docusaurus)
+/docs-site/node_modules/
+/docs-site/build/
+/docs-site/.docusaurus/

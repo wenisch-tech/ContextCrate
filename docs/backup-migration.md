@@ -21,7 +21,8 @@ jobs become Website source/ingestion-job pairs.
 Secrets, users, memberships, API keys, elevations, and audit records are intentionally absent.
 Configure source and provider credentials after import.
 
-!!! warning
-    A crate export is not a complete installation backup. Use database and object-store snapshots for disaster recovery and keep all components from the same recovery point.
+:::warning
+A crate export is not a complete installation backup. Use database and object-store snapshots for disaster recovery and keep all components from the same recovery point.
+:::
 
 For the breaking product upgrade, follow [Upgrade from Harvex](upgrade-from-harvex.md).

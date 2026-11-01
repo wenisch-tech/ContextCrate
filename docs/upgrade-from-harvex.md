@@ -2,8 +2,9 @@
 
 ContextCrate is a breaking rename and data-model upgrade. Java packages, Maven artifacts, configuration keys, environment variables, container/Helm names, metrics, default H2 filename, and content APIs changed.
 
-!!! danger
-    Stop all control-plane and worker processes and take verified backups before upgrading. Do not run old and new binaries against the same database.
+:::danger
+Stop all control-plane and worker processes and take verified backups before upgrading. Do not run old and new binaries against the same database.
+:::
 
 ## Identifier changes
 

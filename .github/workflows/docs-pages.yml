@@ -2,20 +2,66 @@ name: Documentation
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'mkdocs.yml']
+    paths: ['docs/**', 'docs-site/**', '.github/workflows/docs-pages.yml']
   workflow_dispatch:
 permissions: { contents: read, pages: write, id-token: write }
+concurrency: { group: pages, cancel-in-progress: true }
 jobs:
-  deploy:
-    environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with: { python-version: '3.x' }
-      - run: pip install mkdocs-material
-      - run: mkdocs build --strict
+      - uses: actions/setup-node@v6
+        with: { node-version: '22', cache: npm, cache-dependency-path: docs-site/package-lock.json }
+      - name: Install
+        working-directory: docs-site
+        run: npm ci
+      - name: Build (fails on broken links)
+        working-directory: docs-site
+        run: npm run build
       - uses: actions/upload-pages-artifact@v5
-        with: { path: site }
+        with: { path: docs-site/build }
+      - name: Keep the rendered HTML for the FTP upload
+        uses: actions/upload-artifact@v7
+        with: { name: docs-html, path: docs-site/build, if-no-files-found: error }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+  # Uploads the rendered HTML to an FTP server. Configure these repository secrets:
+  #   FTP_SERVER    host name or IP, e.g. ftp.example.com
+  #   FTP_USERNAME
+  #   FTP_PASSWORD
+  # Optional:
+  #   FTP_SERVER_DIR  target directory on the server, default ./docs/ (relative to the FTP login root)
+  #   FTP_PROTOCOL    ftp | ftps | ftps-legacy, default ftps
+  #   FTP_PORT        default 21
+  # The step is skipped (not failed) while FTP_SERVER is not set.
+  ftp:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+    steps:
+      - if: env.FTP_SERVER == ''
+        run: echo "::notice::FTP_SERVER secret is not set - skipping FTP upload."
+      - if: env.FTP_SERVER != ''
+        uses: actions/download-artifact@v8
+        with: { name: docs-html, path: html }
+      - name: Upload to FTP server
+        if: env.FTP_SERVER != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ secrets.FTP_PROTOCOL || 'ftps' }}
+          port: ${{ secrets.FTP_PORT || '21' }}
+          local-dir: ./html/
+          server-dir: ${{ secrets.FTP_SERVER_DIR || './docs/' }}
+          # Changed files are overwritten and pages removed from the docs are deleted again,
+          # tracked through .ftp-deploy-sync-state.json on the server.
+          state-name: .ftp-deploy-sync-state.json

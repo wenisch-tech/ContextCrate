@@ -12,7 +12,7 @@ flowchart LR
   AUTH --> DB[(Relational store)]
   DB --> Q[Crate-aware work queue]
   Q --> C[Website/Git connectors]
-  C --> A[(crates/{crateId} artifacts)]
+  C --> A[("crates/{crateId} artifacts")]
   C --> P[Normalize and discover]
   P --> D[(Documents and chunks)]
   D --> E[Extraction]

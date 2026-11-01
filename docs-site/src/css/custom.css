@@ -1,0 +1,150 @@
+/* ContextCrate docs theme — same palette and type as the application (ink + indigo). */
+@import '@fontsource-variable/inter';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+:root {
+  --ifm-font-family-base: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --ifm-font-size-base: 100%;
+  --ifm-line-height-base: 1.7;
+  --ifm-heading-font-weight: 650;
+  --ifm-heading-letter-spacing: -0.015em;
+  --ifm-global-radius: 0.6rem;
+  --ifm-navbar-height: 4rem;
+  --ifm-navbar-shadow: none;
+  --ifm-code-font-size: 88%;
+
+  --ifm-color-primary: #4350d6;
+  --ifm-color-primary-dark: #3b47c0;
+  --ifm-color-primary-darker: #3843b5;
+  --ifm-color-primary-darkest: #2e379a;
+  --ifm-color-primary-light: #5968e8;
+  --ifm-color-primary-lighter: #6573ee;
+  --ifm-color-primary-lightest: #8996ff;
+
+  --ifm-background-color: #f5f7fb;
+  --ifm-background-surface-color: #ffffff;
+  --ifm-color-content: #172033;
+  --ifm-color-content-secondary: #334155;
+  --ifm-toc-border-color: #ced6e4;
+  --ifm-color-emphasis-200: #e5eaf3;
+  --ifm-color-emphasis-300: #ced6e4;
+  --ifm-table-stripe-background: transparent;
+  --docusaurus-highlighted-code-line-bg: rgba(89, 104, 232, 0.1);
+  --cc-line: #ced6e4;
+  --cc-glow: rgba(113, 128, 255, 0.16);
+  --cc-cyan: #0b857f;
+}
+
+html[data-theme='dark'] {
+  --ifm-color-primary: #8996ff;
+  --ifm-color-primary-dark: #6f7eff;
+  --ifm-color-primary-darker: #6272ff;
+  --ifm-color-primary-darkest: #3b4fff;
+  --ifm-color-primary-light: #a3adff;
+  --ifm-color-primary-lighter: #b1b9ff;
+  --ifm-color-primary-lightest: #d2d7ff;
+
+  --ifm-background-color: #070b13;
+  --ifm-background-surface-color: #0b111d;
+  --ifm-color-content: #e8eef8;
+  --ifm-color-content-secondary: #a6b4ca;
+  --ifm-toc-border-color: #22314a;
+  --ifm-color-emphasis-200: #151f31;
+  --ifm-color-emphasis-300: #22314a;
+  --ifm-navbar-background-color: rgba(7, 11, 19, 0.82);
+  --ifm-footer-background-color: #0b111d;
+  --docusaurus-highlighted-code-line-bg: rgba(137, 150, 255, 0.14);
+  --cc-line: #22314a;
+  --cc-glow: rgba(61, 79, 168, 0.32);
+  --cc-cyan: #35c9c2;
+}
+
+html, html body { background-color: var(--ifm-background-color); }
+.footer--dark { --ifm-footer-background-color: var(--ifm-background-surface-color); --ifm-footer-color: var(--ifm-color-content-secondary); --ifm-footer-title-color: var(--ifm-color-content); --ifm-footer-link-color: var(--ifm-color-content-secondary); }
+[data-theme='light'] .footer--dark { --ifm-footer-background-color: #ffffff; }
+body {
+  background-image: radial-gradient(circle at 16% -8%, var(--cc-glow), transparent 34rem);
+  background-repeat: no-repeat;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* navbar */
+.navbar {
+  border-bottom: 1px solid var(--cc-line);
+  backdrop-filter: blur(14px);
+}
+html[data-theme='light'] .navbar { background: rgba(245, 247, 251, 0.85); }
+.navbar__title { font-weight: 650; letter-spacing: -0.01em; }
+.navbar__logo img { height: 2rem; }
+.navbar__link { font-weight: 500; }
+.navbar__link--active { color: var(--ifm-color-primary); }
+
+/* sidebar */
+.theme-doc-sidebar-container { border-right: 1px solid var(--cc-line) !important; }
+.menu { padding-top: 1rem; }
+.menu__link { border-radius: 0.5rem; font-size: 0.92rem; font-weight: 500; color: var(--ifm-color-content-secondary); }
+.menu__link:hover { background: var(--ifm-color-emphasis-200); color: var(--ifm-color-content); }
+.menu__link--active:not(.menu__link--sublist) {
+  background: color-mix(in srgb, var(--ifm-color-primary) 13%, transparent);
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ifm-color-primary) 22%, transparent);
+}
+.menu__list-item-collapsible:hover { background: var(--ifm-color-emphasis-200); }
+
+/* article */
+.theme-doc-markdown h1 { font-size: clamp(2rem, 4vw, 2.6rem); line-height: 1.12; margin-bottom: 1.25rem; }
+.theme-doc-markdown h2 { margin-top: 2.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--cc-line); }
+.markdown > p, .markdown li { max-width: 72ch; }
+.markdown a { text-underline-offset: 0.2em; }
+.breadcrumbs__link { background: transparent; }
+
+/* code */
+code { border: 1px solid var(--cc-line); background: var(--ifm-color-emphasis-200); border-radius: 0.35rem; padding: 0.1em 0.38em; }
+a code { color: inherit; }
+[class*='codeBlockContainer'] { border: 1px solid var(--cc-line); border-radius: 0.7rem; box-shadow: none !important; }
+pre code { border: 0; background: transparent; padding: 0; }
+
+/* tables */
+table { display: table; width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--cc-line); border-radius: 0.7rem; overflow: hidden; font-size: 0.92rem; }
+thead tr { background: var(--ifm-color-emphasis-200); }
+th { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.7rem; color: var(--ifm-color-content-secondary); border: 0; }
+td, th { padding: 0.7rem 1rem; border: 0; border-top: 1px solid var(--cc-line); }
+thead th { border-top: 0; }
+tbody tr:hover { background: color-mix(in srgb, var(--ifm-color-emphasis-200) 55%, transparent); }
+.markdown table { margin-bottom: 1.5rem; }
+
+/* admonitions */
+.alert { border: 1px solid var(--cc-line); border-left-width: 3px; border-radius: 0.7rem; box-shadow: none; background: var(--ifm-background-surface-color); }
+.alert--warning { border-left-color: #f2b84b; }
+.alert--danger { border-left-color: #f06a72; }
+.alert--info, .alert--secondary { border-left-color: var(--ifm-color-primary); }
+.alert--success { border-left-color: #36d399; }
+
+/* mermaid */
+.docusaurus-mermaid-container {
+  margin: 1.5rem 0; padding: 1.25rem; overflow-x: auto; text-align: center;
+  border: 1px solid var(--cc-line); border-radius: 0.8rem; background: var(--ifm-background-surface-color);
+}
+
+/* toc + footer + pagination */
+.table-of-contents__link--active { color: var(--ifm-color-primary); font-weight: 600; }
+.pagination-nav__link { border-radius: 0.7rem; border-color: var(--cc-line); background: var(--ifm-background-surface-color); }
+.pagination-nav__link:hover { border-color: var(--ifm-color-primary); }
+.footer { border-top: 1px solid var(--cc-line); }
+.footer__copyright { color: var(--ifm-color-content-secondary); font-size: 0.85rem; }
+
+/* search box (local search plugin) */
+[class*='searchBar'] input, .navbar__search-input {
+  background: var(--ifm-color-emphasis-200); border: 1px solid var(--cc-line); border-radius: 0.6rem; color: var(--ifm-color-content);
+}
+
+img { border-radius: 0.5rem; }
+:focus-visible { outline: 2px solid var(--ifm-color-primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+/* wide flowcharts stay readable and scroll instead of shrinking to fit */
+.docusaurus-mermaid-container svg { min-width: 44rem; max-width: none !important; height: auto; }
+html[data-theme='dark'] pre { background-color: #070b13 !important; }

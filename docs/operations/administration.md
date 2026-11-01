@@ -31,11 +31,12 @@ The second rule exists because the start-up routine that guarantees an administr
 `contextcrate.security.initial-admin-email` nor any `ADMIN` account exists — the installation would
 no longer boot.
 
-!!! warning "OIDC overrides local roles"
-    When `contextcrate.security.oidc.enabled` is `true`, the role is re-derived from the identity
-    provider on **every** sign-in. An administrator role granted here is reset to `USER` the next
-    time that user signs in through Keycloak unless they also hold the `ContextCrate_Admin` role
-    there. See [OIDC with Keycloak](oidc.md).
+:::warning OIDC overrides local roles
+When `contextcrate.security.oidc.enabled` is `true`, the role is re-derived from the identity
+provider on **every** sign-in. An administrator role granted here is reset to `USER` the next
+time that user signs in through Keycloak unless they also hold the `ContextCrate_Admin` role
+there. See [OIDC with Keycloak](oidc.md).
+:::
 
 ## Policies
 
