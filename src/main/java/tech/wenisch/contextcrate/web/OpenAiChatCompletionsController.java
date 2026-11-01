@@ -225,15 +225,7 @@ public class OpenAiChatCompletionsController {
   /** Mirrors the dashboard's sourceLink(): unwraps a Git source URI and rejects non-http(s) links. */
   private static String sourceLink(String sourceUri) {
     if (sourceUri == null) return null;
-    Matcher git = GIT_SOURCE_URI.matcher(sourceUri);
-    String candidate = git.matches() ? git.group(1) : sourceUri;
-    try {
-      URI uri = new URI(candidate);
-      String scheme = uri.getScheme();
-      return "http".equals(scheme) || "https".equals(scheme) ? uri.toString() : null;
-    } catch (URISyntaxException invalid) {
-      return null;
-    }
+    return tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(sourceUri);
   }
 
   /**

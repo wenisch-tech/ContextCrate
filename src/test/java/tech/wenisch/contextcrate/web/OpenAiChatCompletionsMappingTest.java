@@ -269,9 +269,9 @@ class OpenAiChatCompletionsMappingTest {
         .startsWith("Nightly backups:\n  ¹ applies here.");
   }
 
-  /** A Git source URI (git+repo@sha/path) is unwrapped to the plain repository link. */
+  /** A Git source URI (git+repo@sha/path) becomes a link to the file on the forge. */
   @Test
-  void aGitSourceUriIsUnwrappedToItsRepositoryLink() throws Exception {
+  void aGitSourceUriBecomesAFileLinkOnTheForge() throws Exception {
     when(answers.prepare(any())).thenReturn(prepared(List.of(
         source(1, "git+https://github.com/example/repo@"
             + "a".repeat(40) + "/docs/backups.md"))));
@@ -281,7 +281,7 @@ class OpenAiChatCompletionsMappingTest {
 
     var completion = (OpenAiChatCompletionsController.ChatCompletion) response.getBody();
     assertThat((String) completion.choices().get(0).message().content()).contains(
-        "[1] [title](https://github.com/example/repo)");
+        "[1] [title](https://github.com/example/repo/blob/" + "a".repeat(40) + "/docs/backups.md)");
   }
 
   /** A source URI that isn't a plain http(s) link is never turned into a link or a list entry. */

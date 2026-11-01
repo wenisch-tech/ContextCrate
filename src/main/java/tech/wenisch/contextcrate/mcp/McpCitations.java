@@ -66,9 +66,8 @@ public final class McpCitations {
    */
   public static String displayUri(String sourceUri) {
     if (sourceUri == null) return "";
-    Matcher git = GIT_URI.matcher(sourceUri);
-    String candidate = git.matches() ? git.group(1) : sourceUri;
-    return safe(candidate) ? candidate : sourceUri;
+    String link = tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(sourceUri);
+    return link != null ? link : sourceUri;
   }
 
   private static boolean safe(String value) {

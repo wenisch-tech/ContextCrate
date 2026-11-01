@@ -164,7 +164,11 @@ public class AnswerService {
     public Request withCrate(UUID crateId) { return new Request(crateId, question, runId, kind, retrievalMode, maxSources, history); }
   }
   public record HistoryMessage(String role,String content) {}
-  public record Source(int citation,UUID chunkId,UUID documentId,UUID runId,String title,String sourceUri,Integer chunkOrdinal,String snippet,float score,@JsonIgnore String content) {}
+  public record Source(int citation,UUID chunkId,UUID documentId,UUID runId,String title,String sourceUri,Integer chunkOrdinal,String snippet,float score,@JsonIgnore String content) {
+    /** Where a person can open this source: for Git documents the file at its commit on the forge. */
+    @com.fasterxml.jackson.annotation.JsonProperty("viewUrl")
+    public String viewUrl() { return tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(sourceUri); }
+  }
   /** @param searchQueries what retrieval searched for; @param transformations strategies that changed the query set */
   public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations) {
     public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,List.of(question),List.of()); }

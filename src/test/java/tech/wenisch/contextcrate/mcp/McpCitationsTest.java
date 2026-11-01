@@ -45,11 +45,11 @@ class McpCitationsTest {
   }
 
   @Test
-  void gitSourceUrisAreUnwrappedForDisplayJustLikeTheDashboard() {
+  void gitSourceUrisBecomeViewableForgeLinks() {
     String git = "git+https://git.example.com/team/product.git@"
         + "0123456789abcdef0123456789abcdef01234567/docs/install.md";
 
-    assertThat(McpCitations.displayUri(git)).isEqualTo("https://git.example.com/team/product.git");
+    assertThat(McpCitations.displayUri(git)).isEqualTo("https://git.example.com/team/product/src/commit/0123456789abcdef0123456789abcdef01234567/docs/install.md");
   }
 
   @Test

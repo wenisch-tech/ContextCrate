@@ -160,8 +160,8 @@
       head.append(el('span', 'cite cite--static', String(source.citation)), el('h4', 'src__title', source.title || shortUri(source.sourceUri || '') || 'Untitled'));
       item.append(head);
       if (source.sourceUri) {
-        const href = safeUrl(source.sourceUri.replace(/^git\+/, ''));
-        const uri = el(href ? 'a' : 'p', 'src__uri', shortUri(source.sourceUri));
+        const href = safeUrl(source.viewUrl || '');
+        const uri = el(href ? 'a' : 'p', 'src__uri', shortUri(source.viewUrl || source.sourceUri));
         if (href) { uri.href = href; uri.target = '_blank'; uri.rel = 'noopener noreferrer'; }
         uri.title = source.sourceUri; item.append(uri);
       }
