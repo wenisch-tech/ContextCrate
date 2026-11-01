@@ -28,7 +28,9 @@ public final class PipelineTypes {
     PARSE,
     DISCOVERY,
     EXTRACT,
-    INDEX
+    INDEX,
+    /** Describes one image with a vision model (opt-in per crate). */
+    IMAGE_DESCRIBE
   }
 
   public enum ExtractionType {

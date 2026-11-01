@@ -166,4 +166,51 @@ class DocumentParserTest {
     assertThat(created.getValue()).anyMatch(c -> c.getSymbol() != null && c.getSymbol().contains("Greeter"));
     assertThat(created.getValue().get(0).displayContent()).startsWith("```java\n");
   }
+
+  @Test
+  void markdownImagesAreIndexedOnlyWhenImageIndexingIsOn() throws Exception {
+    for (boolean on : new boolean[] {true, false}) {
+      var rag = mock(tech.wenisch.contextcrate.answer.RagSettingsService.class);
+      var settings = new tech.wenisch.contextcrate.domain.RagSettings(UUID.randomUUID(), false, true, true, true, true, true, "revise-once", "hybrid", "standard", "fail-indexing", 5);
+      settings.updateImages(on, false, null, 200, 5_000_000, 64, "");
+      var imageRows = mock(tech.wenisch.contextcrate.repository.DocumentImageRepository.class);
+      when(rag.current(any())).thenReturn(settings);
+      DocumentParser parser = new DocumentParser(acquisitions, runs, documents, chunks, items,
+          artifacts, ingestion, new UrlPolicy(true), queue, extraction, new ObjectMapper(), providers);
+      parser.setImageSupport(rag, imageRows);
+      UUID crateId = UUID.randomUUID(), runId = UUID.randomUUID(), acquisitionId = UUID.randomUUID();
+      IngestionRun run = new IngestionRun(runId, crateId, UUID.randomUUID(), UUID.randomUUID(), "{}", "{}");
+      AcquisitionRecord acquisition = new AcquisitionRecord(acquisitionId, runId, UUID.randomUUID(), "docs/guide.md");
+      acquisition.assignCrate(crateId);
+      acquisition.success("git+https://github.com/o/r.git@" + "a".repeat(40) + "/docs/guide.md", 200,
+          "text/markdown", "UTF-8", "a.md", "sha", 100, 1);
+      String md = "# Guide\n\nSee the diagram.\n\n![Request flow](img/flow.png)\n\n![](img/spacer.png)\n";
+      when(acquisitions.findById(acquisitionId)).thenReturn(Optional.of(acquisition));
+      when(runs.findById(runId)).thenReturn(Optional.of(run));
+      when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
+      when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
+          new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000,
+              new CrawlConfiguration.Output(30, "", List.of(), 1000, 20, "default"), false)));
+      when(artifacts.open("a.md")).thenReturn(new ByteArrayInputStream(md.getBytes(StandardCharsets.UTF_8)));
+      when(providers.effectiveEmbedding(crateId)).thenReturn(new RuntimeProviderSettings.Embedding(
+          true, "local", "model", "revision", "url", java.nio.file.Path.of("models"), null, null, null, null, 384, 8000));
+      when(documents.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(any(), any(), anyString())).thenReturn(Optional.empty());
+      clearInvocations(chunks);
+
+      parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+
+      @SuppressWarnings("unchecked")
+      ArgumentCaptor<List<DocumentChunk>> created = ArgumentCaptor.forClass(List.class);
+      verify(chunks).saveAll(created.capture());
+      String all = created.getValue().stream().map(DocumentChunk::getContent).reduce("", String::concat);
+      if (on) {
+        assertThat(all).contains("[Image: Request flow").contains("github.com/o/r/blob/");
+        verify(imageRows, atLeastOnce()).save(any());
+      } else {
+        assertThat(all).doesNotContain("[Image:");
+        verify(imageRows, never()).save(any());
+      }
+    }
+  }
 }

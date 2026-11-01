@@ -86,9 +86,10 @@ inside the crate. See [Authorization](../authorization.md).
 
 ## Model policy
 
-Under **Policies → Model policy**, two switches (both on by default) control what crate owners may
-configure themselves: adding their own OpenAI-/Cohere-compatible endpoints, and changing local
-ONNX model settings (model id, revision, download URL, paths). Shared models are always selectable.
+Under **Policies → Model policy**, three switches (all on by default) control what crate owners may
+configure themselves: adding their own OpenAI-/Cohere-compatible endpoints, changing local
+ONNX model settings (model id, revision, download URL, paths), and sending images to a vision
+model to have them described (see [Images](../features/images.md)). Shared models are always selectable.
 Turning a switch off does not break crates that already use such a setup; it only makes that part
 of their provider settings read-only. Downloading the already-configured local model stays possible.
 

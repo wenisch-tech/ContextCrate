@@ -79,6 +79,20 @@ public final class HtmlBlocks {
         } else if (tag.equals("ul") || tag.equals("ol")) {
           state.flushInline();
           walkList(el, state);
+        } else if (tag.equals("img") || tag.equals("picture")) {
+          state.flushInline();
+          Element img = tag.equals("img") ? el : el.selectFirst("img");
+          if (img != null) state.blocks.add(Block.image(state.path(), imageOf(img, el)));
+        } else if (tag.equals("svg")) {
+          state.flushInline();
+          String title = textOf(el.selectFirst("> title"));
+          String desc = textOf(el.selectFirst("> desc"));
+          if (!title.isEmpty() || !desc.isEmpty())
+            state.blocks.add(Block.image(state.path(), new ImageRef(null, title, null,
+                desc.isEmpty() ? null : desc, null, null, hints(el), false)));
+        } else if (tag.equals("figcaption") && el.parent() != null
+            && !el.parent().select("img, picture").isEmpty()) {
+          // used as the caption of the image in the same figure
         } else if (tag.equals("p") || tag.equals("blockquote") && !hasBlocks(el)) {
           state.flushInline();
           if (hasBlocks(el)) walk(el, state);
@@ -92,11 +106,103 @@ public final class HtmlBlocks {
           state.flushInline();
         } else if (tag.equals("br")) {
           state.inline.append(' ');
+        } else if (!el.select("img, picture, svg").isEmpty()) {
+          state.flushInline();
+          walk(el, state); // a link or span around an image
+          state.flushInline();
         } else {
           state.inline.append(' ').append(el.text()).append(' ');
         }
       }
     }
+  }
+
+  private static ImageRef imageOf(Element img, Element wrapper) {
+    String src = img.attr("src");
+    String srcset = img.attr("srcset");
+    if (srcset.isBlank() && wrapper != img) srcset = wrapper.select("source[srcset]").attr("srcset");
+    if (!srcset.isBlank()) {
+      String largest = largestFromSrcset(srcset);
+      if (largest != null) src = largest;
+    }
+    if (src.isBlank()) src = img.attr("data-src");
+    String url = src.isBlank() ? null : absolute(img, src);
+    Element link = img.parent() != null && img.parent().normalName().equals("a") ? img.parent() : null;
+    if (link != null && url != null) {
+      String href = link.attr("href");
+      if (ImageFilter.isImagePath(href.contains("?") ? href.substring(0, href.indexOf('?')) : href))
+        url = absolute(link, href);
+    }
+    Element figure = img.closest("figure");
+    String caption = null;
+    if (figure != null) {
+      Element figcaption = figure.selectFirst("figcaption");
+      if (figcaption != null) caption = textOf(figcaption);
+    }
+    return new ImageRef(url, img.hasAttr("alt") ? img.attr("alt").strip() : null,
+        blankToNull(img.attr("title")), blankToNull(caption), dimension(img.attr("width")),
+        dimension(img.attr("height")), hints(img),
+        "presentation".equals(img.attr("role")) || "none".equals(img.attr("role"))
+            || "true".equals(img.attr("aria-hidden")));
+  }
+
+  private static String largestFromSrcset(String srcset) {
+    String best = null;
+    double bestScore = -1;
+    for (String candidate : srcset.split(",")) {
+      String[] parts = candidate.strip().split("\\s+");
+      if (parts[0].isBlank()) continue;
+      double score = 1;
+      if (parts.length > 1) {
+        String d = parts[1].toLowerCase(java.util.Locale.ROOT);
+        try {
+          score = Double.parseDouble(d.substring(0, d.length() - 1));
+        } catch (RuntimeException ignored) {
+          score = 1;
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = parts[0];
+      }
+    }
+    return best;
+  }
+
+  private static String absolute(Element context, String value) {
+    try {
+      String base = context.baseUri();
+      return base == null || base.isBlank() ? value : java.net.URI.create(base).resolve(value.strip().replace(" ", "%20")).toString();
+    } catch (RuntimeException e) {
+      return value;
+    }
+  }
+
+  private static Integer dimension(String value) {
+    try {
+      return value.isBlank() ? null : (int) Double.parseDouble(value.replace("px", "").strip());
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private static String hints(Element el) {
+    StringBuilder hints = new StringBuilder();
+    for (Element e = el; e != null && hints.length() < 400; e = e.parent()) {
+      hints.append(' ').append(e.className()).append(' ').append(e.id());
+      if (e == el) hints.append(' ').append(e.attr("role"));
+      if (e.normalName().equals("body")) break;
+      if (hints.length() > 0 && e != el && !e.className().isBlank()) { /* keep ancestors' classes */ }
+    }
+    return hints.toString().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").strip();
+  }
+
+  private static String textOf(Element e) {
+    return e == null ? "" : e.text().replaceAll("\\s+", " ").strip();
+  }
+
+  private static String blankToNull(String v) {
+    return v == null || v.isBlank() ? null : v.strip();
   }
 
   private static void walkList(Element list, State state) {

@@ -29,6 +29,12 @@ public class PipelineCoordinator {
   private final ContextCrateProperties properties;
   private final MeterRegistry metrics;
   private final IngestionRunRepository runs;
+  private ImageDescriptionWorker imageWorker;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setImageWorker(ImageDescriptionWorker worker) {
+    this.imageWorker = worker;
+  }
   private final ThreadPoolExecutor executor;
   private tech.wenisch.contextcrate.metrics.CrateMetrics cm;
 
@@ -110,6 +116,7 @@ public class PipelineCoordinator {
           case PARSE, DISCOVERY -> role.equals("parser");
           case EXTRACT -> role.equals("extractor");
           case INDEX -> role.equals("indexer");
+          case IMAGE_DESCRIBE -> role.equals("parser") || role.equals("indexer");
         };
   }
 
@@ -135,6 +142,10 @@ public class PipelineCoordinator {
         case PARSE -> parser.parse(payload);
         case EXTRACT -> extractor.extract(payload);
         case INDEX -> indexer.index(payload);
+        case IMAGE_DESCRIBE -> {
+          if (imageWorker == null) throw new IllegalStateException("Image worker is unavailable");
+          imageWorker.describe(payload);
+        }
         case DISCOVERY -> {}
       }
       queue.acknowledge(message.id());

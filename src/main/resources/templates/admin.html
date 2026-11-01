@@ -114,6 +114,7 @@
         <p class="text-secondary small">What crate owners may configure themselves. Shared models (see the Models tab) are always selectable. Crates that already use a custom setup keep working; they just can no longer change it.</p>
         <div class="form-check"><input class="form-check-input" type="checkbox" id="allow-custom" name="allowCustomEndpoints" value="true" th:checked="${systemSetting.allowCustomEndpoints}"><label class="form-check-label" for="allow-custom">Users may add their own OpenAI-compatible / Cohere-compatible endpoints</label></div>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-local" name="allowLocalModels" value="true" th:checked="${systemSetting.allowLocalModels}"><label class="form-check-label" for="allow-local">Users may configure their own local ONNX models (model id, revision, download URL, paths)</label></div>
+        <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-vision" name="allowVisionDescriptions" value="true" th:checked="${systemSetting.allowVisionDescriptions}"><label class="form-check-label" for="allow-vision">Crates may send images to a vision model to have them described</label></div>
         <button class="btn btn-primary mt-4">Save model policy</button>
       </form>
       <form class="card panel p-4" method="post" action="/admin/settings/crate-creation">

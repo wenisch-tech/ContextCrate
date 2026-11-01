@@ -28,5 +28,13 @@ public class RagSettingsService {
     if(normalized==null){if(enabled)throw new IllegalArgumentException("select at least one query transformation strategy");normalized=value.getQueryTransformationStrategies();}
     value.updateQueryTransformation(enabled,normalized);return settings.save(value);
   }
+  @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
+    var value=current(crateId);
+    if(indexing&&description){
+      if(providers!=null&&!providers.allowVisionDescriptions())throw new IllegalArgumentException("Image descriptions are disabled by the administrator");
+      if(visionModelId==null&&providers!=null){var a=providers.effectiveAnswer(crateId);if(!a.enabled()||a.baseUrl()==null||a.baseUrl().isBlank()||a.model()==null||a.model().isBlank())throw new IllegalArgumentException("Select a vision model or configure the answer model first");}
+    }
+    value.updateImages(indexing,description,visionModelId,maxPerRun,maxBytes,minSize,skipPatterns);return settings.save(value);
+  }
   public void validateProviders(java.util.UUID crateId){if(providers==null)return;var embedding=providers.effectiveEmbedding(crateId);var answer=providers.effectiveAnswer(crateId);boolean embeddingConfigured=embedding.enabled()&&("local".equals(embedding.provider())||embedding.openaiBaseUrl()!=null&&!embedding.openaiBaseUrl().isBlank()&&embedding.openaiModel()!=null&&!embedding.openaiModel().isBlank());if(!embeddingConfigured)throw new IllegalArgumentException("Proposition retrieval requires configured embeddings");if(!answer.enabled()||answer.baseUrl()==null||answer.baseUrl().isBlank()||answer.model()==null||answer.model().isBlank())throw new IllegalArgumentException("Proposition retrieval requires an enabled and configured answer model");}
 }

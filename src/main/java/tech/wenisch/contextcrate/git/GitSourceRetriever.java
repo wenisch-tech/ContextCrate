@@ -108,9 +108,15 @@ public class GitSourceRetriever {
             || !included(relative, config.includePatterns(), config.excludePatterns()))
           continue;
         long size = Files.size(file);
-        if (size < 1 || size > config.maxFileBytes()) continue;
+        boolean image = imageSettings != null && tech.wenisch.contextcrate.service.chunking.ImageFilter.isImagePath(relative)
+            && imageSettings.current(run.getCrateId()).isImageIndexingEnabled();
+        long limit = image ? Math.max(config.maxFileBytes(), imageSettings.current(run.getCrateId()).getImageMaxBytes())
+            : config.maxFileBytes();
+        if (size < 1 || size > limit) continue;
         byte[] bytes = Files.readAllBytes(file);
-        if (binary(bytes) || lfsPointer(bytes)) continue;
+        if (image) {
+          if (lfsPointer(bytes)) continue;
+        } else if (binary(bytes) || lfsPointer(bytes)) continue;
 
         String sourceUri = gitUri(source.repositoryUrl(), revision, relative);
         if (items.findByRunIdAndSourceUri(run.getId(), sourceUri).isPresent()) continue;
@@ -123,7 +129,7 @@ public class GitSourceRetriever {
 
         String lowerPath = relative.toLowerCase(Locale.ROOT);
         boolean markdown = lowerPath.endsWith(".md") || lowerPath.endsWith(".markdown");
-        String extension = markdown ? ".md" : lowerPath.endsWith(".txt") ? ".txt" : ".src";
+        String extension = image ? ".img" : markdown ? ".md" : lowerPath.endsWith(".txt") ? ".txt" : ".src";
         String key = "crates/" + run.getCrateId() + "/runs/" + run.getId() + "/"
             + acquisitionId + extension;
         var saved = artifacts.put(key, new ByteArrayInputStream(bytes), config.maxFileBytes());
@@ -131,7 +137,7 @@ public class GitSourceRetriever {
             new AcquisitionRecord(acquisitionId, run.getId(), itemId, relative);
         record.assignCrate(run.getCrateId());
         record.success(sourceUri, 200,
-            markdown ? "text/markdown; charset=UTF-8"
+            image ? imageType(lowerPath) : markdown ? "text/markdown; charset=UTF-8"
                 : extension.equals(".txt") ? "text/plain; charset=UTF-8"
                 : "text/x-source; charset=UTF-8",
             "UTF-8", saved.key(), saved.sha256(), saved.length(), durationMillis);
@@ -153,6 +159,22 @@ public class GitSourceRetriever {
     }
     if (id == null) throw new IllegalArgumentException("Git ref was not found");
     git.checkout().setName(id.name()).call();
+  }
+
+  private tech.wenisch.contextcrate.answer.RagSettingsService imageSettings;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setImageSettings(tech.wenisch.contextcrate.answer.RagSettingsService settings) {
+    this.imageSettings = settings;
+  }
+
+  private static String imageType(String lowerPath) {
+    if (lowerPath.endsWith(".svg")) return "image/svg+xml";
+    if (lowerPath.endsWith(".gif")) return "image/gif";
+    if (lowerPath.endsWith(".webp")) return "image/webp";
+    if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) return "image/jpeg";
+    if (lowerPath.endsWith(".png")) return "image/png";
+    return "image/" + lowerPath.substring(lowerPath.lastIndexOf('.') + 1);
   }
 
   private static boolean included(String path, List<String> includes, List<String> excludes) {

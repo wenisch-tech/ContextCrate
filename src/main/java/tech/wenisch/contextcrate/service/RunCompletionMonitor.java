@@ -10,7 +10,8 @@ import tech.wenisch.contextcrate.repository.*;
 @Component
 public class RunCompletionMonitor {
   private static final List<WorkStage> FETCH_STAGES =
-      List.of(WorkStage.WEB_FETCH, WorkStage.GIT_FETCH, WorkStage.BROWSER_FETCH);
+      List.of(WorkStage.WEB_FETCH, WorkStage.GIT_FETCH, WorkStage.BROWSER_FETCH,
+          WorkStage.IMAGE_DESCRIBE);
 
   private final IngestionRunRepository runs;
   private final SourceItemRepository frontier;

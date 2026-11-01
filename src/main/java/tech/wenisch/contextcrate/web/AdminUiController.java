@@ -124,8 +124,9 @@ public class AdminUiController {
 
   @PostMapping("/settings/model-policy")
   String modelPolicy(@RequestParam(defaultValue = "false") boolean allowCustomEndpoints,
-      @RequestParam(defaultValue = "false") boolean allowLocalModels) {
-    administration.modelPolicy(allowCustomEndpoints, allowLocalModels);
+      @RequestParam(defaultValue = "false") boolean allowLocalModels,
+      @RequestParam(defaultValue = "false") boolean allowVisionDescriptions) {
+    administration.modelPolicy(allowCustomEndpoints, allowLocalModels, allowVisionDescriptions);
     return "redirect:/admin?modelPolicySaved#policies";
   }
 

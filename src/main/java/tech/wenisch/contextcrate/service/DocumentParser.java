@@ -35,6 +35,13 @@ public class DocumentParser {
   private final ObjectMapper mapper;
   private final RuntimeProviderSettings providers;
   private tech.wenisch.contextcrate.metrics.CrateMetrics cm = tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
+  private tech.wenisch.contextcrate.answer.RagSettingsService ragSettings;
+  private DocumentImageRepository imageRows;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setImageSupport(tech.wenisch.contextcrate.answer.RagSettingsService rag, DocumentImageRepository images) {
+    this.ragSettings = rag;
+    this.imageRows = images;
+  }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) { this.cm = metrics; }
 
@@ -91,7 +98,8 @@ public class DocumentParser {
     if (root == null) root = page.body();
     HtmlBlocks.Result structure = root == null
         ? new HtmlBlocks.Result(List.of(), List.of()) : HtmlBlocks.parse(root);
-    String text = BlockPacker.body(structure.blocks());
+    ImageFilter.Outcome images = ImageFilter.apply(structure.blocks(), imageOptions(run), url -> url);
+    String text = BlockPacker.body(images.blocks());
     if (text.length() < 100 && scriptCount > 3
         && config.reliability().renderMode() == CrawlConfiguration.RenderMode.AUTO
         && !browserRendered(acquisition)) {
@@ -109,7 +117,7 @@ public class DocumentParser {
         blankToNull(page.selectFirst("html") == null ? null : page.selectFirst("html").attr("lang")),
         meta(page, "meta[name=description]", "content"),
         meta(page, "meta[name=author]", "content"), text, metadata,
-        BlockPacker.pack(structure.blocks(), options(run, config.output())), config.output());
+        BlockPacker.pack(images.blocks(), options(run, config.output())), config.output(), images, true);
     discover(run, acquisition, page, config);
   }
 
@@ -133,13 +141,20 @@ public class DocumentParser {
     String title = null;
     List<String> headings = List.of();
     List<ChunkDraft> drafts;
+    ImageFilter.Outcome imageOutcome = null;
+    if (lowerType.startsWith("image/")) {
+      parseImageFile(run, acquisition, path, config);
+      return;
+    }
     if (markdown) {
       format = "markdown";
       var structure = MarkdownBlocks.parse(value);
       headings = structure.headings();
-      body = BlockPacker.body(structure.blocks());
+      imageOutcome = ImageFilter.apply(structure.blocks(), imageOptions(run),
+          url -> repoImageUrl(acquisition.getFinalLocator(), path, url));
+      body = BlockPacker.body(imageOutcome.blocks());
       title = headings.isEmpty() ? null : headings.get(0);
-      drafts = BlockPacker.pack(structure.blocks(), options);
+      drafts = BlockPacker.pack(imageOutcome.blocks(), options);
     } else if (codeLanguage != null) {
       format = "code";
       body = value.stripTrailing();
@@ -163,7 +178,58 @@ public class DocumentParser {
     if (codeLanguage != null) meta.put("language", codeLanguage);
     meta.put("headings", headings);
     persist(run, acquisition, acquisition.getFinalLocator(), title, null, null, null, body,
-        mapper.writeValueAsString(meta), drafts, config.output());
+        mapper.writeValueAsString(meta), drafts, config.output(), imageOutcome, false);
+  }
+
+  private ImageFilter.Options imageOptions(IngestionRun run) {
+    if (ragSettings == null) return ImageFilter.Options.disabled();
+    var settings = ragSettings.current(run.getCrateId());
+    return ImageFilter.Options.of(settings.isImageIndexingEnabled(), settings.getImageMinSize(),
+        settings.getImageSkipPatterns());
+  }
+
+  /** A repository-relative image path in Markdown becomes the link to that file on the forge. */
+  private static String repoImageUrl(String sourceUri, String documentPath, String url) {
+    if (url == null || url.isBlank()) return null;
+    String lower = url.toLowerCase(Locale.ROOT);
+    if (lower.startsWith("http://") || lower.startsWith("https://")) return url;
+    if (lower.startsWith("data:") || lower.startsWith("//") || lower.contains(":")) return null;
+    var m = java.util.regex.Pattern.compile("^(git\\+.+@[0-9a-fA-F]{40}/)(.+)$").matcher(sourceUri == null ? "" : sourceUri);
+    if (!m.matches()) return null;
+    String cleaned = url.contains("#") ? url.substring(0, url.indexOf('#')) : url;
+    cleaned = cleaned.contains("?") ? cleaned.substring(0, cleaned.indexOf('?')) : cleaned;
+    java.net.URI base = java.net.URI.create("file:///" + (cleaned.startsWith("/") ? "" : (documentPath == null ? "" : documentPath.replace(" ", "%20"))));
+    String resolved;
+    try {
+      resolved = cleaned.startsWith("/") ? cleaned.substring(1)
+          : base.resolve(cleaned.replace(" ", "%20")).getPath().replaceFirst("^/+", "");
+    } catch (RuntimeException e) {
+      return null;
+    }
+    return tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(m.group(1) + resolved);
+  }
+
+  /** A standalone image file in a repository: findable by name and, optionally, by description. */
+  private void parseImageFile(IngestionRun run, AcquisitionRecord acquisition, String path,
+      IngestionConfiguration.Git config) throws Exception {
+    ImageFilter.Options options = imageOptions(run);
+    if (!options.enabled()) return;
+    String name = filename(path);
+    ImageRef ref = new ImageRef(path, null, null, null, null, null, "", false);
+    String link = tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(acquisition.getFinalLocator());
+    String body = "Image file " + name + "\nPath: " + path + "\nImage: " + ref.label();
+    String reason = ImageFilter.reject(ref, options);
+    Map<String, Object> meta = new LinkedHashMap<>();
+    meta.put("connector", "GIT");
+    meta.put("path", path);
+    meta.put("format", "image");
+    List<ChunkDraft> drafts = reason != null ? List.of()
+        : List.of(new ChunkDraft(name, body, "image", null, null, null, null));
+    ImageFilter.Outcome outcome = new ImageFilter.Outcome(List.of(),
+        reason == null ? List.of(ref) : List.of(),
+        reason == null ? List.of() : List.of(new ImageFilter.Skipped(ref, reason)));
+    persist(run, acquisition, acquisition.getFinalLocator(), name, null, null, null, body,
+        mapper.writeValueAsString(meta), drafts, config.output(), outcome, false);
   }
 
   private ChunkOptions options(IngestionRun run, CrawlConfiguration.Output output) {
@@ -173,7 +239,8 @@ public class DocumentParser {
 
   private void persist(IngestionRun run, AcquisitionRecord acquisition, String sourceUri,
       String title, String language, String description, String author, String body,
-      String metadata, List<ChunkDraft> drafts, CrawlConfiguration.Output output) {
+      String metadata, List<ChunkDraft> drafts, CrawlConfiguration.Output output,
+      ImageFilter.Outcome images, boolean describable) {
     String hash = Hashing.sha256(body);
     String identityUri = ingestion.connector(run) == ConnectorType.GIT
         ? acquisition.getRequestedLocator() : sourceUri;
@@ -193,6 +260,7 @@ public class DocumentParser {
     current.ifPresent(document -> { document.supersede(); documents.save(document); });
     NormalizedDocument document = documents.save(value);
     var produced = toChunks(document, drafts);
+    recordImages(run, acquisition, document, images, describable);
     chunks.saveAll(produced);
     cm.count("ingestion.documents", run.getCrateId(), "result", current.isPresent() ? "updated" : "new");
     cm.summary("ingestion.chunks_per_document", run.getCrateId(), produced.size());
@@ -201,6 +269,45 @@ public class DocumentParser {
     queue.publish(PipelineMessage.create(run.getCrateId(), WorkStage.INDEX,
         IngestionService.payload(run.getCrateId(), run.getId(), document.getId()), run.getId(),
         run.getCrateId() + ":index:" + document.getId(), 20));
+  }
+
+  private void recordImages(IngestionRun run, AcquisitionRecord acquisition, NormalizedDocument document,
+      ImageFilter.Outcome outcome, boolean describable) {
+    if (outcome == null || imageRows == null || ragSettings == null) return;
+    var settings = ragSettings.current(run.getCrateId());
+    if (!settings.isImageIndexingEnabled()) return;
+    boolean describe = settings.isImageDescriptionEnabled() && providers.allowVisionDescriptions();
+    long alreadyQueued = imageRows.countByRunId(run.getId());
+    boolean gitImageFile = acquisition.getContentType() != null && acquisition.getContentType().startsWith("image/");
+    for (ImageRef ref : outcome.kept()) {
+      DocumentImage row = new DocumentImage(run.getCrateId(), document.getId(), run.getId(),
+          ref.url() == null ? "inline-svg" : ref.url(),
+          gitImageFile ? tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(acquisition.getFinalLocator()) : null,
+          ref.alt(), ref.caption(), null, null);
+      boolean canDescribe = describe && ref.url() != null && (describable || gitImageFile)
+          && alreadyQueued < settings.getImageMaxPerRun();
+      if (canDescribe) {
+        row.queue(gitImageFile ? acquisition.getArtifactKey() : null);
+        imageRows.save(row);
+        alreadyQueued++;
+        queue.publish(PipelineMessage.create(run.getCrateId(), WorkStage.IMAGE_DESCRIBE,
+            IngestionService.payload(run.getCrateId(), run.getId(), row.getId()), run.getId(),
+            run.getCrateId() + ":image:" + row.getId(), 5));
+      } else {
+        imageRows.save(row);
+      }
+      cm.count("images", run.getCrateId(), "result", "kept");
+    }
+    int skippedRows = 0;
+    for (ImageFilter.Skipped skipped : outcome.skipped()) {
+      cm.count("images", run.getCrateId(), "result", "skipped");
+      if (skippedRows++ >= 50) continue;
+      DocumentImage row = new DocumentImage(run.getCrateId(), document.getId(), run.getId(),
+          skipped.image().url() == null ? "inline-svg" : skipped.image().url(), null,
+          skipped.image().alt(), skipped.image().caption(), null, null);
+      row.skip(skipped.reason());
+      imageRows.save(row);
+    }
   }
 
   private void discover(IngestionRun run, AcquisitionRecord acquisition,

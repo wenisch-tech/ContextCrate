@@ -60,6 +60,26 @@
           </fieldset>
         </section>
 
+        <section id="images" class="panel scroll-mt-24" x-data="{img:false,desc:false}" x-init="img=$el.querySelector('#image-indexing-enabled').checked;desc=$el.querySelector('#image-description-enabled').checked">
+          <div class="panel-header"><div><h2 class="settings-title">Images</h2><p class="settings-hint">Makes meaningful images in web pages, Markdown and Git repositories searchable and citable. Icons, logos, badges, avatars and tracking pixels are skipped. Applies to the next ingestion run.</p></div><label class="switch-labelled" for="image-indexing-enabled"><span>Index images</span><span class="switch"><input type="checkbox" id="image-indexing-enabled" name="imageIndexingEnabled" x-model="img" th:checked="${rag.imageIndexingEnabled}"><span></span></span></label></div>
+          <fieldset class="panel-body space-y-1" :disabled="!img" :class="{'opacity-50':!img}">
+            <p class="field-help pb-2">When on, an image becomes a searchable reference built from its alt text, caption, file name and the text around it. Turn it off to ignore images completely, including image files in Git. Existing image entries are kept until the documents are ingested again.</p>
+            <div class="setting-row"><label for="image-description-enabled"><strong>Describe images with a vision model</strong><span>Downloads each image that passes the filter and asks a vision-capable model to describe it and transcribe visible text. The description is indexed with the document. The image is sent to the model endpoint. Costs one model call per new image.</span></label><span class="switch"><input type="checkbox" id="image-description-enabled" name="imageDescriptionEnabled" x-model="desc" th:checked="${rag.imageDescriptionEnabled}" th:disabled="${!allowVision}"><span></span></span></div>
+            <p class="field-help text-warn-500" th:if="${!allowVision}">An administrator has disabled image descriptions for this installation.</p>
+            <fieldset class="space-y-3 pt-2" :disabled="!desc" :class="{'opacity-50':!desc}">
+              <div class="field md:max-w-sm"><label class="field-label" for="image-vision-model">Vision model</label><select class="input" id="image-vision-model" name="imageVisionModelId"><option value="">Use the answer model of this crate</option><option th:each="m:${sharedAnswers}" th:value="${m.id}" th:text="${m.name}" th:selected="${rag.imageVisionModelId != null and rag.imageVisionModelId.toString() == m.id.toString()}"></option></select><p class="field-help">The model must accept images (OpenAI-compatible <code>image_url</code> content).</p></div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="field"><label class="field-label" for="image-max-per-run">Maximum images described per run</label><input class="input" type="number" min="1" max="5000" id="image-max-per-run" name="imageMaxPerRun" th:value="${rag.imageMaxPerRun}"></div>
+                <div class="field"><label class="field-label" for="image-max-bytes">Maximum bytes per image</label><input class="input" type="number" min="10000" max="20000000" id="image-max-bytes" name="imageMaxBytes" th:value="${rag.imageMaxBytes}"></div>
+              </div>
+            </fieldset>
+            <div class="grid gap-4 pt-2 md:grid-cols-2">
+              <div class="field"><label class="field-label" for="image-min-size">Smallest image (pixels)</label><input class="input" type="number" min="1" max="2000" id="image-min-size" name="imageMinSize" th:value="${rag.imageMinSize}"><p class="field-help">Images declared smaller than this in width or height are skipped.</p></div>
+              <div class="field"><label class="field-label" for="image-skip-patterns">Extra skip patterns</label><input class="input" id="image-skip-patterns" name="imageSkipPatterns" th:value="${rag.imageSkipPatterns}" placeholder="comma-separated, e.g. screenshot-ad, /thumbs/"><p class="field-help">Images whose address, class or alt text contains one of these are skipped, in addition to the built-in icon, logo and badge rules.</p></div>
+            </div>
+          </fieldset>
+        </section>
+
         <section id="grounding" class="panel scroll-mt-24">
           <div class="panel-header"><div><h2 class="settings-title">Grounding &amp; citations</h2><p class="settings-hint">What answers may rely on and how sources are shown.</p></div></div>
           <div class="panel-body">

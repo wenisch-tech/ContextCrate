@@ -48,6 +48,7 @@ public class RuntimeProviderSettings {
 
   /** Administrator policy: may crate owners use their own endpoints / change local model settings? Defaults to yes. */
   public boolean allowCustomEndpoints(){return system==null||system.findById(1).map(x->x.isAllowCustomEndpoints()).orElse(true);}
+  public boolean allowVisionDescriptions(){return system==null||system.findById(1).map(x->x.isAllowVisionDescriptions()).orElse(true);}
   public boolean allowLocalModels(){return system==null||system.findById(1).map(x->x.isAllowLocalModels()).orElse(true);}
   /** Existing configuration keeps working; only changes to it are refused. Compared with the effective values so unchanged form posts pass. */
   private void enforcePolicy(java.util.UUID crateId,ProviderForm f,boolean eShared,boolean rShared,boolean aShared){

@@ -20,6 +20,21 @@ public class RagSettings {
   @Column(name="query_transformation_enabled",nullable=false) private boolean queryTransformationEnabled;
   /** Comma-separated canonical list of rewrite, step-back and sub-queries, or the single value auto. */
   @Column(name="query_transformation_strategies",nullable=false,length=60) private String queryTransformationStrategies="auto";
+  @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
+  @Column(name="image_description_enabled",nullable=false) private boolean imageDescriptionEnabled;
+  @Column(name="image_vision_model_id") private java.util.UUID imageVisionModelId;
+  @Column(name="image_max_per_run",nullable=false) private int imageMaxPerRun=200;
+  @Column(name="image_max_bytes",nullable=false) private int imageMaxBytes=5_242_880;
+  @Column(name="image_min_size",nullable=false) private int imageMinSize=64;
+  @Column(name="image_skip_patterns",nullable=false,length=500) private String imageSkipPatterns="";
+  public boolean isImageIndexingEnabled(){return imageIndexingEnabled;} public boolean isImageDescriptionEnabled(){return imageDescriptionEnabled;}
+  public java.util.UUID getImageVisionModelId(){return imageVisionModelId;} public int getImageMaxPerRun(){return imageMaxPerRun;} public int getImageMaxBytes(){return imageMaxBytes;}
+  public int getImageMinSize(){return imageMinSize;} public String getImageSkipPatterns(){return imageSkipPatterns;}
+  public void updateImages(boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
+    this.imageIndexingEnabled=indexing;this.imageDescriptionEnabled=indexing&&description;this.imageVisionModelId=visionModelId;
+    this.imageMaxPerRun=Math.max(1,Math.min(maxPerRun,5000));this.imageMaxBytes=Math.max(10_000,Math.min(maxBytes,20_000_000));
+    this.imageMinSize=Math.max(1,Math.min(minSize,2000));this.imageSkipPatterns=skipPatterns==null?"":skipPatterns.strip();
+  }
   protected RagSettings() {}
   public RagSettings(boolean strictGrounding, boolean allowClientHistory, boolean inlineCitations, boolean structuredSources, boolean gradingEnabled, boolean answerVerificationEnabled, String answerVerificationFailureAction, String retrievalMode, int sourceLimit) { this(CrateIds.LEGACY,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,"standard","fail-indexing",sourceLimit); }
   public RagSettings(java.util.UUID crateId,boolean strictGrounding, boolean allowClientHistory, boolean inlineCitations, boolean structuredSources, boolean gradingEnabled, boolean answerVerificationEnabled, String answerVerificationFailureAction, String retrievalMode, int sourceLimit) { this(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,"standard","fail-indexing",sourceLimit); }

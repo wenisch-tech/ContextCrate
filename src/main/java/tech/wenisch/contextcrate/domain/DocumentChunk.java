@@ -50,6 +50,18 @@ public class DocumentChunk {
   @Column(name = "end_line")
   private Integer endLine;
 
+  @Column(name = "media_url", length = 2000)
+  private String mediaUrl;
+
+  public String getMediaUrl() {
+    return mediaUrl;
+  }
+
+  public DocumentChunk media(String url) {
+    this.mediaUrl = url;
+    return this;
+  }
+
   protected DocumentChunk() {}
 
   public DocumentChunk(
@@ -82,7 +94,8 @@ public class DocumentChunk {
 
   /** The text as shown to people and models: code chunks come back inside a fenced block. */
   public String displayContent() {
-    return isCode() ? "```" + (language == null ? "" : language) + "\n" + content + "\n```" : content;
+    String text = isCode() ? "```" + (language == null ? "" : language) + "\n" + content + "\n```" : content;
+    return mediaUrl == null ? text : text + "\n(Image: " + mediaUrl + ")";
   }
 
   public String getKind() {

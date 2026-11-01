@@ -11,7 +11,7 @@ const sidebars = {
     'answers',
     {
       type: 'category', label: 'Features', collapsed: true,
-      items: ['features/parsing', 'features/chunking', 'features/retrieval', 'features/query-transformation', 'features/grading', 'features/answer-verification'],
+      items: ['features/parsing', 'features/chunking', 'features/images', 'features/retrieval', 'features/query-transformation', 'features/grading', 'features/answer-verification'],
     },
     'pipeline',
     'security',

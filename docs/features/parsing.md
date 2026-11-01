@@ -45,6 +45,7 @@ All text is normalised to Unicode NFC. Line endings are converted to `\n`.
 | `table` | One block of `cell | cell` rows, kept together |
 | `ul`, `ol` | One block of `- item` lines, nested lists indented |
 | `p`, `blockquote`, other text | Prose blocks with whitespace collapsed |
+| `img`, `picture`, `figure`/`figcaption`, inline `svg` | An **image reference** (alt text, caption and address) when image indexing is on; see [Images](images.md) |
 
 Inline `code` inside a sentence stays part of that sentence.
 
@@ -75,6 +76,8 @@ what the document actually means:
 - **Tables** (GitHub style), **lists** (nested, ordered and unordered) and **block quotes** are
   kept as single blocks.
 - Emphasis markers, link syntax and HTML tags are removed from prose; the link text is kept.
+- **Images** (`![alt](path)`) become image references when image indexing is on. Relative paths are
+  resolved against the file and linked to the file on the forge. See [Images](images.md).
 
 Files with the extension `.md` or `.markdown` are parsed as Markdown.
 
@@ -136,6 +139,14 @@ The tree-sitter library is a prebuilt native component that depends only on the 
 language grammars are versioned in the application, so a new language needs a new ContextCrate
 release.
 
+## Images
+
+Image handling is a separate, optional layer on top of parsing and can be switched off per crate
+under **Settings → Images**. When it is on, the parsers above recognise images, drop icons, logos,
+badges and tracking pixels, and keep a one-line reference with the alt text, caption and address
+in the text. Optionally a vision model describes the remaining images. All rules, defaults and
+the privacy implications are described on the [Images](images.md) page.
+
 ## Plain text
 
 Files with the extension `.txt`, and unknown text files, are split into paragraphs at blank lines.
@@ -166,7 +177,11 @@ Typical setups:
 - **A Java service:** include `src/**, *.md`, exclude `**/generated/**, *.min.js`.
 - **Everything except noise:** keep `**` and exclude `node_modules/, dist/, build/, *.lock, package-lock.json`.
 
-Regardless of the patterns, ContextCrate skips the `.git` directory, symbolic links, binary files,
+Image files (`.png`, `.jpg`, `.gif`, `.webp`, `.svg`) follow the same patterns. They are imported
+as small image documents while **Index images** is on in the crate settings, and skipped as binary
+files otherwise. Icons, logos and similar are filtered by name, see [Images](images.md).
+
+Regardless of the patterns, ContextCrate skips the `.git` directory, symbolic links, other binary files,
 Git LFS pointers, empty files, files larger than **Maximum bytes per file**, and anything beyond
 **Maximum files** (default 10,000).
 

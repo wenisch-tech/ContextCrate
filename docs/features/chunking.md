@@ -29,7 +29,7 @@ to re-chunk existing content.
 ## How chunks are built
 
 1. **Blocks.** The parser turns the document into an ordered list of blocks. Each block knows the
-   headings above it (its *heading path*) and whether it is prose or code.
+   headings above it (its *heading path*) and whether it is prose, code or an image reference.
 2. **Sections.** A chunk never crosses a heading boundary. Content below *Guide > Setup* and
    content below *Guide > Usage* always end up in different chunks.
 3. **Packing.** Within a section, neighbouring blocks are added to the current chunk until the
@@ -79,10 +79,11 @@ Every chunk stores more than its text:
 | Field | Description |
 |---|---|
 | Heading | The heading path, for example `Guide > Setup > Linux`. For code chunks, the symbol or the file name. |
-| Kind | `text` or `code`. |
+| Kind | `text`, `code`, or `image` (a description produced by a vision model, or an image file). |
 | Language | The programming language for code chunks (`java`, `python`, `yaml`, …) or the fence language. |
 | Symbol | For source code, the qualified declaration, for example `UserService.findById`. |
 | Start / end line | The line range in the source file, for code chunks. |
+| Media URL | For `image` chunks, the address of the image. |
 | Ordinal | Position of the chunk in the document. |
 
 ### Where the metadata is used
@@ -97,6 +98,18 @@ Every chunk stores more than its text:
 - **Answers and MCP.** Code chunks are given to the model, and returned by the MCP tools, inside a
   fenced block with their language, so formatting and indentation survive.
 - **Backups.** The metadata is part of crate export and import. Older exports without it still import.
+
+## Images
+
+When image indexing is on (**Settings → Images**), an image that passes the filter becomes a short
+line such as `[Image: Request flow — Figure 2] (https://…/flow.png)`. This line is a block like any
+other, so it is packed into the chunk of the paragraph it belongs to and is searchable together
+with that text.
+
+With image descriptions on, a vision model's description is added later as a separate chunk of
+kind `image` under the heading where the image appeared, and the document is re-indexed. Its
+Media URL points to the image, and answers and MCP results show it as `(Image: <url>)`. See
+[Images](images.md).
 
 ## Code files
 

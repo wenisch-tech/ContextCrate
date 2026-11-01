@@ -68,6 +68,19 @@ public final class MarkdownBlocks {
       add(out, Block.prose(path, list(list, 0)));
     } else {
       add(out, Block.prose(path, inline(node).strip()));
+      images(node, path, out);
+    }
+  }
+
+  /** Images inside a paragraph become their own blocks, right after the paragraph text. */
+  private static void images(Node node, List<String> path, List<Block> out) {
+    for (Node child = node.getFirstChild(); child != null; child = child.getNext()) {
+      if (child instanceof Image image) {
+        String alt = inline(image).strip();
+        String title = image.getTitle();
+        out.add(Block.image(path, new ImageRef(image.getDestination(), alt,
+            title == null || title.isBlank() ? null : title.strip(), null, null, null, "", false)));
+      } else images(child, path, out);
     }
   }
 

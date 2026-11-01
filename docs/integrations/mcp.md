@@ -103,12 +103,13 @@ For a genuinely complete list of some entity across a whole crate — every IP a
 reference — the right tool is ContextCrate's [extraction rules](../api.md), which run over every
 chunk at ingest time. Extraction is not exposed over MCP today.
 
-**ContextCrate is a text-only corpus.** No images are stored. The Git connector accepts text files only (no
-binaries); the crawler follows `a[href]` and never `img[src]`; and the HTML parser keeps
-text only, so `<img>` disappears entirely. In Markdown, `![Architecture diagram](arch.png)` is
-reduced to the bare words `Architecture diagram`, indistinguishable from prose. A model asked which
-images a crate contains will find that text and answer confidently and wrongly, so tell it — or your
-users — that images are not ingested.
+**Images are indexed as text.** No image data is stored or returned. With **Settings → Images** on
+(the default), meaningful images become a line such as `[Image: Request flow] (https://…/flow.png)`
+in the surrounding passage, and, if a vision model is configured, a separate passage with the
+image's description and `(Image: <url>)`. Icons, logos and badges are skipped. A crate with image
+indexing off, or an image without alt text, caption or description, cannot be found by its
+content, so a model asked what images a crate contains can only report what these text entries
+say. See [Images](../features/images.md).
 
 **No CORS and no rate limiting.** Server-to-server clients such as LiteLLM and Open WebUI are
 unaffected, but a browser page calling the endpoint directly from JavaScript is blocked. Put an

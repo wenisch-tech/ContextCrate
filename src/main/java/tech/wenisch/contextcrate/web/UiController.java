@@ -461,6 +461,13 @@ public class UiController {
     return "documents";
   }
 
+  private tech.wenisch.contextcrate.repository.DocumentImageRepository documentImages;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setDocumentImages(tech.wenisch.contextcrate.repository.DocumentImageRepository repository) {
+    this.documentImages = repository;
+  }
+
   @GetMapping("/documents/{id}")
   String documentDetails(@PathVariable UUID crateId, @PathVariable UUID id, Model model) {
     var document = documents.findByIdAndCrateId(id, crateId).orElseThrow();
@@ -470,6 +477,8 @@ public class UiController {
     for (int position = 0; position + 1 < versions.size(); position++)
       previous.put(versions.get(position).getId(), versions.get(position + 1).getId());
     model.addAttribute("document", document);
+    model.addAttribute("images", documentImages == null ? java.util.List.of()
+        : documentImages.findByDocumentIdAndCrateIdOrderByCreatedAt(id, crateId));
     model.addAttribute("source", sources.require(crateId, document.getSourceId()));
     model.addAttribute("run", ingestion.requireRun(crateId, document.getRunId()));
     model.addAttribute("versions", versions);
@@ -584,6 +593,7 @@ public class UiController {
     model.addAttribute("sharedSelection", sharedSelection);
     model.addAttribute("allowCustomEndpoints", providerSettings.allowCustomEndpoints());
     model.addAttribute("allowLocalModels", providerSettings.allowLocalModels());
+    model.addAttribute("allowVision", providerSettings.allowVisionDescriptions());
     model.addAttribute("sharedEmbeddings", sharedModels.options(SharedModel.Kind.EMBEDDING, sharedSelection.embedding()));
     model.addAttribute("sharedRerankings", sharedModels.options(SharedModel.Kind.RERANKING, sharedSelection.reranking()));
     model.addAttribute("sharedAnswers", sharedModels.options(SharedModel.Kind.ANSWER, sharedSelection.answering()));
@@ -650,9 +660,16 @@ public class UiController {
       @RequestParam(defaultValue="fail-indexing") String propositionFailurePolicy,
       @RequestParam int sourceLimit,
       @RequestParam(defaultValue = "false") boolean queryTransformationEnabled,
-      @RequestParam(required = false) java.util.List<String> queryTransformationStrategies) {
+      @RequestParam(required = false) java.util.List<String> queryTransformationStrategies,
+      @RequestParam(defaultValue = "false") boolean imageIndexingEnabled,
+      @RequestParam(defaultValue = "false") boolean imageDescriptionEnabled,
+      @RequestParam(defaultValue = "") String imageVisionModelId,
+      @RequestParam(defaultValue = "200") int imageMaxPerRun,
+      @RequestParam(defaultValue = "5242880") int imageMaxBytes,
+      @RequestParam(defaultValue = "64") int imageMinSize,
+      @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous=ragSettings.current(crateId);boolean changed=!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);if(changed)rebuild.rebuildAsync(crateId);
+    var previous=ragSettings.current(crateId);boolean changed=!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 

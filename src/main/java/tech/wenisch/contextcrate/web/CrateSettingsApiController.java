@@ -29,6 +29,9 @@ public class CrateSettingsApiController {
       boolean enabled=r.queryTransformationEnabled()==null?current.isQueryTransformationEnabled():r.queryTransformationEnabled();
       updated=rag.updateQueryTransformation(crateId,enabled,r.queryTransformationStrategies()==null?java.util.List.of(current.getQueryTransformationStrategies()):r.queryTransformationStrategies());
     }
+    if(r.imageIndexingEnabled()!=null||r.imageDescriptionEnabled()!=null||r.imageVisionModelId()!=null||r.imageMaxPerRun()!=null||r.imageMaxBytes()!=null||r.imageMinSize()!=null||r.imageSkipPatterns()!=null){
+      updated=rag.updateImages(crateId,r.imageIndexingEnabled()==null?current.isImageIndexingEnabled():r.imageIndexingEnabled(),r.imageDescriptionEnabled()==null?current.isImageDescriptionEnabled():r.imageDescriptionEnabled(),r.imageVisionModelId()==null?current.getImageVisionModelId():r.imageVisionModelId(),r.imageMaxPerRun()==null?current.getImageMaxPerRun():r.imageMaxPerRun(),r.imageMaxBytes()==null?current.getImageMaxBytes():r.imageMaxBytes(),r.imageMinSize()==null?current.getImageMinSize():r.imageMinSize(),r.imageSkipPatterns()==null?current.getImageSkipPatterns():r.imageSkipPatterns());
+    }
     if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy))rebuild.rebuildAsync(crateId);return updated;
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
@@ -50,7 +53,8 @@ public class CrateSettingsApiController {
     return providers(crateId);
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
-      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies){}
+      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,
+      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

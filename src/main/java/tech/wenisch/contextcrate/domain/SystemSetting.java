@@ -22,6 +22,10 @@ public class SystemSetting {
   private boolean allowCustomEndpoints = true;
   @Column(name = "allow_local_models", nullable = false)
   private boolean allowLocalModels = true;
+  @Column(name = "allow_vision_descriptions", nullable = false)
+  private boolean allowVisionDescriptions = true;
+  public boolean isAllowVisionDescriptions() { return allowVisionDescriptions; }
+  public void allowVisionDescriptions(boolean value) { this.allowVisionDescriptions = value; }
   protected SystemSetting() {}
   public CrateCreationMode getCrateCreationMode() { return crateCreationMode; }
   public void crateCreationMode(CrateCreationMode mode) { this.crateCreationMode = mode; }

@@ -113,6 +113,16 @@ public class UserAdministrationService {
   }
 
   @Transactional
+  public SystemSetting modelPolicy(boolean allowCustomEndpoints, boolean allowLocalModels,
+      boolean allowVisionDescriptions) {
+    requireAdmin();
+    SystemSetting setting = settings.findById(1).orElseThrow();
+    setting.modelPolicy(allowCustomEndpoints, allowLocalModels);
+    setting.allowVisionDescriptions(allowVisionDescriptions);
+    return settings.save(setting);
+  }
+
+  @Transactional
   public SystemSetting modelPolicy(boolean allowCustomEndpoints, boolean allowLocalModels) {
     requireAdmin();
     SystemSetting setting = settings.findById(1).orElseThrow();
