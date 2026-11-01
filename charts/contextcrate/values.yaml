@@ -2,19 +2,19 @@ profile: standalone
 image:
   repository: ghcr.io/wenisch-tech/contextcrate
   browserRepository: ghcr.io/wenisch-tech/contextcrate-browser
-  tag: "0.10.0"
+  tag: "0.11.0"
   pullPolicy: IfNotPresent
 roles:
-  all: { enabled: true, replicas: 1 }
-  control-plane: { enabled: false, replicas: 1 }
-  source-web: { enabled: false, replicas: 1 }
-  source-git: { enabled: false, replicas: 1 }
-  crawler-browser: { enabled: false, replicas: 1 }
-  parser: { enabled: false, replicas: 1 }
-  indexer: { enabled: false, replicas: 1 }
-service: { type: ClusterIP, port: 8080 }
-ingress: { enabled: false, className: "", host: contextcrate.example.com, tls: [] }
-persistence: { enabled: true, storageClassName: "", accessMode: ReadWriteOnce, size: 10Gi }
+  all: {enabled: true, replicas: 1}
+  control-plane: {enabled: false, replicas: 1}
+  source-web: {enabled: false, replicas: 1}
+  source-git: {enabled: false, replicas: 1}
+  crawler-browser: {enabled: false, replicas: 1}
+  parser: {enabled: false, replicas: 1}
+  indexer: {enabled: false, replicas: 1}
+service: {type: ClusterIP, port: 8080}
+ingress: {enabled: false, className: "", host: contextcrate.example.com, tls: []}
+persistence: {enabled: true, storageClassName: "", accessMode: ReadWriteOnce, size: 10Gi}
 security:
   oidc:
     enabled: false
@@ -27,8 +27,8 @@ tls:
   # self-signed CAs you already trust.
   trustAllCertificates: false
 resources:
-  requests: { cpu: 250m, memory: 512Mi }
-  limits: { cpu: "2", memory: 2Gi }
+  requests: {cpu: 250m, memory: 512Mi}
+  limits: {cpu: "2", memory: 2Gi}
 env: {}
 secrets: {}
 embeddings:
@@ -52,4 +52,4 @@ answering:
     model: ""
     apiKeySecret: ""
 podAnnotations: {}
-serviceMonitor: { enabled: false, interval: 30s }
+serviceMonitor: {enabled: false, interval: 30s}
