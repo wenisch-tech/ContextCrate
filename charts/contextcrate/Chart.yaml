@@ -2,8 +2,8 @@ apiVersion: v2
 name: contextcrate
 description: Self-hosted crawling and indexing platform
 type: application
-version: 0.11.3
-appVersion: "0.11.3"
+version: 0.12.0
+appVersion: "0.12.0"
 home: https://github.com/wenisch-tech/ContextCrate
 sources: ['https://github.com/wenisch-tech/ContextCrate']
 keywords: [crawler, scraper, search, indexing]
