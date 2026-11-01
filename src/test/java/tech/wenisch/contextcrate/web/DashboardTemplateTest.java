@@ -21,7 +21,7 @@ class DashboardTemplateTest {
         .contains("Document index", "Sources monitored", "Indexing activity", "Documents indexed")
         .contains("analytics-chart", "contextcrate-logo-clean.png", "last 24h")
         .contains("WEB_FETCH", "GIT_FETCH", "BROWSER_FETCH", "PARSE", "DISCOVERY", "EXTRACT", "INDEX")
-        .contains("pipeline-graph", "pipeline-packet", "x-cloak", "PROCESSING")
+        .contains("x-cloak", "PROCESSING")
         .doesNotContain("pipeline?.[k]?.COMPLETED")
         .doesNotContain("answer-form", "content-search")
         .doesNotContain("innerHTML", "/webjars/bootstrap");

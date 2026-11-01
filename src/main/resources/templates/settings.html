@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Settings · ContextCrate</title><link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
-<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header><main class="container p-4 p-lg-5">
+<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header><main class="page">
   <div class="mb-6"><p class="eyebrow">CONTROL PLANE</p><h1 class="page-title">Crate settings</h1><p class="page-copy">Manage this crate, how it retrieves and answers, and which models it uses.</p></div>
   <div class="alert-success mb-4" role="status" th:if="${param.generalSaved != null}">General settings saved.</div>
   <div class="alert-success mb-4" role="status" th:if="${param.saved != null or param.providersSaved != null}">Settings saved.</div>

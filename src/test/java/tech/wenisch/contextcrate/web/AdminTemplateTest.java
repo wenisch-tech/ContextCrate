@@ -17,7 +17,7 @@ class AdminTemplateTest {
   @Test
   void administrationEntryPointsAreGuardedByTheAdminFlag() throws IOException {
     assertThat(template("crates.html"))
-        .contains("<a th:if=\"${isAdmin}\" class=\"card panel admin-tile mb-4\" href=\"/admin\">");
+        .contains("<a th:if=\"${isAdmin}\" class=\"panel admin-tile mb-6\" href=\"/admin\">");
     assertThat(template("fragments.html"))
         .contains("th:if=\"${isAdmin}\" href=\"/admin\"")
         .contains("Crate management", "Personal API keys");
