@@ -103,8 +103,8 @@ For a genuinely complete list of some entity across a whole crate — every IP a
 reference — the right tool is ContextCrate's [extraction rules](../api.md), which run over every
 chunk at ingest time. Extraction is not exposed over MCP today.
 
-**ContextCrate is a text-only corpus.** No images are stored. The Git connector accepts only `.md`,
-`.markdown` and `.txt`; the crawler follows `a[href]` and never `img[src]`; and the HTML parser keeps
+**ContextCrate is a text-only corpus.** No images are stored. The Git connector accepts text files only (no
+binaries); the crawler follows `a[href]` and never `img[src]`; and the HTML parser keeps
 text only, so `<img>` disappears entirely. In Markdown, `![Architecture diagram](arch.png)` is
 reduced to the bare words `Architecture diagram`, indistinguishable from prose. A model asked which
 images a crate contains will find that text and answer confidently and wrongly, so tell it — or your

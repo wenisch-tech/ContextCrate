@@ -20,8 +20,8 @@ Java `HttpClient` is the normal fetcher. Redirect targets are resolved and safet
 
 The Git connector clones one HTTPS repository snapshot into an isolated temporary directory.
 Blank refs use the remote default branch; explicit branches, tags, and reachable commits are
-resolved to an exact SHA stored on the ingestion run. Eligible UTF-8 `.md`, `.markdown`, and
-`.txt` files become acquisition records and raw artifacts before normalization. Temporary clones
+resolved to an exact SHA stored on the ingestion run. Eligible UTF-8 text files (documentation and source code, filtered by the
+job's include and exclude globs, see [Parsing](features/parsing.md)) become acquisition records and raw artifacts before normalization. Temporary clones
 are removed after success or failure.
 
 ## Parsing, extraction, and indexing

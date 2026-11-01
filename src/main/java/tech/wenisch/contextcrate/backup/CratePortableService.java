@@ -240,6 +240,9 @@ public class CratePortableService {
           documentIds.get(UUID.fromString(text(node, "documentId"))),
           node.path("ordinal").asInt(), nullable(node, "heading"), text(node, "content"),
           text(node, "contentHash"));
+      value.describe(nullable(node, "kind"), nullable(node, "language"), nullable(node, "symbol"),
+          node.hasNonNull("startLine") ? node.get("startLine").asInt() : null,
+          node.hasNonNull("endLine") ? node.get("endLine").asInt() : null);
       value.assignCrate(crateId); chunks.save(value);
     }
     for(JsonNode node:data.path("propositionEvaluations")){UUID id=UUID.randomUUID();evaluationIds.put(uuid(node),id);propositionEvaluations.save(new PropositionEvaluation(id,crateId,chunkIds.get(UUID.fromString(text(node,"chunkId"))),text(node,"contentHash"),text(node,"fingerprint"),nullable(node,"model"),text(node,"status"),nullable(node,"errorMessage")));}

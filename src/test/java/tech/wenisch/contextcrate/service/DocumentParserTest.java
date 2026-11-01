@@ -72,7 +72,7 @@ class DocumentParserTest {
     ArgumentCaptor<List<DocumentChunk>> created = ArgumentCaptor.forClass(List.class);
     verify(chunks).saveAll(created.capture());
     assertThat(created.getValue()).extracting(DocumentChunk::getHeading)
-        .contains("Product docs", "Setup");
+        .contains("Product docs", "Product docs > Setup");
   }
 
   @Test
@@ -124,5 +124,46 @@ class DocumentParserTest {
     assertThat(second.getVersionNumber()).isEqualTo(2);
     assertThat(second.getIdentityUri()).isEqualTo("docs/readme.md");
     assertThat(first.isCurrentVersion()).isFalse();
+  }
+
+  @Test
+  void gitCodeFilesAreChunkedByStructureWithLanguageAndSymbol() throws Exception {
+    DocumentParser parser = new DocumentParser(acquisitions, runs, documents, chunks, items,
+        artifacts, ingestion, new UrlPolicy(true), queue, extraction, new ObjectMapper(), providers);
+    UUID crateId = UUID.randomUUID(), runId = UUID.randomUUID(), acquisitionId = UUID.randomUUID();
+    IngestionRun run = new IngestionRun(runId, crateId, UUID.randomUUID(), UUID.randomUUID(), "{}", "{}");
+    AcquisitionRecord acquisition = new AcquisitionRecord(acquisitionId, runId, UUID.randomUUID(),
+        "src/Greeter.java");
+    acquisition.assignCrate(crateId);
+    acquisition.success("git+https://example.com/repo.git@abc/src/Greeter.java", 200,
+        "text/x-source", "UTF-8", "artifact.src", "sha", 100, 1);
+    String code = "public class Greeter {\n  public String hello(String name) {\n"
+        + "    return \"Hello \" + name;\n  }\n\n  public String bye() {\n    return \"Bye\";\n  }\n}\n";
+    when(acquisitions.findById(acquisitionId)).thenReturn(Optional.of(acquisition));
+    when(runs.findById(runId)).thenReturn(Optional.of(run));
+    when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
+    when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
+        new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000,
+            new CrawlConfiguration.Output(30, "", List.of(), 200, 20, "default"), false)));
+    when(artifacts.open("artifact.src")).thenReturn(
+        new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8)));
+    when(providers.effectiveEmbedding(crateId)).thenReturn(new RuntimeProviderSettings.Embedding(
+        true, "local", "model", "revision", "url", java.nio.file.Path.of("models"), null,
+        null, null, null, 384, 8000));
+    when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
+        any(), any(), anyString())).thenReturn(Optional.empty());
+
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<DocumentChunk>> created = ArgumentCaptor.forClass(List.class);
+    verify(chunks).saveAll(created.capture());
+    assertThat(created.getValue()).isNotEmpty().allSatisfy(c -> {
+      assertThat(c.isCode()).isTrue();
+      assertThat(c.getLanguage()).isEqualTo("java");
+    });
+    assertThat(created.getValue()).anyMatch(c -> c.getSymbol() != null && c.getSymbol().contains("Greeter"));
+    assertThat(created.getValue().get(0).displayContent()).startsWith("```java\n");
   }
 }

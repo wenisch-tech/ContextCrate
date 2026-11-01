@@ -15,6 +15,8 @@
     <description>Self-hosted crawling and indexing platform</description>
     <properties>
         <java.version>25</java.version>
+        <commonmark.version>0.24.0</commonmark.version>
+        <treesitter.version>0.25.3</treesitter.version>
         <jsoup.version>1.23.2</jsoup.version>
         <lucene.version>10.6.0</lucene.version>
         <playwright.version>1.64.0</playwright.version>
@@ -67,6 +69,21 @@
         <dependency><groupId>org.springframework.ai</groupId><artifactId>mcp-spring-webmvc</artifactId><version>${mcp.version}</version></dependency>
         <dependency><groupId>io.modelcontextprotocol.sdk</groupId><artifactId>mcp-json-jackson3</artifactId><version>${mcp.sdk.version}</version></dependency>
         <dependency><groupId>org.jsoup</groupId><artifactId>jsoup</artifactId><version>${jsoup.version}</version></dependency>
+        <dependency><groupId>org.commonmark</groupId><artifactId>commonmark</artifactId><version>${commonmark.version}</version></dependency>
+        <dependency><groupId>org.commonmark</groupId><artifactId>commonmark-ext-gfm-tables</artifactId><version>${commonmark.version}</version></dependency>
+        <!-- Syntax-aware code chunking. Prebuilt natives (libc only); guarded by a line-based fallback. -->
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter</artifactId><version>${treesitter.version}</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-java</artifactId><version>0.23.4</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-python</artifactId><version>0.23.4</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-javascript</artifactId><version>0.23.1</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-typescript</artifactId><version>0.23.2</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-go</artifactId><version>0.23.3</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-rust</artifactId><version>0.23.1</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-c</artifactId><version>0.23.2</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-cpp</artifactId><version>0.23.4</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-c-sharp</artifactId><version>0.23.1</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-ruby</artifactId><version>0.23.1</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-bash</artifactId><version>0.23.3</version></dependency>
         <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><version>${jgit.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-core</artifactId><version>${lucene.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-analysis-common</artifactId><version>${lucene.version}</version></dependency>

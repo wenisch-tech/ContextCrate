@@ -16,12 +16,12 @@ import tech.wenisch.contextcrate.crawl.UrlPolicy;
 import tech.wenisch.contextcrate.config.RuntimeProviderSettings;
 import tech.wenisch.contextcrate.domain.*;
 import tech.wenisch.contextcrate.queue.*;
+import tech.wenisch.contextcrate.service.chunking.*;
 import tech.wenisch.contextcrate.repository.*;
 import tech.wenisch.contextcrate.storage.*;
 
 @Service
 public class DocumentParser {
-  private static final Pattern MARKDOWN_HEADING = Pattern.compile("^\\s{0,3}(#{1,6})\\s+(.+?)\\s*#*\\s*$");
   private final AcquisitionRecordRepository acquisitions;
   private final IngestionRunRepository runs;
   private final NormalizedDocumentRepository documents;
@@ -89,7 +89,9 @@ public class DocumentParser {
     Element root = config.output().contentSelector().isBlank()
         ? preferredRoot(page) : page.selectFirst(config.output().contentSelector());
     if (root == null) root = page.body();
-    String text = normalizeInline(root == null ? "" : root.text());
+    HtmlBlocks.Result structure = root == null
+        ? new HtmlBlocks.Result(List.of(), List.of()) : HtmlBlocks.parse(root);
+    String text = BlockPacker.body(structure.blocks());
     if (text.length() < 100 && scriptCount > 3
         && config.reliability().renderMode() == CrawlConfiguration.RenderMode.AUTO
         && !browserRendered(acquisition)) {
@@ -107,43 +109,71 @@ public class DocumentParser {
         blankToNull(page.selectFirst("html") == null ? null : page.selectFirst("html").attr("lang")),
         meta(page, "meta[name=description]", "content"),
         meta(page, "meta[name=author]", "content"), text, metadata,
-        List.of(new Section(null, text)), config.output());
+        BlockPacker.pack(structure.blocks(), options(run, config.output())), config.output());
     discover(run, acquisition, page, config);
   }
 
   private void parseText(IngestionRun run, AcquisitionRecord acquisition, byte[] raw)
       throws Exception {
     IngestionConfiguration.Git config = ingestion.jobConfiguration(run).git();
+    String path = acquisition.getRequestedLocator();
     String value = new String(raw, StandardCharsets.UTF_8);
     value = java.text.Normalizer.normalize(value.replace("\r\n", "\n").replace('\r', '\n'),
         java.text.Normalizer.Form.NFC);
-    boolean markdown = acquisition.getContentType() != null
-        && acquisition.getContentType().toLowerCase(Locale.ROOT).contains("markdown");
-    List<Section> sections = markdown ? markdownSections(value)
-        : List.of(new Section(null, normalizeBlock(value)));
-    String body = sections.stream()
-        .map(section -> (section.heading() == null ? "" : section.heading() + "\n")
-            + section.content())
-        .filter(text -> !text.isBlank())
-        .reduce((left, right) -> left + "\n\n" + right).orElse("");
+    String lowerType = acquisition.getContentType() == null ? ""
+        : acquisition.getContentType().toLowerCase(Locale.ROOT);
+    String lowerPath = path == null ? "" : path.toLowerCase(Locale.ROOT);
+    boolean markdown = lowerType.contains("markdown") || lowerPath.endsWith(".md")
+        || lowerPath.endsWith(".markdown");
+    String codeLanguage = markdown ? null : LanguageRegistry.languageOf(path);
+    ChunkOptions options = options(run, config.output());
+
+    String format;
+    String body;
+    String title = null;
+    List<String> headings = List.of();
+    List<ChunkDraft> drafts;
+    if (markdown) {
+      format = "markdown";
+      var structure = MarkdownBlocks.parse(value);
+      headings = structure.headings();
+      body = BlockPacker.body(structure.blocks());
+      title = headings.isEmpty() ? null : headings.get(0);
+      drafts = BlockPacker.pack(structure.blocks(), options);
+    } else if (codeLanguage != null) {
+      format = "code";
+      body = value.stripTrailing();
+      drafts = CodeChunker.chunk(path, body, options);
+    } else {
+      format = "text";
+      List<Block> blocks = new ArrayList<>();
+      for (String paragraph : normalizeBlock(value).split("\n{2,}"))
+        if (!paragraph.isBlank()) blocks.add(Block.prose(List.of(), paragraph.strip()));
+      body = BlockPacker.body(blocks);
+      drafts = BlockPacker.pack(blocks, options);
+    }
     if (body.isBlank()) return;
-    String title = sections.stream().map(Section::heading).filter(Objects::nonNull)
-        .findFirst().orElse(filename(acquisition.getRequestedLocator()));
-    String metadata = mapper.writeValueAsString(Map.of(
-        "connector", "GIT",
-        "requestedRef", config.ref(),
-        "resolvedRevision", Objects.toString(run.getResolvedRevision(), ""),
-        "path", acquisition.getRequestedLocator(),
-        "format", markdown ? "markdown" : "text",
-        "headings", sections.stream().map(Section::heading).filter(Objects::nonNull).toList()));
-    String sourceUri = acquisition.getFinalLocator();
-    persist(run, acquisition, sourceUri, title, null, null, null, body, metadata, sections,
-        config.output());
+    if (title == null) title = filename(path);
+    Map<String, Object> meta = new LinkedHashMap<>();
+    meta.put("connector", "GIT");
+    meta.put("requestedRef", config.ref());
+    meta.put("resolvedRevision", Objects.toString(run.getResolvedRevision(), ""));
+    meta.put("path", path);
+    meta.put("format", format);
+    if (codeLanguage != null) meta.put("language", codeLanguage);
+    meta.put("headings", headings);
+    persist(run, acquisition, acquisition.getFinalLocator(), title, null, null, null, body,
+        mapper.writeValueAsString(meta), drafts, config.output());
+  }
+
+  private ChunkOptions options(IngestionRun run, CrawlConfiguration.Output output) {
+    int size = effectiveChunkSize(run, output.chunkSize());
+    return new ChunkOptions(size, Math.min(output.chunkOverlap(), Math.max(0, size - 1)));
   }
 
   private void persist(IngestionRun run, AcquisitionRecord acquisition, String sourceUri,
       String title, String language, String description, String author, String body,
-      String metadata, List<Section> sections, CrawlConfiguration.Output output) {
+      String metadata, List<ChunkDraft> drafts, CrawlConfiguration.Output output) {
     String hash = Hashing.sha256(body);
     String identityUri = ingestion.connector(run) == ConnectorType.GIT
         ? acquisition.getRequestedLocator() : sourceUri;
@@ -162,9 +192,7 @@ public class DocumentParser {
         current.map(document -> document.getVersionNumber() + 1).orElse(1));
     current.ifPresent(document -> { document.supersede(); documents.save(document); });
     NormalizedDocument document = documents.save(value);
-    int chunkSize = effectiveChunkSize(run, output.chunkSize());
-    int chunkOverlap = Math.min(output.chunkOverlap(), Math.max(0, chunkSize - 1));
-    var produced = chunk(document, sections, chunkSize, chunkOverlap);
+    var produced = toChunks(document, drafts);
     chunks.saveAll(produced);
     cm.count("ingestion.documents", run.getCrateId(), "result", current.isPresent() ? "updated" : "new");
     cm.summary("ingestion.chunks_per_document", run.getCrateId(), produced.size());
@@ -203,69 +231,21 @@ public class DocumentParser {
     }
   }
 
-  private static List<Section> markdownSections(String markdown) {
-    List<Section> result = new ArrayList<>();
-    String heading = null;
-    StringBuilder content = new StringBuilder();
-    boolean fenced = false;
-    for (String line : markdown.split("\n", -1)) {
-      if (line.stripLeading().startsWith("```") || line.stripLeading().startsWith("~~~")) {
-        fenced = !fenced;
-        continue;
-      }
-      var matcher = MARKDOWN_HEADING.matcher(line);
-      if (!fenced && matcher.matches()) {
-        addSection(result, heading, content);
-        heading = cleanMarkdown(matcher.group(2));
-        content = new StringBuilder();
-      } else {
-        String cleaned = fenced ? line : cleanMarkdown(line);
-        content.append(cleaned.stripTrailing()).append('\n');
-      }
-    }
-    addSection(result, heading, content);
-    return result.isEmpty() ? List.of(new Section(null, normalizeBlock(markdown))) : result;
-  }
-
-  private static void addSection(List<Section> target, String heading, StringBuilder content) {
-    String normalized = normalizeBlock(content.toString());
-    if (heading != null || !normalized.isBlank()) target.add(new Section(heading, normalized));
-  }
-
-  private static String cleanMarkdown(String value) {
-    return value
-        .replaceAll("!\\[([^]]*)]\\([^)]*\\)", "$1")
-        .replaceAll("\\[([^]]+)]\\([^)]*\\)", "$1")
-        .replaceAll("^\\s{0,3}([-+*]|\\d+[.)])\\s+", "")
-        .replaceAll("[`*_~]", "")
-        .replaceAll("<[^>]+>", "")
-        .trim();
-  }
-
-  private static List<DocumentChunk> chunk(NormalizedDocument document, List<Section> sections,
-      int size, int overlap) {
+  private static List<DocumentChunk> toChunks(NormalizedDocument document, List<ChunkDraft> drafts) {
     List<DocumentChunk> result = new ArrayList<>();
     int ordinal = 0;
-    for (Section section : sections) {
-      String text = section.content();
-      int start = 0;
-      while (start < text.length()) {
-        int end = Math.min(text.length(), start + size);
-        if (end < text.length()) {
-          int boundary = Math.max(text.lastIndexOf(' ', end), text.lastIndexOf('\n', end));
-          if (boundary > start + size / 2) end = boundary;
-        }
-        String content = text.substring(start, end).trim();
-        if (!content.isBlank()) {
-          DocumentChunk chunk = new DocumentChunk(
-              stable("chunk:" + document.getId() + ":" + ordinal), document.getId(), ordinal++,
-              section.heading(), content, Hashing.sha256(content));
-          chunk.assignCrate(document.getCrateId());
-          result.add(chunk);
-        }
-        if (end >= text.length()) break;
-        start = Math.max(start + 1, end - overlap);
-      }
+    for (ChunkDraft draft : drafts) {
+      String content = draft.content().strip();
+      if (content.isBlank()) continue;
+      // Code keeps its indentation, so only blank lines around it are removed.
+      if (ChunkDraft.CODE.equals(draft.kind())) content = draft.content().stripTrailing();
+      DocumentChunk chunk = new DocumentChunk(
+          stable("chunk:" + document.getId() + ":" + ordinal), document.getId(), ordinal++,
+          draft.heading(), content, Hashing.sha256(content));
+      chunk.assignCrate(document.getCrateId());
+      chunk.describe(draft.kind(), draft.language(), draft.symbol(), draft.startLine(),
+          draft.endLine());
+      result.add(chunk);
     }
     return result;
   }
@@ -318,5 +298,4 @@ public class DocumentParser {
   private static UUID stable(String value) {
     return UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8));
   }
-  private record Section(String heading, String content) {}
 }

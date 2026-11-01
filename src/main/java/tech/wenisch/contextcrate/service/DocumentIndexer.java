@@ -71,9 +71,9 @@ public class DocumentIndexer {
   }
   private void rechunk(tech.wenisch.contextcrate.domain.NormalizedDocument document,int size) {
     List<DocumentChunk> replacement=new ArrayList<>();int ordinal=0;
-    for(var old:chunks.findByDocumentIdOrderByOrdinal(document.getId())) for(String part:split(old.getContent(),size)) {
+    for(var old:chunks.findByDocumentIdOrderByOrdinal(document.getId())) for(String part:old.isCode()?tech.wenisch.contextcrate.service.chunking.TextSplitter.lines(old.getContent(),size):split(old.getContent(),size)) {
       var chunk=new DocumentChunk(UUID.nameUUIDFromBytes(("chunk:"+document.getId()+":"+ordinal).getBytes(java.nio.charset.StandardCharsets.UTF_8)),document.getId(),ordinal++,old.getHeading(),part,Hashing.sha256(part));
-      chunk.assignCrate(document.getCrateId());replacement.add(chunk);
+      chunk.describe(old.getKind(),old.getLanguage(),old.getSymbol(),old.getStartLine(),null);chunk.assignCrate(document.getCrateId());replacement.add(chunk);
     }
     extraction.rebuildDocument(document.getCrateId(),document.getId());
     chunks.deleteByDocumentId(document.getId());

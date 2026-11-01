@@ -42,6 +42,20 @@ public class McpTools {
   static final int LIST_DEFAULT_LIMIT = 25;
   static final int LIST_MAX_LIMIT = 200;
 
+  private tech.wenisch.contextcrate.repository.DocumentChunkRepository chunkLookup;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setChunkLookup(tech.wenisch.contextcrate.repository.DocumentChunkRepository chunks) {
+    this.chunkLookup = chunks;
+  }
+
+  /** Code chunks are shown inside a fenced block with their language. */
+  private String display(SearchIndex.SearchHit hit, String body) {
+    if (chunkLookup == null || hit.id() == null) return body;
+    return chunkLookup.findById(hit.id()).filter(c -> c.isCode() && body.equals(c.getContent()))
+        .map(tech.wenisch.contextcrate.domain.DocumentChunk::displayContent).orElse(body);
+  }
+
   private final SearchIndex index;
   private final AnswerService answers;
   private final NormalizedDocumentRepository documents;
@@ -102,6 +116,7 @@ public class McpTools {
     for (SearchIndex.SearchHit hit : hits) {
       String body = hit.content() == null ? hit.snippet() : hit.content();
       if (body == null) body = "";
+      body = display(hit, body);
       boolean truncated = body.length() > remaining;
       if (truncated) body = body.substring(0, Math.max(0, remaining));
       remaining -= body.length();

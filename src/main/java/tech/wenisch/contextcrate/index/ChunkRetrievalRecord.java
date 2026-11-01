@@ -2,5 +2,10 @@ package tech.wenisch.contextcrate.index;
 import java.util.UUID;
 import tech.wenisch.contextcrate.domain.DocumentChunk;
 public record ChunkRetrievalRecord(UUID recordId,UUID chunkId,int ordinal,String heading,String retrievalText,String sourceContent,String contentHash,boolean proposition){
-  public static ChunkRetrievalRecord standard(DocumentChunk c){return new ChunkRetrievalRecord(c.getId(),c.getId(),c.getOrdinal(),c.getHeading(),c.getContent(),c.getContent(),c.getContentHash(),false);}
+  public static ChunkRetrievalRecord standard(DocumentChunk c){return new ChunkRetrievalRecord(c.getId(),c.getId(),c.getOrdinal(),c.getHeading(),retrievalText(c),c.getContent(),c.getContentHash(),false);}
+  /** Code is embedded and indexed together with its language and symbol, so a query for a function name finds it. */
+  public static String retrievalText(DocumentChunk c){
+    if(!c.isCode()||(c.getSymbol()==null&&c.getLanguage()==null))return c.getContent();
+    return "["+(c.getLanguage()==null?"code":c.getLanguage())+"] "+(c.getSymbol()==null?"":c.getSymbol())+"\n"+c.getContent();
+  }
 }

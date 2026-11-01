@@ -104,7 +104,7 @@ public class GitSourceRetriever {
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(file))
           continue;
         String relative = checkout.relativize(file).toString().replace('\\', '/');
-        if (relative.startsWith(".git/") || !supported(relative)
+        if (relative.startsWith(".git/")
             || !included(relative, config.includePatterns(), config.excludePatterns()))
           continue;
         long size = Files.size(file);
@@ -121,7 +121,9 @@ public class GitSourceRetriever {
         item.status(FrontierStatus.FETCHED);
         items.save(item);
 
-        String extension = relative.toLowerCase(Locale.ROOT).endsWith(".txt") ? ".txt" : ".md";
+        String lowerPath = relative.toLowerCase(Locale.ROOT);
+        boolean markdown = lowerPath.endsWith(".md") || lowerPath.endsWith(".markdown");
+        String extension = markdown ? ".md" : lowerPath.endsWith(".txt") ? ".txt" : ".src";
         String key = "crates/" + run.getCrateId() + "/runs/" + run.getId() + "/"
             + acquisitionId + extension;
         var saved = artifacts.put(key, new ByteArrayInputStream(bytes), config.maxFileBytes());
@@ -129,7 +131,9 @@ public class GitSourceRetriever {
             new AcquisitionRecord(acquisitionId, run.getId(), itemId, relative);
         record.assignCrate(run.getCrateId());
         record.success(sourceUri, 200,
-            extension.equals(".md") ? "text/markdown; charset=UTF-8" : "text/plain; charset=UTF-8",
+            markdown ? "text/markdown; charset=UTF-8"
+                : extension.equals(".txt") ? "text/plain; charset=UTF-8"
+                : "text/x-source; charset=UTF-8",
             "UTF-8", saved.key(), saved.sha256(), saved.length(), durationMillis);
         acquisitions.save(record);
         queue.publish(PipelineMessage.create(run.getCrateId(), WorkStage.PARSE,
@@ -151,25 +155,32 @@ public class GitSourceRetriever {
     git.checkout().setName(id.name()).call();
   }
 
-  private static boolean supported(String path) {
-    String lower = path.toLowerCase(Locale.ROOT);
-    return lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".txt");
-  }
-
   private static boolean included(String path, List<String> includes, List<String> excludes) {
     boolean include = includes.stream().anyMatch(pattern -> glob(pattern).matcher(path).matches());
     return include && excludes.stream().noneMatch(pattern -> glob(pattern).matcher(path).matches());
   }
 
-  private static Pattern glob(String value) {
+  /**
+   * Glob with gitignore-like conveniences: {@code *.java} matches in any directory, a trailing
+   * slash matches a whole directory, {@code **}/ matches zero or more directories.
+   */
+  static Pattern glob(String value) {
+    String normalized = value.strip().replace('\\', '/');
+    if (normalized.startsWith("/")) normalized = normalized.substring(1);
+    else if (!normalized.contains("/") && !normalized.equals("**")) normalized = "**/" + normalized;
+    if (normalized.endsWith("/")) normalized = normalized + "**";
     StringBuilder regex = new StringBuilder("^");
-    String normalized = value.replace('\\', '/');
     for (int i = 0; i < normalized.length(); i++) {
       char c = normalized.charAt(i);
       if (c == '*') {
         if (i + 1 < normalized.length() && normalized.charAt(i + 1) == '*') {
-          regex.append(".*");
-          i++;
+          if (i + 2 < normalized.length() && normalized.charAt(i + 2) == '/') {
+            regex.append("(?:.*/)?");
+            i += 2;
+          } else {
+            regex.append(".*");
+            i++;
+          }
         } else regex.append("[^/]*");
       } else if (c == '?') regex.append("[^/]");
       else regex.append(Pattern.quote(String.valueOf(c)));

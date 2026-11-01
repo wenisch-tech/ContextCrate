@@ -43,7 +43,8 @@ Git sources accept repository URLs. Each Git ingestion job holds optional userna
 the remote default branch or a branch, tag, or reachable commit, plus include/exclude globs. The
 defaults are 10,000 files, 1 MiB per file, and all eligible repository paths.
 
-Only valid UTF-8 `.md`, `.markdown`, and `.txt` files are normalized. SSH, filesystem remotes,
+Only valid UTF-8 text files are normalized; binary files and LFS pointers are skipped (see
+[Parsing](features/parsing.md) for include/exclude globs and code handling). SSH, filesystem remotes,
 symlinks, submodules, Git LFS objects, repository history, webhooks, scheduling, and incremental
 synchronization are not supported yet. There is no repository-wide transfer quota. Each run
 acquires a complete selected-ref snapshot.

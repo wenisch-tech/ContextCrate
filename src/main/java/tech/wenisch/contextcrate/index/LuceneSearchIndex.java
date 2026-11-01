@@ -4,7 +4,7 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
@@ -25,7 +25,7 @@ import tech.wenisch.contextcrate.repository.CrateRepository;
 @ConditionalOnProperty(name = "contextcrate.index.backend", havingValue = "lucene", matchIfMissing = true)
 public class LuceneSearchIndex implements SearchIndex {
   private static final int MAX_OPEN_WRITERS = 32;
-  private final Path root; private final StandardAnalyzer analyzer = new StandardAnalyzer();
+  private final Path root; private final Analyzer analyzer = new CodeAwareAnalyzer();
   private final EmbeddingProvider embeddings; private final RerankingProvider reranking; private final ContextCrateProperties.Retrieval retrieval;
   private final Map<String, IndexWriter> writers = new LinkedHashMap<>();
   private final CrateRepository crates;

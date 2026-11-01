@@ -34,6 +34,22 @@ public class DocumentChunk {
   @Column(name = "token_estimate", nullable = false)
   private int tokenEstimate;
 
+  /** {@code text} or {@code code}; null on chunks created before code-aware chunking. */
+  @Column(length = 16)
+  private String kind;
+
+  @Column(length = 32)
+  private String language;
+
+  @Column(length = 512)
+  private String symbol;
+
+  @Column(name = "start_line")
+  private Integer startLine;
+
+  @Column(name = "end_line")
+  private Integer endLine;
+
   protected DocumentChunk() {}
 
   public DocumentChunk(
@@ -47,6 +63,46 @@ public class DocumentChunk {
     this.contentHash = hash;
     this.characterCount = content.length();
     this.tokenEstimate = Math.max(1, content.length() / 4);
+  }
+
+  public DocumentChunk describe(
+      String kind, String language, String symbol, Integer startLine, Integer endLine) {
+    this.kind = kind;
+    this.language = language;
+    this.symbol = symbol == null || symbol.length() <= 512 ? symbol : symbol.substring(0, 512);
+    this.startLine = startLine;
+    this.endLine = endLine;
+    return this;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public boolean isCode() {
+    return "code".equals(kind);
+  }
+
+  /** The text as shown to people and models: code chunks come back inside a fenced block. */
+  public String displayContent() {
+    return isCode() ? "```" + (language == null ? "" : language) + "\n" + content + "\n```" : content;
+  }
+
+  public String getKind() {
+    return kind;
+  }
+
+  public String getLanguage() {
+    return language;
+  }
+
+  public String getSymbol() {
+    return symbol;
+  }
+
+  public Integer getStartLine() {
+    return startLine;
+  }
+
+  public Integer getEndLine() {
+    return endLine;
   }
 
   public UUID getCrateId() {
