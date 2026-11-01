@@ -3,6 +3,7 @@
 /node_modules/
 /site/
 /data/
+/.agents/
 /.mvn/
 /.idea/
 /.vscode/
@@ -14,3 +15,4 @@ mvnw
 mvnw.cmd
 /.claude
 scripts/
+skills-lock.json

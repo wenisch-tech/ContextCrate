@@ -1,14 +1,358 @@
 <!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org"><head><th:block th:replace="~{fragments :: head('Chat')}"></th:block></head>
-<body class="app-shell"><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div>
+<body class="app-shell chat-page"><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div>
 <div class="app-main"><header th:replace="~{fragments :: topbar('Chat')}"></header><div th:replace="~{fragments :: elevation}"></div>
-<main id="chat-workspace" class="page" th:data-crate-id="${crate.id}">
-  <div class="page-header"><div><p class="eyebrow">Grounded answers</p><h2 class="page-title">Chat with this crate</h2><p class="page-copy">Ask questions across indexed content. Answers stream live and retain citations to their source chunks.</p></div></div>
-  <section class="panel"><div class="panel-body">
-    <form id="answer-form" class="grid gap-3 md:grid-cols-[1fr_auto]"><div class="field"><label class="field-label" for="answer-question">Question</label><input id="answer-question" class="input" required maxlength="8000" autocomplete="off" placeholder="What do the indexed documents say about…"></div><div class="flex items-end gap-2"><button id="cancel-answer" class="btn-secondary hidden" type="button">Cancel</button><button class="btn-primary" type="submit"><i data-lucide="message-square" class="size-4"></i>Ask</button></div></form>
-    <div id="answer-status" class="mt-4 text-xs text-ink-500" role="status"></div><div id="answer-verification-status" class="alert-info mt-3 hidden" role="status"></div>
-    <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]"><article id="answer-text" class="prose-answer min-h-40 rounded-xl border border-ink-700/60 bg-ink-950/35 p-5"><p class="text-sm text-ink-500">The grounded answer will appear here.</p></article><aside><h3 class="mb-3 text-sm font-semibold text-white">Sources</h3><div id="answer-sources" class="space-y-3"><p class="text-sm text-ink-500">Citations will appear as sources are retrieved.</p></div></aside></div>
-  </div></section>
+<main id="chat-workspace" class="chat" th:data-crate-id="${crate.id}">
+  <section class="chat-main" aria-label="Conversation">
+    <div class="chat-bar">
+      <span class="chat-bar__title" th:text="${crate.name}">Crate</span>
+      <span class="chat-bar__actions">
+        <button id="chat-new" class="chip-btn" type="button" hidden>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New chat
+        </button>
+        <button id="sources-toggle" class="chip-btn chat-sources-toggle" type="button" aria-controls="chat-sources" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z"/><path d="M8 7h6M8 11h6"/></svg>
+          <span id="sources-toggle-label">Sources</span>
+        </button>
+      </span>
+    </div>
+
+    <div id="chat-thread" class="chat-scroll" role="log" aria-live="polite" aria-relevant="additions" aria-label="Messages">
+      <div class="chat-column">
+        <div id="chat-empty" class="chat-empty">
+          <p class="eyebrow">Grounded answers</p>
+          <h2 class="chat-empty__title">Chat with this crate</h2>
+          <p class="chat-empty__copy">Every answer is written from the documents indexed here, and each claim points back to the passage it came from.</p>
+          <div class="chat-starters" role="group" aria-label="Example questions">
+            <button class="starter" type="button" data-prompt="Give me an overview of what this crate covers.">Give me an overview of what this crate covers.<span aria-hidden="true">→</span></button>
+            <button class="starter" type="button" data-prompt="What are the key terms and definitions, and where are they explained?">What are the key terms and definitions, and where are they explained?<span aria-hidden="true">→</span></button>
+            <button class="starter" type="button" data-prompt="Which topics are covered in the most detail?">Which topics are covered in the most detail?<span aria-hidden="true">→</span></button>
+          </div>
+        </div>
+        <div id="chat-turns"></div>
+      </div>
+    </div>
+
+    <div class="chat-composer-wrap">
+      <form id="answer-form" class="chat-composer">
+        <label class="sr-only" for="answer-question">Question</label>
+        <textarea id="answer-question" rows="1" required maxlength="8000" autocomplete="off" placeholder="Ask about the indexed content…"></textarea>
+        <button id="chat-send" class="chat-send" type="submit" aria-label="Send question" disabled>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+        <button id="cancel-answer" class="chat-send chat-send--stop" type="button" aria-label="Stop generating" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+      </form>
+      <p id="chat-note" class="chat-fineprint">Enter to send, Shift+Enter for a new line. Check the cited sources before relying on an answer.</p>
+    </div>
+  </section>
+
+  <aside id="chat-sources" class="chat-sources" aria-label="Sources">
+    <div class="chat-sources__head">
+      <h3>Sources <span id="sources-count" class="chat-sources__count"></span></h3>
+      <button id="sources-close" class="chip-btn chat-sources-toggle" type="button" aria-label="Close sources">Close</button>
+    </div>
+    <div id="answer-sources" class="chat-sources__list"></div>
+  </aside>
 </main></div>
 <script th:inline="none">
-(()=>{const root=document.getElementById('chat-workspace'),form=document.getElementById('answer-form'),question=document.getElementById('answer-question'),status=document.getElementById('answer-status'),verification=document.getElementById('answer-verification-status'),answer=document.getElementById('answer-text'),sources=document.getElementById('answer-sources'),cancel=document.getElementById('cancel-answer');let controller,markdown='',sourceList=[];const safeUrl=value=>{try{const url=new URL(value,location.origin);return ['http:','https:'].includes(url.protocol)?url.href:null}catch{return null}};const inline=(parent,value)=>{const pattern=/(\[(?:SOURCE\s+)?\d+\]|\*\*[^*]+\*\*|`[^`]+`)/g;let last=0;for(const match of value.matchAll(pattern)){parent.append(document.createTextNode(value.slice(last,match.index)));const part=match[0],citation=part.match(/^\[(?:SOURCE\s+)?(\d+)\]$/);if(citation&&sourceList.some(source=>source.citation===Number(citation[1]))){const link=document.createElement('a');link.href='#citation-'+citation[1];link.textContent='['+citation[1]+']';link.className='text-brand-400';parent.append(link)}else{const node=document.createElement(part.startsWith('**')?'strong':'code');node.textContent=part.replace(/^(\*\*|`)|(`|\*\*)$/g,'');parent.append(node)}last=match.index+part.length}parent.append(document.createTextNode(value.slice(last)))};const render=()=>{answer.replaceChildren();for(const line of markdown.replace(/\r/g,'').split('\n')){if(!line.trim())continue;const heading=line.match(/^(#{1,3})\s+(.+)$/),node=document.createElement(heading?'h'+heading[1].length:'p');inline(node,heading?heading[2]:line);answer.append(node)}};const renderSources=items=>{sourceList=items;sources.replaceChildren();for(const source of items){const item=document.createElement('article'),title=document.createElement('div'),link=document.createElement('a'),detail=document.createElement('p');item.id='citation-'+source.citation;item.className='rounded-lg border border-ink-700/60 bg-ink-950/35 p-3';title.className='text-sm font-semibold text-white';title.textContent=`[${source.citation}] ${source.title||source.sourceUri}`;link.className='mt-1 block break-all text-xs text-brand-400';link.textContent=source.sourceUri;const href=safeUrl(source.sourceUri?.replace(/^git\+/,''));if(href){link.href=href;link.target='_blank';link.rel='noopener noreferrer'}detail.className='mt-2 text-xs text-ink-500';detail.textContent=source.snippet;item.append(title,link,detail);sources.append(item)}render()};cancel.addEventListener('click',()=>controller?.abort());form.addEventListener('submit',async event=>{event.preventDefault();controller?.abort();controller=new AbortController();markdown='';sourceList=[];answer.replaceChildren();sources.replaceChildren();verification.classList.add('hidden');cancel.classList.remove('hidden');status.textContent='Finding sources…';try{const response=await fetch(`/api/v1/crates/${root.dataset.crateId}/answers`,{method:'POST',headers:{'Content-Type':'application/json',Accept:'text/event-stream'},body:JSON.stringify({question:question.value}),signal:controller.signal});if(!response.ok)throw new Error(response.status===503?'Answer generation is not configured.':'Unable to generate an answer.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';status.textContent='Generating answer…';while(true){const result=await reader.read();if(result.done)break;buffer+=decoder.decode(result.value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop();for(const raw of events){let name='',data='';for(const line of raw.split('\n')){if(line.startsWith('event:'))name=line.slice(6).trim();if(line.startsWith('data:'))data+=line.slice(5).trim()}if(!data)continue;const payload=JSON.parse(data);if(name==='sources')renderSources(payload);if(name==='verification'){verification.textContent='Verification: '+payload.status;verification.classList.remove('hidden')}if(name==='delta'){markdown+=payload.text;render()}if(name==='complete')status.textContent='Complete.';if(name==='error')throw new Error(payload.error)}}}catch(error){status.textContent=error.name==='AbortError'?'Cancelled.':error.message}finally{cancel.classList.add('hidden')}})})();
+(() => {
+  const root = document.getElementById('chat-workspace');
+  const crateId = root.dataset.crateId;
+  const $ = id => document.getElementById(id);
+  const thread = $('chat-thread'), turnsEl = $('chat-turns'), emptyEl = $('chat-empty'), form = $('answer-form'),
+    input = $('answer-question'), sendBtn = $('chat-send'), stopBtn = $('cancel-answer'), rail = $('chat-sources'),
+    railList = $('answer-sources'), railCount = $('sources-count'), railToggle = $('sources-toggle'),
+    railToggleLabel = $('sources-toggle-label'), railClose = $('sources-close'), newChat = $('chat-new'), note = $('chat-note');
+  const MAX_HISTORY = 8;
+  const wide = matchMedia('(min-width: 1024px)');
+  const STORE = 'contextcrate.chat.' + crateId;
+  let turns = [], history = [], controller = null, active = null, busy = false, historyDisabled = false;
+
+  /* ---------- helpers ---------- */
+  const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
+  const safeUrl = value => { try { const url = new URL(value, location.origin); return ['http:', 'https:'].includes(url.protocol) ? url.href : null; } catch { return null; } };
+  const shortUri = value => { try { const url = new URL(value.replace(/^git\+/, '')); return url.hostname + (url.pathname === '/' ? '' : url.pathname); } catch { return value; } };
+
+  /* ---------- markdown (text nodes only, built from DOM nodes only) ---------- */
+  const INLINE = /(\[(?:SOURCE\s+)?\d+(?:\s*,\s*(?:SOURCE\s+)?\d+)*\]|\[[^\]]+\]\([^)\s]+\)|\*\*[^*]+\*\*|`[^`]+`|(?<![*\w])\*[^*\s][^*]*\*(?!\w))/g;
+  const inline = (parent, value, turn) => {
+    let last = 0;
+    for (const match of value.matchAll(INLINE)) {
+      if (match.index > last) parent.append(document.createTextNode(value.slice(last, match.index)));
+      const part = match[0];
+      if (part.startsWith('[') && !part.includes('](')) {
+        for (const number of part.match(/\d+/g).map(Number)) {
+          const source = turn.sources.find(s => s.citation === number);
+          if (!source) { parent.append(document.createTextNode('[' + number + ']')); continue; }
+          const cite = el('button', 'cite', String(number));
+          cite.type = 'button'; cite.dataset.n = number; cite.title = source.title || source.sourceUri || ('Source ' + number);
+          cite.setAttribute('aria-label', 'Source ' + number + ': ' + cite.title);
+          parent.append(cite);
+        }
+      } else if (part.startsWith('[')) {
+        const [, text, url] = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        const href = safeUrl(url);
+        if (href) { const a = el('a', null, text); a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; parent.append(a); }
+        else parent.append(document.createTextNode(text));
+      } else if (part.startsWith('**')) { const strong = el('strong'); inline(strong, part.slice(2, -2), turn); parent.append(strong); }
+      else if (part.startsWith('`')) parent.append(el('code', null, part.slice(1, -1)));
+      else parent.append(el('em', null, part.slice(1, -1)));
+      last = match.index + part.length;
+    }
+    if (last < value.length) parent.append(document.createTextNode(value.slice(last)));
+  };
+  const renderMarkdown = (container, markdown, turn) => {
+    container.replaceChildren();
+    const lines = markdown.replace(/\r/g, '').split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) { i++; continue; }
+      if (/^```/.test(line)) {
+        const code = []; i++;
+        while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++]);
+        i++;
+        const pre = el('pre'); pre.append(el('code', null, code.join('\n'))); container.append(pre); continue;
+      }
+      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      if (heading) { const h = el('h' + (heading[1].length + 1)); inline(h, heading[2], turn); container.append(h); i++; continue; }
+      const listMatch = line.match(/^\s*([-*]|\d+[.)])\s+/);
+      if (listMatch) {
+        const ordered = /\d/.test(listMatch[1]), list = el(ordered ? 'ol' : 'ul');
+        while (i < lines.length && /^\s*([-*]|\d+[.)])\s+/.test(lines[i])) {
+          const li = el('li'); inline(li, lines[i].replace(/^\s*([-*]|\d+[.)])\s+/, ''), turn); list.append(li); i++;
+        }
+        container.append(list); continue;
+      }
+      if (/^>\s?/.test(line)) {
+        const quote = el('blockquote'), parts = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) parts.push(lines[i++].replace(/^>\s?/, ''));
+        const p = el('p'); inline(p, parts.join(' '), turn); quote.append(p); container.append(quote); continue;
+      }
+      const para = [];
+      while (i < lines.length && lines[i].trim() && !/^(```|#{1,3}\s|\s*([-*]|\d+[.)])\s+|>\s?)/.test(lines[i])) para.push(lines[i++].trim());
+      const p = el('p'); inline(p, para.join(' '), turn); container.append(p);
+    }
+  };
+
+  /* ---------- sources rail ---------- */
+  const setRailOpen = open => {
+    rail.classList.toggle('is-open', open);
+    railToggle.setAttribute('aria-expanded', String(open));
+    rail.inert = !wide.matches && !open;
+  };
+  const renderRail = highlight => {
+    railList.replaceChildren();
+    const turn = active;
+    const count = turn ? turn.sources.length : 0;
+    railCount.textContent = count ? String(count) : '';
+    railToggleLabel.textContent = count ? (count === 1 ? '1 source' : count + ' sources') : 'Sources';
+    if (!turn || !count) {
+      const p = el('p', 'chat-sources__empty', !turn
+        ? 'The passages behind each answer appear here. Select a numbered citation to jump to its source.'
+        : (turn.done ? 'This answer did not draw on any indexed passage.' : 'Looking for relevant passages…'));
+      railList.append(p); return;
+    }
+    for (const source of turn.sources) {
+      const item = el('article', 'src'); item.dataset.n = source.citation;
+      const head = el('div', 'src__head');
+      head.append(el('span', 'cite cite--static', String(source.citation)), el('h4', 'src__title', source.title || shortUri(source.sourceUri || '') || 'Untitled'));
+      item.append(head);
+      if (source.sourceUri) {
+        const href = safeUrl(source.sourceUri.replace(/^git\+/, ''));
+        const uri = el(href ? 'a' : 'p', 'src__uri', shortUri(source.sourceUri));
+        if (href) { uri.href = href; uri.target = '_blank'; uri.rel = 'noopener noreferrer'; }
+        uri.title = source.sourceUri; item.append(uri);
+      }
+      if (source.snippet) item.append(el('p', 'src__snippet', source.snippet));
+      railList.append(item);
+      if (highlight === source.citation) {
+        item.classList.add('is-hit');
+        requestAnimationFrame(() => item.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+        setTimeout(() => item.classList.remove('is-hit'), 1800);
+      }
+    }
+  };
+  const setActive = (turn, highlight) => {
+    active = turn;
+    for (const t of turns) t.el.classList.toggle('is-active', t === turn);
+    renderRail(highlight);
+  };
+
+  /* ---------- turns ---------- */
+  const createTurn = question => {
+    const turn = { q: question, md: '', sources: [], verification: null, done: false, failed: false };
+    turn.el = el('article', 'turn');
+    turn.qEl = el('p', 'turn__q', question);
+    turn.aEl = el('div', 'turn__a'); turn.aEl.setAttribute('aria-busy', 'true');
+    turn.statusEl = el('div', 'turn__status');
+    turn.statusEl.append(el('span', 'spinner'), el('span', null, 'Searching the crate…'));
+    turn.bodyEl = el('div', 'turn__body');
+    turn.metaEl = el('div', 'turn__meta'); turn.metaEl.hidden = true;
+    turn.aEl.append(turn.statusEl, turn.bodyEl, turn.metaEl);
+    turn.el.append(turn.qEl, turn.aEl);
+    turns.push(turn); turnsEl.append(turn.el);
+    emptyEl.hidden = true; newChat.hidden = false; root.classList.add('has-turns'); railToggle.hidden = false;
+    return turn;
+  };
+  const setStatus = (turn, text) => { const span = turn.statusEl.lastChild; span.textContent = text; turn.statusEl.hidden = !text; };
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICONS = {
+    book: ['M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z', 'M8 7h6M8 11h6'],
+    retry: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'],
+    copy: ['M11 9h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z', 'M5 15V6a2 2 0 0 1 2-2h9']
+  };
+  const chip = (label, icon, onClick) => {
+    const b = el('button', 'chip-btn'); b.type = 'button';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: 14, height: 14, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
+    for (const d of ICONS[icon]) { const path = document.createElementNS(SVG_NS, 'path'); path.setAttribute('d', d); svg.append(path); }
+    b.append(svg, el('span', null, label)); b.addEventListener('click', onClick); return b;
+  };
+  const VERIFICATION = {
+    verified: ['good', 'Checked against sources'],
+    revised: ['warn', 'Revised after checking']
+  };
+  const finishTurn = (turn, error) => {
+    turn.done = true; turn.failed = Boolean(error);
+    turn.aEl.removeAttribute('aria-busy');
+    turn.metaEl.replaceChildren();
+    if (error) {
+      setStatus(turn, '');
+      const msg = el('p', 'turn__error', error); msg.setAttribute('role', 'alert');
+      turn.bodyEl.append(msg);
+      turn.metaEl.append(chip('Try again', 'retry', () => { turn.el.remove(); turns = turns.filter(t => t !== turn); if (active === turn) setActive(turns.at(-1) || null); ask(turn.q); }));
+    } else {
+      setStatus(turn, '');
+      if (turn.verification) {
+        const [tone, label] = VERIFICATION[turn.verification] || ['neutral', 'Verification: ' + turn.verification];
+        const pill = el('span', 'verif verif--' + tone); pill.append(el('i'), document.createTextNode(label)); turn.metaEl.append(pill);
+      }
+      if (turn.sources.length) turn.metaEl.append(chip(turn.sources.length === 1 ? '1 source' : turn.sources.length + ' sources', 'book', () => { setActive(turn); setRailOpen(!wide.matches); }));
+      if (turn.md) {
+        const copy = chip('Copy', 'copy', async () => {
+          try { await navigator.clipboard.writeText(turn.md); copy.lastChild.textContent = 'Copied'; setTimeout(() => copy.lastChild.textContent = 'Copy', 1600); } catch { copy.lastChild.textContent = 'Copy failed'; copy.title = 'Your browser blocked clipboard access. Select the text and copy it manually.'; }
+        });
+        turn.metaEl.append(copy);
+      }
+    }
+    turn.metaEl.hidden = !turn.metaEl.childElementCount;
+    if (active === turn) renderRail();
+  };
+
+  /* ---------- persistence (this browser tab only) ---------- */
+  const persist = () => {
+    try {
+      const done = turns.filter(t => t.saved).map(t => ({ q: t.q, md: t.md, sources: t.sources, verification: t.verification }));
+      if (done.length) sessionStorage.setItem(STORE, JSON.stringify(done)); else sessionStorage.removeItem(STORE);
+    } catch { /* storage unavailable: the conversation simply is not kept across reloads */ }
+  };
+  const restore = () => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(STORE) || '[]');
+      for (const item of saved) {
+        const turn = createTurn(item.q);
+        Object.assign(turn, { saved: true, md: item.md, sources: item.sources || [], verification: item.verification });
+        renderMarkdown(turn.bodyEl, turn.md, turn);
+        finishTurn(turn);
+        history.push({ role: 'user', content: turn.q }, { role: 'assistant', content: turn.md });
+      }
+      if (turns.length) setActive(turns.at(-1));
+    } catch { /* ignore a corrupt or unavailable store */ }
+  };
+
+  /* ---------- request ---------- */
+  const request = (question, withHistory, signal) => fetch(`/api/v1/crates/${crateId}/answers`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, signal,
+    body: JSON.stringify(withHistory && history.length ? { question, history: history.slice(-MAX_HISTORY) } : { question })
+  });
+  const ask = async question => {
+    if (busy || !question.trim()) return;
+    const turn = createTurn(question.trim());
+    setActive(turn); setBusy(true);
+    turn.el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    controller = new AbortController();
+    let revealed = false;
+    try {
+      let response = await request(turn.q, !historyDisabled, controller.signal);
+      if (response.status === 400 && history.length && !historyDisabled) {
+        // The crate's RAG settings refuse client-supplied history: carry on with single questions.
+        historyDisabled = true; note.textContent = 'This crate answers each question on its own; follow-ups do not see earlier messages.';
+        response = await request(turn.q, false, controller.signal);
+      }
+      if (!response.ok) throw new Error(response.status === 503
+        ? 'Answer generation is not configured for this crate. A crate owner can set up an answer model in the crate settings.'
+        : 'The answer could not be generated. Please try again.');
+      const reader = response.body.getReader(), decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n'); buffer = events.pop();
+        for (const raw of events) {
+          let name = '', data = '';
+          for (const line of raw.split('\n')) { if (line.startsWith('event:')) name = line.slice(6).trim(); if (line.startsWith('data:')) data += line.slice(5).trim(); }
+          if (!data) continue;
+          const payload = JSON.parse(data);
+          if (name === 'sources') { turn.sources = payload; setStatus(turn, payload.length ? `Found ${payload.length} ${payload.length === 1 ? 'source' : 'sources'} · writing the answer…` : 'Writing the answer…'); if (active === turn) renderRail(); }
+          else if (name === 'verification') turn.verification = payload.status;
+          else if (name === 'delta') {
+            turn.md += payload.text; setStatus(turn, '');
+            renderMarkdown(turn.bodyEl, turn.md, turn);
+            if (!revealed) { turn.bodyEl.classList.add('reveal'); revealed = true; }
+          }
+          else if (name === 'error') throw new Error(payload.error || 'The answer could not be generated.');
+        }
+      }
+      if (!turn.md) throw new Error('The model returned an empty answer. Please try again.');
+      history.push({ role: 'user', content: turn.q }, { role: 'assistant', content: turn.md });
+      turn.saved = true; finishTurn(turn); persist();
+    } catch (error) {
+      if (error.name === 'AbortError') { if (turn.md) { finishTurn(turn); } else { finishTurn(turn, 'Stopped before an answer was written.'); } }
+      else finishTurn(turn, error.message);
+    } finally {
+      controller = null; setBusy(false); input.focus({ preventScroll: true });
+    }
+  };
+
+  /* ---------- composer ---------- */
+  function setBusy(value) {
+    busy = value; sendBtn.hidden = value; stopBtn.hidden = !value; input.readOnly = value; syncSend();
+  }
+  function syncSend() { sendBtn.disabled = busy || !input.value.trim(); }
+  const autosize = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 200) + 'px'; };
+  input.addEventListener('input', () => { autosize(); syncSend(); });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
+  });
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const question = input.value;
+    if (busy || !question.trim()) return;
+    input.value = ''; autosize(); syncSend(); ask(question);
+  });
+  stopBtn.addEventListener('click', () => controller?.abort());
+  for (const starter of document.querySelectorAll('.starter')) starter.addEventListener('click', () => ask(starter.dataset.prompt));
+
+  /* ---------- citations, rail, new chat ---------- */
+  turnsEl.addEventListener('click', event => {
+    const cite = event.target.closest('.cite[data-n]');
+    if (!cite) return;
+    const turn = turns.find(t => t.el.contains(cite));
+    if (!turn) return;
+    setActive(turn, Number(cite.dataset.n)); if (!wide.matches) setRailOpen(true);
+  });
+  railToggle.addEventListener('click', () => setRailOpen(!rail.classList.contains('is-open')));
+  railClose.addEventListener('click', () => { setRailOpen(false); railToggle.focus(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && rail.classList.contains('is-open') && !wide.matches) { setRailOpen(false); railToggle.focus(); } });
+  wide.addEventListener('change', () => setRailOpen(false));
+  newChat.addEventListener('click', () => {
+    controller?.abort(); turns = []; history = []; active = null; turnsEl.replaceChildren();
+    emptyEl.hidden = false; newChat.hidden = true; root.classList.remove('has-turns'); railToggle.hidden = true; setRailOpen(false); persist(); renderRail(); thread.scrollTo({ top: 0 }); input.focus();
+  });
+
+  railToggle.hidden = true; setRailOpen(false); renderRail(); syncSend(); restore();
+})();
 </script></body></html>
