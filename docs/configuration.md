@@ -99,3 +99,11 @@ Prometheus metrics are described under [Operations](operations.md#metrics).
 | `contextcrate.metrics.flush-interval-ms` | `15000` | How often retrieval hit counters are written to the database |
 | `contextcrate.metrics.refresh-interval-ms` | `30000` | How often database-backed gauges are refreshed |
 | `contextcrate.metrics.key-tag-limit` | `100` | Distinct API key names used as a label; further keys are reported as `other` |
+
+## See also
+
+- [Installation](installation/README.md): install methods and the administrator's path.
+- [Deployment](deployment.md): topology and scaling.
+- [Embeddings](embeddings.md), [Reranking](reranking.md), [Answers](answers.md): model providers.
+- [Parsing](features/parsing.md) and [Chunking](features/chunking.md): the content options of an ingestion job.
+- [Security](security.md) and [Operations](operations.md).

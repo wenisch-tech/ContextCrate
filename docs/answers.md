@@ -71,3 +71,7 @@ The same crate page also configures its embedding provider: select local ONNX or
 Each attempt creates an `ANSWER_GENERATED` audit event containing only actor, model identifier, retrieval mode, source count, completion status, and latency. Configuration, prompts, credentials, question text, history, answer text, and source content are never written to the audit log.
 
 For Kubernetes, configure `answering.enabled`, `answering.openaiCompatible.baseUrl`, and `answering.openaiCompatible.model`; reference a Secret containing `api-key` with `answering.openaiCompatible.apiKeySecret`.
+
+## See also
+
+- [Using ContextCrate](usage.md#features) lists all features. See also [Retrieval](features/retrieval.md), [Grading](features/grading.md) and [Answer verification](features/answer-verification.md).

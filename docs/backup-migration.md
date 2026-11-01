@@ -26,3 +26,8 @@ A crate export is not a complete installation backup. Use database and object-st
 :::
 
 For the breaking product upgrade, follow [Upgrade from Harvex](upgrade-from-harvex.md).
+
+## See also
+
+- [Crates](crates.md#portable-crates), [Upgrade from Harvex](upgrade-from-harvex.md), [Operations](operations.md).
+- [Tutorials](tutorials.md#export-and-import): the API calls.

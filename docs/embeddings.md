@@ -111,3 +111,7 @@ Lexical retrieval remains available if embeddings are disabled (`CONTEXTCRATE_EM
 If a semantic search or an answer request fails with `Embedding endpoint returned HTTP 404`, check the base URL first. It normally means that the configured server does not expose `{base-url}/embeddings`—most commonly because a required version prefix such as `/v1` is missing, or because `/embeddings` was included in the configured base URL. Correct the URL, verify the model is available from that endpoint, then rebuild the index with `POST /api/v1/index/rebuild`. A rebuild is required because existing documents were indexed without vectors or with vectors from the previous model.
 
 The index health detail reports backend and embedding availability, but never credentials or source text. Search indices are derived data and are rebuilt after restore or model changes; backup bundles do not copy index internals.
+
+## See also
+
+- [Using ContextCrate](usage.md#features) lists all features. See also [Chunking](features/chunking.md), [Retrieval](features/retrieval.md) and [Reranking](reranking.md).

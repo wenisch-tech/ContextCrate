@@ -23,3 +23,9 @@ Restore queues a complete rebuild. Wait for index queue depth to reach zero and 
 ## Semantic search is unavailable
 
 Lexical search still works when embeddings are disabled or unhealthy. Check that the local bundle contains `tokenizer.json` and an ONNX model, that its cache is writable, or that the OpenAI-compatible endpoint/model/dimension are configured. After a model change, call `POST /api/v1/index/rebuild`.
+
+## See also
+
+- [Operations](operations.md) for health checks and metrics, [Configuration](configuration.md) for backend combinations.
+- [Pipeline](pipeline.md) for how runs fail and retry.
+- [Using ContextCrate](usage.md) if the problem is about content or answers.

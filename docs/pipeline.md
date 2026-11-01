@@ -57,3 +57,11 @@ their original ingestion run and are excluded from default retrieval.
 When upgrading to this behavior, the database migration retains only the newest pre-existing record
 for each source/URL pair. Rebuild the index once after deployment so any previously indexed
 duplicates are removed from the search backend.
+
+## See also
+
+- [Architecture](architecture.md#from-source-to-answer): the stages in context.
+- [Parsing](features/parsing.md), [Chunking](features/chunking.md) and [Images](features/images.md): what the parse, chunk and image stages do.
+- [Embeddings](embeddings.md): the index stage.
+- [Operations](operations.md): queue depth, dead letters and metrics.
+- [Troubleshooting](troubleshooting.md): stuck or failed runs.

@@ -65,3 +65,11 @@ elevations, and audit logs are excluded.
 
 Import always creates a new crate and remaps internal UUIDs. Missing source credentials must be
 entered by the new owner, and imported documents are queued for indexing into a new namespace.
+
+## See also
+
+- [Architecture](architecture.md): how crates fit into the system.
+- [Authorization](authorization.md): roles, administrators and API keys.
+- [Using ContextCrate](usage.md) and [Tutorials](tutorials.md): creating and working with crates.
+- [Export, import and recovery](backup-migration.md): moving crates between installations.
+- [Administration](operations/administration.md): the crate-creation policy.

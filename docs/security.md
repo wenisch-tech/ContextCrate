@@ -24,3 +24,10 @@ image's system trust store) so only that CA is trusted, rather than disabling va
 Use the global flag only as a last resort in trusted, isolated environments; the narrower per-job
 Git/crawler and OIDC trust-all flags are usually the better fit when only one integration needs
 it.
+
+## See also
+
+- [Architecture](architecture.md): isolation and trust boundaries.
+- [Authorization](authorization.md): roles and keys.
+- [OIDC](operations/oidc.md) and [Administration](operations/administration.md).
+- [Installation](installation/README.md): the administrator's path.

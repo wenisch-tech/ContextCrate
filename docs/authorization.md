@@ -55,3 +55,11 @@ Tokens begin with `cc_` and are shown only once. They are presented either as `X
 ## Resource authorization
 
 Authorization is based on the crate in the URL and the resource's stored `crate_id`. Session state is only a navigation preference. Supplying an ID from another crate results in denial or not-found behavior and never causes ContextCrate to infer a different crate.
+
+## See also
+
+- [Crates](crates.md): membership and the creation policy.
+- [Administration](operations/administration.md): managing users and administrators.
+- [OIDC](operations/oidc.md): single sign-on and role mapping.
+- [REST API](api.md): personal and service keys.
+- [Security](security.md): hardening checklist.

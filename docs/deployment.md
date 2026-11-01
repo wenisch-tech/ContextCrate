@@ -36,3 +36,9 @@ Local rerankers use the same persistent model cache. Set `CONTEXTCRATE_RERANKING
 or mount an offline ONNX cross-encoder and set `CONTEXTCRATE_RERANKING_LOCAL_MODEL_PATH`. A remote
 reranker receives query and candidate text; configure its endpoint and secret through the
 `CONTEXTCRATE_RERANKING_COHERE_COMPATIBLE_*` variables. See [Reranking](reranking.md).
+
+## See also
+
+- [Installation](installation/README.md), [Configuration](configuration.md), [Operations](operations.md).
+- [Architecture](architecture.md#components): which role does what.
+- [Security](security.md).

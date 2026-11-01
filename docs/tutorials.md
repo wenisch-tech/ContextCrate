@@ -55,3 +55,10 @@ The imported crate has new identifiers and no provider or source secrets.
 ## Change an embedding model
 
 Update the crate provider settings. ContextCrate creates a background generation and keeps the prior generation searchable. Monitor `/api/v1/crates/{crateId}/index` until the new generation becomes `ACTIVE`.
+
+## Next steps
+
+- [Using ContextCrate](usage.md): the workflow and all features at a glance.
+- [Parsing](features/parsing.md) and [Chunking](features/chunking.md): control what is imported and how it is split.
+- [MCP](integrations/mcp.md) and the [OpenAI-compatible endpoint](integrations/openai.md): connect assistants.
+- [Crates](crates.md) and [Authorization](authorization.md): isolation and roles.

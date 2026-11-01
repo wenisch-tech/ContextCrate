@@ -25,3 +25,7 @@ Current limitations: no SSH, scheduling, webhooks, incremental synchronization, 
 submodules, LFS objects, symlinks, or repository-wide transfer quota. Files must be valid UTF-8 text
 (include/exclude globs select which). Git tokens are redacted from APIs, logs, audits,
 and exports but remain plaintext in the ingestion-job configuration JSON.
+
+## See also
+
+- [Using ContextCrate](usage.md) and [Architecture](architecture.md).

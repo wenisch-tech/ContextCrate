@@ -93,3 +93,10 @@ Archive before purging. Confirm durable database/object-store backups, submit th
 ## Disaster recovery
 
 Crate export is portability, not installation disaster recovery. Back up PostgreSQL/H2, the filesystem or S3 bucket, and deployment secrets using infrastructure-native tools. OpenSearch/Lucene data is derived and may be rebuilt from normalized documents.
+
+## See also
+
+- [Installation](installation/README.md): the administrator's path.
+- [Deployment](deployment.md): scaling roles.
+- [Pipeline](pipeline.md): stages, retries and dead letters.
+- [Troubleshooting](troubleshooting.md) and [Export, import and recovery](backup-migration.md).

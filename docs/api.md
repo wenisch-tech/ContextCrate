@@ -145,3 +145,7 @@ Start it with `POST .../ingestion-jobs/{jobId}/runs`. A Git run records its reso
 owns the HTTPS URL, while each job owns crawl scope, request behavior, authentication, and output policy.
 
 The former crate-qualified `/jobs` endpoint is intentionally not retained.
+
+## See also
+
+- [Using ContextCrate](usage.md#integrations) shows where the API fits. See also [Authorization](authorization.md) for keys and [MCP](integrations/mcp.md).

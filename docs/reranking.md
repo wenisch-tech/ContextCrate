@@ -48,3 +48,7 @@ Remote reranking receives the question and candidate chunk text. Use TLS and tre
 a data processor. If the provider is disabled, unavailable, returns invalid data, or times out,
 ContextCrate logs the failure and returns the original retrieval order, keeping search and RAG
 answers available.
+
+## See also
+
+- [Using ContextCrate](usage.md#features) lists all features. See also [Retrieval](features/retrieval.md) and [Embeddings](embeddings.md).
