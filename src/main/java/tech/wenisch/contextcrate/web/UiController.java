@@ -661,6 +661,7 @@ public class UiController {
       @RequestParam int sourceLimit,
       @RequestParam(defaultValue = "false") boolean queryTransformationEnabled,
       @RequestParam(required = false) java.util.List<String> queryTransformationStrategies,
+      @RequestParam(defaultValue = "false") boolean hydeEnabled,
       @RequestParam(defaultValue = "false") boolean imageIndexingEnabled,
       @RequestParam(defaultValue = "false") boolean imageDescriptionEnabled,
       @RequestParam(defaultValue = "") String imageVisionModelId,
@@ -669,7 +670,7 @@ public class UiController {
       @RequestParam(defaultValue = "64") int imageMinSize,
       @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous=ragSettings.current(crateId);boolean changed=!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
+    var previous=ragSettings.current(crateId);boolean changed=!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 

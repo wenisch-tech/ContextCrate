@@ -40,6 +40,7 @@ The features are listed in the order content flows through the system.
 | **Retrieval** | Standard and proposition retrieval, lexical, semantic or hybrid. | [Retrieval](features/retrieval.md) |
 | **Reranking** | Optional cross-encoder that reorders the best candidates. | [Reranking](reranking.md) |
 | **Query transformation** | Rewrites vague, specific or multi-part questions before searching. | [Query transformation](features/query-transformation.md) |
+| **HyDE** | Searches with an embedded hypothetical answer instead of the question. | [HyDE](features/hyde.md) |
 | **Answers** | Grounded answer generation with streaming and citations. | [Answers](answers.md) |
 | **Grading** | Drops retrieved chunks the model judges irrelevant. | [Grading](features/grading.md) |
 | **Answer verification** | Checks the answer against its sources and revises or blocks unsupported claims. | [Answer verification](features/answer-verification.md) |

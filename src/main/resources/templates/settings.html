@@ -14,6 +14,7 @@
       <p class="settings-nav__group">Retrieval &amp; answers</p>
       <a href="#retrieval" :class="{'active':active==='retrieval'}">Retrieval</a>
       <a href="#query-transformation" :class="{'active':active==='query-transformation'}">Query transformation</a>
+      <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
       <a href="#quality" :class="{'active':active==='quality'}">Answer quality</a>
       <p class="settings-nav__group">Model providers</p>
@@ -58,6 +59,11 @@
             <div class="setting-row"><label for="qt-sub-queries"><strong>Sub-query composition</strong><span>Splits the question into 2–4 sub-questions and searches each one independently. Best for multi-part questions such as “How do I install X and configure Y?”.</span></label><span class="switch"><input type="checkbox" id="qt-sub-queries" name="queryTransformationStrategies" value="sub-queries" th:checked="${#strings.contains(rag.queryTransformationStrategies, 'sub-queries')}"><span></span></span></div>
             <p class="field-help pt-3">Selected strategies run in this order: rewriting → step-back → sub-queries, each building on the previous result. Every active strategy adds one answer-model call before retrieval. Requires an enabled answer model.</p>
           </fieldset>
+        </section>
+
+        <section id="hyde" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">HyDE</h2><p class="settings-hint">Hypothetical Document Embeddings. The answer model first writes a short hypothetical answer; that text, not the question, is embedded for the vector search. Only real chunks are used to answer, and the hypothetical text is discarded.</p></div><label class="switch-labelled" for="hyde-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="hyde-enabled" name="hydeEnabled" th:checked="${rag.hydeEnabled}"><span></span></span></label></div>
+          <div class="panel-body"><p class="field-help">Helps with short or vague questions whose wording differs from the documents. Costs one answer-model call (about 1,000 characters) per searched query before retrieval, and sends the question to the answer provider. The keyword part of hybrid search, reranking, grading and verification keep using the original question. Skipped in lexical mode, and when embeddings or the answer model are unavailable. Takes effect immediately; no rebuild.</p></div>
         </section>
 
         <section id="images" class="panel scroll-mt-24" x-data="{img:false,desc:false}" x-init="img=$el.querySelector('#image-indexing-enabled').checked;desc=$el.querySelector('#image-description-enabled').checked">

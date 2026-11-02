@@ -19,6 +19,10 @@ Configure the strategy on the crate **Settings** page or with `PUT /api/v1/crate
 
 Proposition retrieval requires enabled, configured embedding and answer providers. It reuses the crate's OpenAI-compatible answer endpoint, model, credentials, headers, timeout, and output-token limit. Generation and grading are deterministic non-streaming requests with temperature zero.
 
+> **Index time or query time?** Proposition retrieval changes what is **indexed** and needs a
+> rebuild. [HyDE](hyde.md) changes what is **searched with** at question time and needs none. The
+> two can be combined.
+
 ## Generation and grading
 
 ContextCrate makes two independent LLM calls for each chunk. The first asks for JSON propositions. Every proposition must state one fact, work without additional context, replace pronouns and ambiguous references with full names, preserve dates, data, names, and qualifications, and contain a clear subject, verb, and object.

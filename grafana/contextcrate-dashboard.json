@@ -3823,6 +3823,16 @@
           "legendFormat": "verification / revision",
           "refId": "E",
           "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(contextcrate_llm_duration_seconds_sum{crate=~\\\"$crate\\\",purpose=\\\"hyde\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_answer_requests_total{crate=~\\\"$crate\\\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "HyDE hypothetical answer",
+          "refId": "F",
+          "format": "time_series"
         }
       ],
       "fieldConfig": {
@@ -4221,6 +4231,355 @@
     },
     {
       "type": "row",
+      "title": "🪄 HyDE — hypothetical answer embeddings (Crate selector)",
+      "id": 201,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 199
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "HyDE calls per answer (1h)",
+      "id": 202,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Hypothetical answers successfully generated per prepared answer. Can exceed 1 when query transformation produces several queries.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 200
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\",outcome=\\\"ok\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_requests_total{crate=~\\\"$crate\\\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "HyDE failure rate (1h)",
+      "id": 203,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Share of attempted generations that failed (model error or empty reply) and fell back to embedding the question",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 200
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\",outcome=\\\"failed\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\",outcome=~\\\"ok|failed\\\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Avg hypothetical answer length (1h)",
+      "id": 204,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Characters per generated hypothetical answer. The target is about one default chunk (1,000 characters).",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 200
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_hyde_length_sum{crate=~\\\"$crate\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_length_count{crate=~\\\"$crate\\\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Avg HyDE generation time (1h)",
+      "id": 205,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Average time of one hypothetical-answer model call. This is added in front of vector search.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 200
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_hyde_duration_seconds_sum{crate=~\\\"$crate\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_duration_seconds_count{crate=~\\\"$crate\\\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HyDE outcomes",
+      "id": 206,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "ok, failed (fell back to the question) and skipped (lexical mode, embeddings or answer model unavailable)",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 204
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (outcome,reason) (increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}} ({{reason}})",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HyDE generation time (p50 / p95)",
+      "id": 207,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Time of one hypothetical-answer model call",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 204
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_answer_hyde_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "legendFormat": "p50 {{crate}}",
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_answer_hyde_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{crate}}",
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
       "title": "🏭 Ingestion & pipeline (Crate selector)",
       "id": 109,
       "collapsed": false,
@@ -4228,7 +4587,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 199
+        "y": 211
       },
       "panels": []
     },
@@ -4245,7 +4604,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 200
+        "y": 212
       },
       "targets": [
         {
@@ -4304,7 +4663,7 @@
         "h": 8,
         "w": 10,
         "x": 4,
-        "y": 200
+        "y": 212
       },
       "targets": [
         {
@@ -4357,7 +4716,7 @@
         "h": 8,
         "w": 10,
         "x": 14,
-        "y": 200
+        "y": 212
       },
       "targets": [
         {
@@ -4420,7 +4779,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 208
+        "y": 220
       },
       "targets": [
         {
@@ -4483,7 +4842,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 208
+        "y": 220
       },
       "targets": [
         {
@@ -4536,7 +4895,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 216
+        "y": 228
       },
       "targets": [
         {
@@ -4599,7 +4958,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 216
+        "y": 228
       },
       "targets": [
         {
@@ -4662,7 +5021,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 216
+        "y": 228
       },
       "targets": [
         {
@@ -4725,7 +5084,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 224
+        "y": 236
       },
       "targets": [
         {
@@ -4778,7 +5137,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 224
+        "y": 236
       },
       "targets": [
         {
@@ -4841,7 +5200,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 224
+        "y": 236
       },
       "targets": [
         {
@@ -4894,7 +5253,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 231
+        "y": 243
       },
       "targets": [
         {
@@ -4947,7 +5306,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 238
+        "y": 250
       },
       "targets": [
         {
@@ -5006,7 +5365,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 245
+        "y": 257
       },
       "panels": []
     },
@@ -5023,7 +5382,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 246
+        "y": 258
       },
       "targets": [
         {
@@ -5076,7 +5435,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 246
+        "y": 258
       },
       "targets": [
         {
@@ -5129,7 +5488,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 246
+        "y": 258
       },
       "targets": [
         {
@@ -5178,7 +5537,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 254
+        "y": 266
       },
       "panels": []
     },
@@ -5195,7 +5554,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 255
+        "y": 267
       },
       "targets": [
         {
@@ -5274,7 +5633,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 255
+        "y": 267
       },
       "targets": [
         {
@@ -5353,7 +5712,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 264
+        "y": 276
       },
       "targets": [
         {
@@ -5431,7 +5790,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 264
+        "y": 276
       },
       "targets": [
         {
@@ -5480,7 +5839,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 273
+        "y": 285
       },
       "panels": [
         {

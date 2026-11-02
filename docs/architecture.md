@@ -54,6 +54,7 @@ and [Deployment](deployment.md).
    images. See [Images](features/images.md).
 
 **Querying.** A question is optionally transformed ([Query transformation](features/query-transformation.md)),
+optionally turned into a hypothetical answer whose embedding drives the vector search ([HyDE](features/hyde.md)),
 retrieved with keyword, semantic or hybrid search ([Retrieval](features/retrieval.md)), optionally
 reranked ([Reranking](reranking.md)) and graded ([Grading](features/grading.md)); the answer model
 then writes a cited answer ([Answers](answers.md)) that can be verified

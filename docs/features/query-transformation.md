@@ -96,6 +96,13 @@ secure it and set up backups?”*. The crate has **rewrite** and **sub-queries**
 Without transformation, the single search for the short follow-up would be dominated by the
 installation context or match nothing. The cost is two model calls plus three searches instead of one.
 
+## Combining with HyDE
+
+[HyDE](hyde.md) can run on top of query transformation. It then writes one hypothetical answer per
+query that is searched (up to six), embeds each, and uses it for the vector leg of that query. The
+queries themselves, the fusion and the use of the original question for grading, generation and
+verification do not change. Each HyDE call adds to the cost shown below.
+
 ## Retrieval and merging
 
 Each query is searched with the same retrieval mode, source limit and filters as a normal answer

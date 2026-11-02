@@ -24,12 +24,19 @@ public class AnswerService {
   private final RagSettingsService settings;
   private int rrfConstant = 60;
   private QueryTransformationService transformation;
+  private HydeService hyde;
+  private tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings;
   private CrateMetrics metrics = CrateMetrics.noop();
   private HotContentTracker hot = HotContentTracker.noop();
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setMetrics(CrateMetrics metrics, HotContentTracker hot) { this.metrics=metrics; this.hot=hot; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setQueryTransformation(QueryTransformationService transformation) { this.transformation=transformation; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setHyde(HydeService hyde) { this.hyde=hyde; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setEmbeddings(tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings) { this.embeddings=embeddings; }
+  private boolean embeddingsAvailable(UUID crateId){if(embeddings==null)return true;try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){return embeddings.available();}}
   /** Runs a non-streaming completion and records its latency and outcome per purpose. */
   private String completeTimed(UUID crateId,String purpose,List<AnswerGenerationProvider.Message> messages) throws Exception {
     long started=System.nanoTime();String outcome="ok";
@@ -63,7 +70,7 @@ public class AnswerService {
     metrics.count("answer.requests",request.crateId(),"transformed",transformed);
     metrics.time("answer.prepare.duration",request.crateId(),System.nanoTime()-prepareStarted,"transformed",transformed);
     for(var source:sources)hot.record(request.crateId(),source.documentId(),source.chunkId());
-    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied());
+    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied(),retrieved.hydeQueries());
   }
   /**
    * Retrieves chunks for the question. With query transformation enabled the question is turned into
@@ -78,10 +85,20 @@ public class AnswerService {
     } else if(policy.isQueryTransformationEnabled()) metrics.count("answer.query_transformation",request.crateId(),"strategy","none","outcome","skipped");
     long searchStarted=System.nanoTime();
     List<SearchIndex.SearchResults> lists=new ArrayList<>();
-    for(String query:queries)lists.add(index.search(new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode)));
+    // HyDE: the vector leg embeds an LLM-written hypothetical answer; keywords, reranking and snippets keep the query.
+    boolean useHyde=policy.isHydeEnabled()&&hyde!=null;int hydeQueries=0;long hydeNanos=0;
+    if(useHyde&&"lexical".equals(mode)){hyde.skipped(request.crateId(),"lexical-mode");useHyde=false;}
+    else if(useHyde&&!embeddingsAvailable(request.crateId())){hyde.skipped(request.crateId(),"embeddings-unavailable");useHyde=false;}
+    else if(useHyde&&!available(request.crateId())){hyde.skipped(request.crateId(),"answer-model-unavailable");useHyde=false;}
+    for(String query:queries) {
+      var search=new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode);
+      if(useHyde) { long hydeStarted=System.nanoTime();String hypothetical=hyde.generate(request.crateId(),query);hydeNanos+=System.nanoTime()-hydeStarted;if(hypothetical!=null){search=search.withVectorQuery(hypothetical);hydeQueries++;} }
+      lists.add(index.search(search));
+    }
     var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,limit);
-    metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted,"transformed",applied.isEmpty()?"false":"true");
-    return new Retrieved(results,queries,applied);
+    // HyDE generation has its own timer; keep it out of the retrieval time so the latency budget does not count it twice.
+    metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted-hydeNanos,"transformed",applied.isEmpty()?"false":"true");
+    return new Retrieved(results,queries,applied,hydeQueries);
   }
   /** Reciprocal rank fusion across the result lists of several queries, deduplicated by hit id. */
   private SearchIndex.SearchResults fuse(String query,List<SearchIndex.SearchResults> lists,int limit) {
@@ -91,7 +108,7 @@ public class AnswerService {
         .map(h->new SearchIndex.SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),score.get(h.id()).floatValue(),h.lexicalScore(),h.semanticScore(),h.rerankScore(),h.content(),h.retrievalContent())).toList();
     return new SearchIndex.SearchResults(query,lists.getFirst().mode(),fused);
   }
-  private record Retrieved(SearchIndex.SearchResults results,List<String> queries,List<String> applied) {}
+  private record Retrieved(SearchIndex.SearchResults results,List<String> queries,List<String> applied,int hydeQueries) {}
   private List<Source> grade(UUID crateId,String question,List<Source> candidates) {
     List<Source> accepted=new ArrayList<>();
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)) {
@@ -117,7 +134,7 @@ public class AnswerService {
       success=true;
       Result result=prepared.answerVerificationEnabled()?verify(prepared,answer.toString()):new Result(answer.toString(),null);
       verification=result.verificationStatus()==null?"disabled":result.verificationStatus();return result;
-    } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);metrics.time("answer.duration",prepared.crateId(),System.nanoTime()-totalStarted,"transformed",transformed,"success",String.valueOf(success));audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", transform="+(prepared.transformations().isEmpty()?"none":String.join("+",prepared.transformations()))+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
+    } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);metrics.time("answer.duration",prepared.crateId(),System.nanoTime()-totalStarted,"transformed",transformed,"success",String.valueOf(success));audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", transform="+(prepared.transformations().isEmpty()?"none":String.join("+",prepared.transformations()))+", hyde="+prepared.hydeQueries()+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
   }
   /** Compatibility method; verified answers are now delivered as one completed delta. */
   public void stream(Prepared prepared, java.util.function.Consumer<String> delta) throws Exception { delta.accept(generate(prepared).text()); }
@@ -170,8 +187,9 @@ public class AnswerService {
     public String viewUrl() { return tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(sourceUri); }
   }
   /** @param searchQueries what retrieval searched for; @param transformations strategies that changed the query set */
-  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations) {
-    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,List.of(question),List.of()); }
+  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries) {
+    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,List.of(question),List.of(),0); }
+    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,0); }
   }
   public record Result(String text,String verificationStatus) {}
 }

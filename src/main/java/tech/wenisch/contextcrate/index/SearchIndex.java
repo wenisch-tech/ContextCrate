@@ -30,9 +30,18 @@ public interface SearchIndex extends AutoCloseable {
 
   record IndexHealth(UUID crateId, String backend, boolean healthy, long documents, String detail) {}
 
-  record SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode) {
+  /**
+   * @param query the user's text; used for keyword search, reranking and snippets
+   * @param vectorQuery optional text embedded <em>instead of</em> {@code query} for the vector leg
+   *     (HyDE: a hypothetical answer). Blank or null means the query itself is embedded.
+   */
+  record SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode,
+      String vectorQuery) {
     public SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind) {
-      this(crateId, query, limit, runId, kind, null);
+      this(crateId, query, limit, runId, kind, null, null);
+    }
+    public SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode) {
+      this(crateId, query, limit, runId, kind, mode, null);
     }
     public SearchRequest {
       crateId = java.util.Objects.requireNonNull(crateId, "crateId");
@@ -42,7 +51,16 @@ public interface SearchIndex extends AutoCloseable {
       mode = mode == null || mode.isBlank() ? null : mode.trim().toLowerCase(java.util.Locale.ROOT);
       if (mode != null && !java.util.Set.of("lexical", "semantic", "hybrid").contains(mode))
         throw new IllegalArgumentException("mode must be lexical, semantic, or hybrid");
+      vectorQuery = vectorQuery == null || vectorQuery.isBlank() ? null : vectorQuery.trim();
     }
+
+    /** Same request, but the vector leg embeds the given text (a hypothetical document). */
+    public SearchRequest withVectorQuery(String text) {
+      return new SearchRequest(crateId, query, limit, runId, kind, mode, text);
+    }
+
+    /** The text to embed as a vector query, and whether it is document-like (HyDE). */
+    public boolean hasVectorQuery() { return vectorQuery != null; }
   }
 
   record SearchHit(

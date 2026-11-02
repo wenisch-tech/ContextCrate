@@ -22,6 +22,7 @@ The dashboard is grouped by topic, one row per topic, ordered from overview to d
 | LLM | Requests by purpose, latency, time to first token, provider HTTP errors |
 | Answers | Grading, sources per answer, verification |
 | Query transformation | Strategies used, combinations, per-strategy statistics and timing |
+| HyDE | Calls per answer, failure rate, hypothetical answer length, generation time and outcomes |
 | Answer timing | Stacked breakdown of where answer time goes, p50/p95 per phase |
 | Ingestion & pipeline | Queue depth, throughput, stage duration, retries, ingestion runs |
 | API keys | Authentication and requests per key |

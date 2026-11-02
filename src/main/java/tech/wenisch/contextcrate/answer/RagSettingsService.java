@@ -28,6 +28,7 @@ public class RagSettingsService {
     if(normalized==null){if(enabled)throw new IllegalArgumentException("select at least one query transformation strategy");normalized=value.getQueryTransformationStrategies();}
     value.updateQueryTransformation(enabled,normalized);return settings.save(value);
   }
+  @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);
     if(indexing&&description){
