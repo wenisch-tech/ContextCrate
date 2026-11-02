@@ -58,7 +58,9 @@ optionally turned into a hypothetical answer whose embedding drives the vector s
 retrieved with keyword, semantic or hybrid search ([Retrieval](features/retrieval.md)), optionally
 reranked ([Reranking](reranking.md)) and graded ([Grading](features/grading.md)); the answer model
 then writes a cited answer ([Answers](answers.md)) that can be verified
-([Answer verification](features/answer-verification.md)).
+([Answer verification](features/answer-verification.md)). Optionally, after the answer has been
+delivered, a separate judge model scores it in the background ([RAG evaluation](features/evaluation.md),
+pipeline stage `EVALUATE`).
 
 ## Crate-aware processing
 

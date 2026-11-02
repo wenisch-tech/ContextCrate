@@ -30,10 +30,15 @@ public class PipelineCoordinator {
   private final MeterRegistry metrics;
   private final IngestionRunRepository runs;
   private ImageDescriptionWorker imageWorker;
+  private tech.wenisch.contextcrate.evaluation.EvaluationService evaluation;
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   void setImageWorker(ImageDescriptionWorker worker) {
     this.imageWorker = worker;
+  }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setEvaluation(tech.wenisch.contextcrate.evaluation.EvaluationService evaluation) {
+    this.evaluation = evaluation;
   }
   private final ThreadPoolExecutor executor;
   private tech.wenisch.contextcrate.metrics.CrateMetrics cm;
@@ -117,6 +122,7 @@ public class PipelineCoordinator {
           case EXTRACT -> role.equals("extractor");
           case INDEX -> role.equals("indexer");
           case IMAGE_DESCRIBE -> role.equals("parser") || role.equals("indexer");
+          case EVALUATE -> role.equals("indexer");
         };
   }
 
@@ -145,6 +151,10 @@ public class PipelineCoordinator {
         case IMAGE_DESCRIBE -> {
           if (imageWorker == null) throw new IllegalStateException("Image worker is unavailable");
           imageWorker.describe(payload);
+        }
+        case EVALUATE -> {
+          if (evaluation == null) throw new IllegalStateException("Evaluation worker is unavailable");
+          evaluation.evaluate(crateId, payload.entityId());
         }
         case DISCOVERY -> {}
       }

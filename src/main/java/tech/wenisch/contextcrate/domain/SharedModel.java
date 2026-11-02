@@ -12,7 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "shared_model")
 public class SharedModel {
-  public enum Kind { EMBEDDING, RERANKING, ANSWER }
+  /** JUDGE is an OpenAI-compatible chat model used only by RAG evaluation; it is selected by administrators. */
+  public enum Kind { EMBEDDING, RERANKING, ANSWER, JUDGE }
 
   @Id private UUID id;
   @Column(nullable = false, length = 120) private String name;

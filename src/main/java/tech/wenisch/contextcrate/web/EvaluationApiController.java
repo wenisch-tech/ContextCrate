@@ -1,0 +1,107 @@
+package tech.wenisch.contextcrate.web;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import tech.wenisch.contextcrate.domain.AuditLog;
+import tech.wenisch.contextcrate.domain.CrateMember;
+import tech.wenisch.contextcrate.evaluation.EvaluationAdminService;
+import tech.wenisch.contextcrate.evaluation.EvaluationSettingsService;
+import tech.wenisch.contextcrate.repository.AuditLogRepository;
+import tech.wenisch.contextcrate.repository.CrateRepository;
+import tech.wenisch.contextcrate.service.CrateAccessService;
+
+/**
+ * RAG evaluation for one crate. Every endpoint requires the crate Owner (or an administrator with an
+ * active elevation); members below Owner and Viewer/Editor service keys cannot read or change it.
+ */
+@RestController
+@RequestMapping("/api/v1/crates/{crateId}/evaluation")
+public class EvaluationApiController {
+  private final CrateAccessService access;
+  private final CrateRepository crates;
+  private final EvaluationSettingsService settings;
+  private final EvaluationAdminService admin;
+  private final AuditLogRepository audits;
+
+  public EvaluationApiController(CrateAccessService access, CrateRepository crates, EvaluationSettingsService settings,
+      EvaluationAdminService admin, AuditLogRepository audits) {
+    this.access = access; this.crates = crates; this.settings = settings; this.admin = admin; this.audits = audits;
+  }
+
+  private void requireOwner(UUID crateId) {
+    access.require(crateId, CrateMember.Role.OWNER);
+  }
+
+  private void requireMutable(UUID crateId) {
+    access.requireMutable(crateId, CrateMember.Role.OWNER);
+  }
+
+  private String actor() { return access.currentUser().getEmail(); }
+
+  @GetMapping("/settings")
+  public EvaluationSettingsService.View settings(@PathVariable UUID crateId) {
+    requireOwner(crateId);
+    return settings.view(crateId);
+  }
+
+  @PutMapping("/settings")
+  public EvaluationSettingsService.View update(@PathVariable UUID crateId, @RequestBody EvaluationSettingsService.Request request) {
+    requireMutable(crateId);
+    var view = settings.apply(crateId, request);
+    // The audit entry names what is switched on, never an endpoint secret.
+    audits.save(new AuditLog(crateId, actor(), "EVALUATION_SETTINGS_CHANGED", "evaluation",
+        "enabled=" + view.enabled() + ", sampling=" + view.samplingRate() + ", logQuestions=" + view.logQuestions()));
+    return view;
+  }
+
+  @GetMapping("/summary")
+  public EvaluationAdminService.Summary summary(@PathVariable UUID crateId, @RequestParam(defaultValue = "7") int days) {
+    requireOwner(crateId);
+    return admin.summary(crateId, days);
+  }
+
+  @GetMapping("/cases")
+  public List<EvaluationAdminService.CaseView> cases(@PathVariable UUID crateId, @RequestParam(defaultValue = "50") int limit) {
+    requireOwner(crateId);
+    return admin.cases(crateId, limit, true);
+  }
+
+  @GetMapping("/golden")
+  public List<EvaluationAdminService.GoldenView> golden(@PathVariable UUID crateId) {
+    requireOwner(crateId);
+    return admin.golden(crateId);
+  }
+
+  public record GoldenRequest(String question, String referenceAnswer, List<String> relevantUris) {}
+
+  @PostMapping("/golden")
+  @ResponseStatus(HttpStatus.CREATED)
+  public EvaluationAdminService.GoldenView addGolden(@PathVariable UUID crateId, @RequestBody GoldenRequest request) {
+    requireMutable(crateId);
+    return admin.addGolden(crateId, actor(), request.question(), request.referenceAnswer(), request.relevantUris());
+  }
+
+  /** Body: a JSON array of {question, referenceAnswer, relevantUris}. */
+  @PostMapping("/golden/import")
+  public Map<String, Integer> importGolden(@PathVariable UUID crateId, @RequestBody String json) {
+    requireMutable(crateId);
+    return Map.of("imported", admin.importGolden(crateId, actor(), json));
+  }
+
+  @DeleteMapping("/golden/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteGolden(@PathVariable UUID crateId, @PathVariable UUID id) {
+    requireMutable(crateId);
+    admin.deleteGolden(crateId, actor(), id);
+  }
+
+  @PostMapping("/golden/run")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  public Map<String, Integer> run(@PathVariable UUID crateId) throws Exception {
+    requireMutable(crateId);
+    return Map.of("queued", admin.runGolden(crateId, actor()));
+  }
+}

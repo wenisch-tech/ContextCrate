@@ -23,6 +23,13 @@ public class SharedModelService {
   private final SharedModelRepository models;
   private final ProviderSettingsRepository providerSettings;
 
+  private tech.wenisch.contextcrate.repository.EvaluationSettingsRepository evaluationSettings;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setEvaluationSettings(tech.wenisch.contextcrate.repository.EvaluationSettingsRepository evaluationSettings) {
+    this.evaluationSettings = evaluationSettings;
+  }
+
   public SharedModelService(SharedModelRepository models, ProviderSettingsRepository providerSettings) {
     this.models = models; this.providerSettings = providerSettings;
   }
@@ -97,12 +104,13 @@ public class SharedModelService {
   public int usageCount(SharedModel model) { return crateIdsUsing(model).size(); }
 
   private List<UUID> crateIdsUsing(SharedModel model) {
-    var rows = switch (model.getKind()) {
-      case EMBEDDING -> providerSettings.findByEmbeddingSharedModelId(model.getId());
-      case RERANKING -> providerSettings.findByRerankingSharedModelId(model.getId());
-      case ANSWER -> providerSettings.findByAnsweringSharedModelId(model.getId());
+    return switch (model.getKind()) {
+      case EMBEDDING -> providerSettings.findByEmbeddingSharedModelId(model.getId()).stream().map(p -> p.getCrateId()).toList();
+      case RERANKING -> providerSettings.findByRerankingSharedModelId(model.getId()).stream().map(p -> p.getCrateId()).toList();
+      case ANSWER -> providerSettings.findByAnsweringSharedModelId(model.getId()).stream().map(p -> p.getCrateId()).toList();
+      case JUDGE -> evaluationSettings == null ? List.<UUID>of()
+          : evaluationSettings.findByJudgeSharedModelId(model.getId()).stream().map(e -> e.getCrateId()).toList();
     };
-    return rows.stream().map(p -> p.getCrateId()).toList();
   }
 
   /** Only one default per type; setting a new one retires the previous one. */
@@ -130,13 +138,13 @@ public class SharedModelService {
     }
     if (kind == SharedModel.Kind.EMBEDDING && (dimensions == null || dimensions < 1))
       throw new IllegalArgumentException("Vector dimensions must be positive");
-    if (kind != SharedModel.Kind.ANSWER && (maxInputCharacters == null || maxInputCharacters < 256))
+    if (kind != SharedModel.Kind.ANSWER && kind != SharedModel.Kind.JUDGE && (maxInputCharacters == null || maxInputCharacters < 256))
       throw new IllegalArgumentException("Maximum input characters must be at least 256");
     if (kind != SharedModel.Kind.EMBEDDING && timeoutSeconds != null && timeoutSeconds < 5)
       throw new IllegalArgumentException("Timeout must be at least 5 seconds");
   }
 
   private static String label(SharedModel.Kind kind) {
-    return switch (kind) { case EMBEDDING -> "embedding"; case RERANKING -> "reranking"; case ANSWER -> "answer"; };
+    return switch (kind) { case EMBEDDING -> "embedding"; case RERANKING -> "reranking"; case ANSWER -> "answer"; case JUDGE -> "judge"; };
   }
 }

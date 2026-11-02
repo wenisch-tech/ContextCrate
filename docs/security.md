@@ -9,6 +9,7 @@
 - S3, database, RabbitMQ, and OpenSearch credentials come from environment/secret stores. Git
   HTTPS tokens currently live in Git ingestion-job configuration JSON; they are redacted externally but not
   encrypted at rest, so protect database access and backups.
+- [RAG evaluation](features/evaluation.md) is off by default and managed by crate owners. When enabled, the judge model receives the question, the retrieved chunks and the answer, so approve its endpoint as a data processor. Text is kept only until a case is scored (or for the retention period with per-question logging); judge API keys entered by an owner on the evaluation page are database-resident, like answer-model overrides.
 - Embedding API keys must be injected from a secret store. Remote embedding providers receive the indexed/query text, so use TLS and approve the endpoint as a data processor.
 - Answer-generation API keys may come from a secret store or the authenticated Settings page. Settings-entered keys are database-resident overrides, so restrict administrative access and protect database backups with encryption. Answer providers receive the question, caller-supplied history, and retrieved chunk context; ContextCrate treats that context as untrusted and does not persist it in audit logs.
 

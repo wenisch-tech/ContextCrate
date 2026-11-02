@@ -35,7 +35,7 @@ const sidebars = {
           items: [
             'features/parsing', 'features/chunking', 'features/contextual-headers', 'features/images', 'embeddings',
             'features/retrieval', 'reranking', 'features/query-transformation', 'features/hyde', 'answers',
-            'features/grading', 'features/answer-verification',
+            'features/grading', 'features/answer-verification', 'features/evaluation',
           ],
         },
         {

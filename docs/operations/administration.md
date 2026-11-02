@@ -95,7 +95,7 @@ of their provider settings read-only. Downloading the already-configured local m
 
 ## Models
 
-The **Models** tab manages **shared models**: named embedding, reranking and answer endpoints that
+The **Models** tab manages **shared models**: named embedding, reranking, answer and judge endpoints that
 crate owners can select instead of configuring their own. Each entry has a name, endpoint URL,
 model identifier, optional API key, and an **Available to all users** switch.
 
@@ -111,6 +111,11 @@ model identifier, optional API key, and an **Available to all users** switch.
 - **Make default for new crates** (only possible while the model is available to users) preselects
   and enables the model for every crate created afterwards. There is one default per type; setting
   a new one replaces the old. Existing crates are not changed.
+- A model of type **Judge for RAG evaluation** works like the other shared models, but is used only by
+  [RAG evaluation](../features/evaluation.md). Crate owners pick it by name in the *Judge model* section
+  of their crate's Evaluation page (or enter their own endpoint, if the model policy allows custom
+  endpoints). *Available to all users* controls whether it is offered, and *Make default for new
+  crates* preselects it for new crates; evaluation itself stays off until an owner enables it.
 - API keys are stored in the database like the per-crate ones; restrict database access accordingly.
 
 ## System

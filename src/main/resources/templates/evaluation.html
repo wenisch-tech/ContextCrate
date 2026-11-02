@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Evaluation · ContextCrate</title>
+  <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
+<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header><main class="page">
+  <div class="mb-4"><p class="eyebrow">QUALITY</p><h1 class="display-6 fw-semibold">RAG evaluation</h1>
+    <p class="text-secondary">A judge model scores sampled answers for context relevance, faithfulness and answer relevance, in the background.</p></div>
+
+  <div class="alert alert-success" th:if="${param.saved != null}">Settings saved.</div>
+  <div class="alert alert-success" th:if="${param.goldenSaved != null}">Golden set updated.</div>
+  <div class="alert alert-success" th:if="${param.goldenRun != null}">Golden set queued. The results appear below in a few minutes.</div>
+  <div class="alert alert-danger" th:if="${evaluationError != null}" th:text="${evaluationError}"></div>
+  <div class="alert alert-warning" th:unless="${settings.judgeConfigured}">No judge model is configured for this crate, so nothing is evaluated. Choose a judge below.</div>
+  <div class="alert alert-info" th:if="${summary.pending > 0 or summary.failed > 0}"><span th:text="${summary.pending}"></span> waiting, <span th:text="${summary.failed}"></span> failed (all time).</div>
+
+  <section id="results" class="mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h5 mb-0">Results</h2>
+      <form method="get" class="d-flex gap-2 align-items-center"><label class="small text-secondary" for="days">Period</label>
+        <select class="form-select form-select-sm" id="days" name="days" onchange="this.form.submit()">
+          <option value="1" th:selected="${days == 1}">Last day</option><option value="7" th:selected="${days == 7}">Last 7 days</option><option value="30" th:selected="${days == 30}">Last 30 days</option><option value="90" th:selected="${days == 90}">Last 90 days</option>
+        </select></form>
+    </div>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3"><div class="metric-card" title="Supported statements / all statements"><span>Faithfulness</span><strong th:text="${summary.live.faithfulness == null ? '–' : #numbers.formatDecimal(summary.live.faithfulness, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card" title="Similarity of questions the answer implies to the real question"><span>Answer relevance</span><strong th:text="${summary.live.answerRelevance == null ? '–' : #numbers.formatDecimal(summary.live.answerRelevance, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card" title="Weighted share of sub-questions addressed"><span>Completeness</span><strong th:text="${summary.live.completeness == null ? '–' : #numbers.formatDecimal(summary.live.completeness, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card" title="Live answers in the period"><span>Answers evaluated</span><strong th:text="${summary.live.cases}"></strong></div></div>
+    </div>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-2"><div class="metric-card"><span>Precision@K</span><strong th:text="${summary.live.precisionAtK == null ? '–' : #numbers.formatDecimal(summary.live.precisionAtK, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>Recall@K</span><strong th:text="${summary.live.recallAtK == null ? '–' : #numbers.formatDecimal(summary.live.recallAtK, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>MRR</span><strong th:text="${summary.live.mrr == null ? '–' : #numbers.formatDecimal(summary.live.mrr, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>MAP</span><strong th:text="${summary.live.map == null ? '–' : #numbers.formatDecimal(summary.live.map, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>NDCG</span><strong th:text="${summary.live.ndcg == null ? '–' : #numbers.formatDecimal(summary.live.ndcg, 1, 2)}"></strong></div></div>
+    </div>
+    <div class="card panel table-responsive mb-4" th:if="${!summary.trend.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Day (UTC)</th><th>Answers</th><th>P@K</th><th>R@K</th><th>MRR</th><th>MAP</th><th>NDCG</th><th>Faithfulness</th><th>Answer rel.</th><th>Completeness</th></tr></thead>
+      <tbody><tr th:each="row:${summary.trend}">
+        <td th:text="${row.day}"></td><td th:text="${row.averages.cases}"></td>
+        <td th:text="${row.averages.precisionAtK == null ? '–' : #numbers.formatDecimal(row.averages.precisionAtK, 1, 2)}"></td>
+        <td th:text="${row.averages.recallAtK == null ? '–' : #numbers.formatDecimal(row.averages.recallAtK, 1, 2)}"></td>
+        <td th:text="${row.averages.mrr == null ? '–' : #numbers.formatDecimal(row.averages.mrr, 1, 2)}"></td>
+        <td th:text="${row.averages.map == null ? '–' : #numbers.formatDecimal(row.averages.map, 1, 2)}"></td>
+        <td th:text="${row.averages.ndcg == null ? '–' : #numbers.formatDecimal(row.averages.ndcg, 1, 2)}"></td>
+        <td th:text="${row.averages.faithfulness == null ? '–' : #numbers.formatDecimal(row.averages.faithfulness, 1, 2)}"></td>
+        <td th:text="${row.averages.answerRelevance == null ? '–' : #numbers.formatDecimal(row.averages.answerRelevance, 1, 2)}"></td>
+        <td th:text="${row.averages.completeness == null ? '–' : #numbers.formatDecimal(row.averages.completeness, 1, 2)}"></td>
+      </tr></tbody></table></div>
+    <p class="text-secondary small" th:if="${summary.trend.empty}">No evaluated answers in this period yet. Ask a question in the crate chat once evaluation is enabled.</p>
+    <div class="card panel p-3" th:if="${summary.golden.cases > 0}">
+      <h3 class="h6">Golden set (last run in the period, <span th:text="${summary.golden.cases}"></span> questions)</h3>
+      <p class="mb-0 small">Precision@K <strong th:text="${summary.golden.precisionAtK == null ? '–' : #numbers.formatDecimal(summary.golden.precisionAtK, 1, 2)}"></strong> ·
+        Recall@K <strong th:text="${summary.golden.recallAtK == null ? '–' : #numbers.formatDecimal(summary.golden.recallAtK, 1, 2)}"></strong> ·
+        MRR <strong th:text="${summary.golden.mrr == null ? '–' : #numbers.formatDecimal(summary.golden.mrr, 1, 2)}"></strong> ·
+        MAP <strong th:text="${summary.golden.map == null ? '–' : #numbers.formatDecimal(summary.golden.map, 1, 2)}"></strong> ·
+        NDCG <strong th:text="${summary.golden.ndcg == null ? '–' : #numbers.formatDecimal(summary.golden.ndcg, 1, 2)}"></strong> ·
+        Faithfulness <strong th:text="${summary.golden.faithfulness == null ? '–' : #numbers.formatDecimal(summary.golden.faithfulness, 1, 2)}"></strong> ·
+        Completeness <strong th:text="${summary.golden.completeness == null ? '–' : #numbers.formatDecimal(summary.golden.completeness, 1, 2)}"></strong> ·
+        Reference recall <strong th:text="${summary.golden.referenceRecall == null ? '–' : #numbers.formatDecimal(summary.golden.referenceRecall, 1, 2)}"></strong></p>
+    </div>
+  </section>
+
+  <section id="settings" class="mb-5">
+    <h2 class="h5">Settings</h2>
+    <form class="card panel p-4" method="post" th:action="@{/crates/{id}/evaluation/settings(id=${crate.id})}">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="enabled" name="enabled" value="true" th:checked="${settings.enabled}"><label class="form-check-label" for="enabled"><strong>Evaluate answers of this crate</strong> — runs in the background after the answer has been delivered and never slows it down.</label></div>
+      <div class="row g-3">
+        <div class="col-md-3"><label class="form-label" for="samplingRate">Sampling rate</label><input class="form-control" id="samplingRate" type="number" name="samplingRate" min="0.01" max="1" step="0.01" th:value="${settings.samplingRate}"><div class="form-text">Share of answers that are evaluated (0.01 to 1).</div></div>
+        <div class="col-md-3"><label class="form-label" for="topK">K</label><input class="form-control" id="topK" type="number" name="topK" min="1" max="20" th:value="${settings.topK}"><div class="form-text">Chunks judged for the ranking metrics.</div></div>
+        <div class="col-md-3"><label class="form-label" for="poolSize">Candidate pool</label><input class="form-control" id="poolSize" type="number" name="poolSize" min="5" max="100" th:value="${settings.poolSize}"><div class="form-text">Results judged to find all relevant chunks (for Recall@K). Not smaller than K.</div></div>
+        <div class="col-md-3"><label class="form-label" for="retentionDays">Keep cases (days)</label><input class="form-control" id="retentionDays" type="number" name="retentionDays" min="1" max="365" th:value="${settings.retentionDays}"></div>
+      </div>
+      <p class="mt-4 mb-2 fw-semibold">Dimensions</p>
+      <div class="d-flex flex-wrap gap-4 mb-3">
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="context" name="context" value="true" th:checked="${settings.context}"><label class="form-check-label" for="context">Context relevance (one judge call per chunk)</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="faithfulness" name="faithfulness" value="true" th:checked="${settings.faithfulness}"><label class="form-check-label" for="faithfulness">Faithfulness (one call per statement)</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="answerRelevance" name="answerRelevance" value="true" th:checked="${settings.answerRelevance}"><label class="form-check-label" for="answerRelevance">Answer relevance</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="completeness" name="completeness" value="true" th:checked="${settings.completeness}"><label class="form-check-label" for="completeness">Completeness (one call per sub-question)</label></div>
+      </div>
+      <div class="form-check form-switch mb-4"><input class="form-check-input" type="checkbox" id="logQuestions" name="logQuestions" value="true" th:checked="${settings.logQuestions}"><label class="form-check-label" for="logQuestions"><strong>Log every question</strong> — keep question, answer, retrieved chunks and the judge's reasoning for each answer, so the scores can be read per question. Off: only the numbers are kept and all text is removed right after the evaluation.</label></div>
+      <p class="fw-semibold mb-2">Judge model</p>
+      <p class="text-secondary small">Independent of the answer model. Question, retrieved chunks and the answer are sent to this endpoint, so use one you trust with the crate's content.</p>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="judgeSharedModelId">Shared judge model</label>
+          <select class="form-select" id="judgeSharedModelId" name="judgeSharedModelId"><option value="">Own endpoint (below)</option>
+            <option th:each="m:${judgeModels}" th:value="${m.id}" th:text="${m.name}" th:selected="${m.id == settings.judgeSharedModelId}"></option></select>
+          <div class="form-text">Managed in Administration → Models (type “Judge for RAG evaluation”).</div></div>
+        <div class="col-md-6"><label class="form-label" for="judgeTimeoutSeconds">Timeout (seconds)</label><input class="form-control" id="judgeTimeoutSeconds" type="number" name="judgeTimeoutSeconds" min="5" max="600" th:value="${settings.judgeTimeoutSeconds}"></div>
+        <div class="col-md-6"><label class="form-label" for="judgeBaseUrl">Own endpoint URL</label><input class="form-control" id="judgeBaseUrl" name="judgeBaseUrl" placeholder="https://api.example.com/v1" th:value="${settings.judgeBaseUrl}"></div>
+        <div class="col-md-3"><label class="form-label" for="judgeModel">Model identifier</label><input class="form-control" id="judgeModel" name="judgeModel" th:value="${settings.judgeModel}"></div>
+        <div class="col-md-3"><label class="form-label" for="judgeApiKey">API key</label><input class="form-control" id="judgeApiKey" type="password" name="judgeApiKey" autocomplete="off" th:placeholder="${settings.judgeApiKeySet} ? 'Stored — leave blank to keep' : ''"></div>
+      </div>
+      <div class="mt-4"><button class="btn btn-primary">Save settings</button></div>
+    </form>
+  </section>
+
+  <section id="golden" class="mb-5">
+    <h2 class="h5">Golden set</h2>
+    <p class="text-secondary small">Questions with the documents that should be found and/or the answer that should be given. Running the set asks every question through the normal answer path and scores it against this ground truth, which gives a true Recall@K and the reference-answer check. Expected documents match as text inside the source address of a chunk (for example <code>docs/oncall.md</code>).</p>
+    <div class="card panel table-responsive mb-3" th:if="${!golden.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Question</th><th>Expected documents</th><th>Reference answer</th><th></th></tr></thead>
+      <tbody><tr th:each="g:${golden}">
+        <td th:text="${g.question}"></td><td class="small"><div th:each="u:${g.relevantUris}" th:text="${u}"></div></td>
+        <td class="small" th:text="${g.referenceAnswer == null ? '–' : #strings.abbreviate(g.referenceAnswer, 120)}"></td>
+        <td class="text-end"><form method="post" th:action="@{/crates/{id}/evaluation/golden/{gid}/delete(id=${crate.id},gid=${g.id})}"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="btn btn-sm btn-outline-danger">Delete</button></form></td>
+      </tr></tbody></table></div>
+    <form method="post" class="mb-3" th:if="${!golden.empty}" th:action="@{/crates/{id}/evaluation/golden/run(id=${crate.id})}"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="btn btn-outline-primary">Run golden set now</button></form>
+    <div class="row g-4">
+      <div class="col-lg-6"><form class="card panel p-3" method="post" th:action="@{/crates/{id}/evaluation/golden(id=${crate.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <label class="form-label" for="gq">Question</label><textarea class="form-control mb-2" id="gq" name="question" rows="2" required maxlength="2000"></textarea>
+        <label class="form-label" for="gu">Expected documents (one per line)</label><textarea class="form-control mb-2" id="gu" name="relevantUris" rows="2"></textarea>
+        <label class="form-label" for="gr">Reference answer (optional)</label><textarea class="form-control mb-3" id="gr" name="referenceAnswer" rows="3" maxlength="8000"></textarea>
+        <button class="btn btn-primary align-self-start">Add question</button></form></div>
+      <div class="col-lg-6"><form class="card panel p-3" method="post" th:action="@{/crates/{id}/evaluation/golden/import(id=${crate.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <label class="form-label" for="gj">Import JSON</label>
+        <textarea class="form-control mb-3" id="gj" name="json" rows="8" required placeholder='[{"question": "How do I escalate an incident?", "relevantUris": ["docs/oncall.md"], "referenceAnswer": "Page the secondary on-call after five minutes."}]'></textarea>
+        <button class="btn btn-outline-primary align-self-start">Import</button></form></div>
+    </div>
+  </section>
+
+  <section id="questions" class="mb-5">
+    <h2 class="h5">Latest evaluated answers</h2>
+    <p class="text-secondary small" th:unless="${settings.logQuestions}">Per-question logging is off, so only the scores are listed. Switch on “Log every question” to see which question received which score.</p>
+    <div class="card panel table-responsive"><table class="table align-middle mb-0">
+      <thead><tr><th>Time</th><th>Source</th><th>Question</th><th>P@K</th><th>R@K</th><th>MRR</th><th>NDCG</th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th><th>Status</th></tr></thead>
+      <tbody>
+        <th:block th:each="c:${cases}">
+        <tr>
+          <td class="small" th:text="${#strings.substring(c.createdAt.toString(), 0, 19)}"></td>
+          <td th:text="${c.source}"></td>
+          <td class="small"><span th:if="${c.text != null}" th:text="${#strings.abbreviate(c.text.question, 90)}"></span><span th:unless="${c.text != null}" class="text-secondary">–</span></td>
+          <td th:text="${c.precisionAtK == null ? '–' : #numbers.formatDecimal(c.precisionAtK, 1, 2)}"></td>
+          <td th:text="${c.recallAtK == null ? '–' : #numbers.formatDecimal(c.recallAtK, 1, 2)}"></td>
+          <td th:text="${c.mrr == null ? '–' : #numbers.formatDecimal(c.mrr, 1, 2)}"></td>
+          <td th:text="${c.ndcg == null ? '–' : #numbers.formatDecimal(c.ndcg, 1, 2)}"></td>
+          <td th:text="${c.faithfulness == null ? '–' : #numbers.formatDecimal(c.faithfulness, 1, 2)}" th:title="${c.statementsTotal == null ? '' : c.statementsSupported + ' of ' + c.statementsTotal + ' statements supported'}"></td>
+          <td th:text="${c.answerRelevance == null ? '–' : #numbers.formatDecimal(c.answerRelevance, 1, 2)}"></td>
+          <td th:text="${c.completeness == null ? '–' : #numbers.formatDecimal(c.completeness, 1, 2)}"></td>
+          <td><span class="badge" th:classappend="${c.status == 'DONE'} ? 'text-bg-success' : (${c.status == 'FAILED'} ? 'text-bg-danger' : 'text-bg-secondary')" th:text="${c.status}" th:title="${c.error}"></span></td>
+        </tr>
+        <tr th:if="${c.text != null}"><td colspan="11" class="small bg-body-tertiary">
+          <details><summary>Answer, sources and judge reasoning</summary>
+            <p class="mt-2"><strong>Answer:</strong> <span th:text="${c.text.answer}"></span></p>
+            <p class="mb-1"><strong>Judge notes</strong></p>
+            <pre class="small mb-2" style="white-space:pre-wrap" th:text="${c.text.details == null ? '' : c.text.details.toPrettyString()}"></pre>
+            <p class="mb-1"><strong>Delivered sources</strong></p>
+            <ol class="mb-0"><li th:each="chunk:${c.text.snapshot?.path('chunks')}"><span th:text="${chunk.path('uri').asText()}"></span>: <span th:text="${#strings.abbreviate(chunk.path('content').asText(), 200)}"></span></li></ol>
+          </details></td></tr>
+        </th:block>
+        <tr th:if="${cases.empty}"><td colspan="11" class="empty-state">Nothing evaluated yet.</td></tr>
+      </tbody></table></div>
+  </section>
+</main>
+</body></html>

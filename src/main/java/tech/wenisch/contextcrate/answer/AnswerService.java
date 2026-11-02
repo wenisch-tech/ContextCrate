@@ -25,6 +25,7 @@ public class AnswerService {
   private int rrfConstant = 60;
   private QueryTransformationService transformation;
   private HydeService hyde;
+  private tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation;
   private tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings;
   private CrateMetrics metrics = CrateMetrics.noop();
   private HotContentTracker hot = HotContentTracker.noop();
@@ -34,6 +35,8 @@ public class AnswerService {
   public void setQueryTransformation(QueryTransformationService transformation) { this.transformation=transformation; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setHyde(HydeService hyde) { this.hyde=hyde; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setEvaluation(tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation) { this.evaluation=evaluation; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setEmbeddings(tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings) { this.embeddings=embeddings; }
   private boolean embeddingsAvailable(UUID crateId){if(embeddings==null)return true;try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)){return embeddings.available();}}
@@ -133,7 +136,10 @@ public class AnswerService {
       finally { metrics.count("llm.requests",prepared.crateId(),"purpose","answer","outcome",streamOutcome);metrics.time("llm.duration",prepared.crateId(),System.nanoTime()-streamStart,"purpose","answer");metrics.time("answer.generation.duration",prepared.crateId(),System.nanoTime()-streamStart,"transformed",transformed); }
       success=true;
       Result result=prepared.answerVerificationEnabled()?verify(prepared,answer.toString()):new Result(answer.toString(),null);
-      verification=result.verificationStatus()==null?"disabled":result.verificationStatus();return result;
+      verification=result.verificationStatus()==null?"disabled":result.verificationStatus();
+      // RAG evaluation: a non-blocking hand-over; the answer is never delayed or affected by it.
+      if(evaluation!=null){try{evaluation.offer(prepared,result.text());}catch(RuntimeException evaluationFailure){}}
+      return result;
     } finally { metrics.count("answer.verification",prepared.crateId(),"status",verification);metrics.time("answer.duration",prepared.crateId(),System.nanoTime()-totalStarted,"transformed",transformed,"success",String.valueOf(success));audits.save(new AuditLog(prepared.crateId(),prepared.actor(),"ANSWER_GENERATED",provider.model()==null?"unconfigured":provider.model(),"mode="+prepared.mode()+", sources="+prepared.sources().size()+", verification="+verification+", success="+success+", transform="+(prepared.transformations().isEmpty()?"none":String.join("+",prepared.transformations()))+", hyde="+prepared.hydeQueries()+", latencyMs="+Duration.between(started,Instant.now()).toMillis())); }
   }
   /** Compatibility method; verified answers are now delivered as one completed delta. */

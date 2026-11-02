@@ -30,7 +30,9 @@ public final class PipelineTypes {
     EXTRACT,
     INDEX,
     /** Describes one image with a vision model (opt-in per crate). */
-    IMAGE_DESCRIBE
+    IMAGE_DESCRIBE,
+    /** Scores one answer with the judge model (RAG evaluation, opt-in per crate). */
+    EVALUATE
   }
 
   public enum ExtractionType {

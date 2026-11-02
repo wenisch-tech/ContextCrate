@@ -45,6 +45,7 @@ The features are listed in the order content flows through the system.
 | **Answers** | Grounded answer generation with streaming and citations. | [Answers](answers.md) |
 | **Grading** | Drops retrieved chunks the model judges irrelevant. | [Grading](features/grading.md) |
 | **Answer verification** | Checks the answer against its sources and revises or blocks unsupported claims. | [Answer verification](features/answer-verification.md) |
+| **RAG evaluation** | Scores sampled answers with a judge model: context relevance, faithfulness, answer relevance. Crate owners only. | [RAG evaluation](features/evaluation.md) |
 
 Most of these are switched on or tuned per crate on the crate's **Settings** page, by its Owner.
 

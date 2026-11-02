@@ -133,6 +133,9 @@ public class CrateService {
         values (?, true, ?, ?, ?, ?, ?, ?)
         """, crateId, embedding == null ? "local" : "openai-compatible", answer != null,
         reranking != null ? Boolean.TRUE : null, embedding, reranking, answer);
+    // A judge model marked as default for new crates is preselected (evaluation itself stays off).
+    UUID judge = defaultModel(tech.wenisch.contextcrate.domain.SharedModel.Kind.JUDGE);
+    if (judge != null) jdbc.update("insert into crate_evaluation_settings(crate_id, judge_shared_model_id) values (?, ?)", crateId, judge);
     jdbc.update("""
         insert into crate_index_generation(crate_id, generation, status,
           configuration_fingerprint, document_count, created_at, activated_at)
