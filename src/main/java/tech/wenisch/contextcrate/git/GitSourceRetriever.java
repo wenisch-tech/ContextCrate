@@ -27,6 +27,8 @@ import tech.wenisch.contextcrate.util.InsecureSsl;
 
 @Service
 public class GitSourceRetriever {
+  private static final org.slf4j.Logger log =
+      org.slf4j.LoggerFactory.getLogger(GitSourceRetriever.class);
   private final SourceItemRepository items;
   private final AcquisitionRecordRepository acquisitions;
   private final IngestionRunRepository runs;
@@ -97,42 +99,58 @@ public class GitSourceRetriever {
   private void ingestFiles(Path checkout, IngestionRun run,
       SourceConfiguration.GitRepository source, IngestionConfiguration.Git config,
       String revision, long durationMillis) throws Exception {
-    int accepted = 0;
-    try (var paths = Files.walk(checkout)) {
-      for (Path file : paths.sorted().toList()) {
-        if (accepted >= config.maxFiles()) break;
-        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(file))
-          continue;
-        String relative = checkout.relativize(file).toString().replace('\\', '/');
-        if (relative.startsWith(".git/")
-            || !included(relative, config.includePatterns(), config.excludePatterns()))
-          continue;
-        long size = Files.size(file);
-        boolean image = imageSettings != null && tech.wenisch.contextcrate.service.chunking.ImageFilter.isImagePath(relative)
-            && imageSettings.current(run.getCrateId()).isImageIndexingEnabled();
-        long limit = image ? Math.max(config.maxFileBytes(), imageSettings.current(run.getCrateId()).getImageMaxBytes())
-            : config.maxFileBytes();
-        if (size < 1 || size > limit) continue;
+  int accepted = 0;
+  int skipped = 0;
+  try (var paths = Files.walk(checkout)) {
+    for (Path file : paths.sorted().toList()) {
+      if (accepted >= config.maxFiles()) break;
+      if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(file))
+        continue;
+      String relative = checkout.relativize(file).toString().replace('\\', '/');
+      if (relative.startsWith(".git/")
+          || !included(relative, config.includePatterns(), config.excludePatterns()))
+        continue;
+      long size = Files.size(file);
+      boolean image = imageSettings != null && tech.wenisch.contextcrate.service.chunking.ImageFilter.isImagePath(relative)
+          && imageSettings.current(run.getCrateId()).isImageIndexingEnabled();
+      long limit = image ? Math.max(config.maxFileBytes(), imageSettings.current(run.getCrateId()).getImageMaxBytes())
+          : config.maxFileBytes();
+      if (size < 1 || size > limit) continue;
+      try {
+        ingestFile(file, relative, image, limit, run, source, config, revision, durationMillis);
+        accepted++;
+      } catch (Exception e) {
+        // One bad file (too large for the store, unreadable, ...) must not fail the whole fetch.
+        skipped++;
+        log.warn("Skipping git file {}: {}", relative, safe(e));
+      }
+    }
+  }
+  }
+
+  private void ingestFile(Path file, String relative, boolean image, long limit,
+      IngestionRun run, SourceConfiguration.GitRepository source,
+      IngestionConfiguration.Git config, String revision, long durationMillis) throws Exception {
         byte[] bytes = Files.readAllBytes(file);
         if (image) {
-          if (lfsPointer(bytes)) continue;
-        } else if (binary(bytes) || lfsPointer(bytes)) continue;
+          if (lfsPointer(bytes)) return;
+        } else if (binary(bytes) || lfsPointer(bytes)) return;
 
         String sourceUri = gitUri(source.repositoryUrl(), revision, relative);
-        if (items.findByRunIdAndSourceUri(run.getId(), sourceUri).isPresent()) continue;
+        if (items.findByRunIdAndSourceUri(run.getId(), sourceUri).isPresent()) return;
         UUID itemId = stable("git-item:" + run.getId() + ":" + sourceUri);
         UUID acquisitionId = stable("git-acquisition:" + run.getId() + ":" + sourceUri);
-        SourceItem item = new SourceItem(itemId, run.getId(), relative, sourceUri, 1);
-        item.assignCrate(run.getCrateId());
-        item.status(FrontierStatus.FETCHED);
-        items.save(item);
-
         String lowerPath = relative.toLowerCase(Locale.ROOT);
         boolean markdown = lowerPath.endsWith(".md") || lowerPath.endsWith(".markdown");
         String extension = image ? ".img" : markdown ? ".md" : lowerPath.endsWith(".txt") ? ".txt" : ".src";
         String key = "crates/" + run.getCrateId() + "/runs/" + run.getId() + "/"
             + acquisitionId + extension;
-        var saved = artifacts.put(key, new ByteArrayInputStream(bytes), config.maxFileBytes());
+        var saved = artifacts.put(key, new ByteArrayInputStream(bytes), limit);
+        SourceItem item = new SourceItem(itemId, run.getId(), relative, sourceUri, 1);
+        item.assignCrate(run.getCrateId());
+        item.status(FrontierStatus.FETCHED);
+        items.save(item);
+
         AcquisitionRecord record =
             new AcquisitionRecord(acquisitionId, run.getId(), itemId, relative);
         record.assignCrate(run.getCrateId());
@@ -145,9 +163,6 @@ public class GitSourceRetriever {
         queue.publish(PipelineMessage.create(run.getCrateId(), WorkStage.PARSE,
             IngestionService.payload(run.getCrateId(), run.getId(), acquisitionId), run.getId(),
             run.getCrateId() + ":parse:" + acquisitionId, 50));
-        accepted++;
-      }
-    }
   }
 
   private static void checkout(Git git, String ref) throws Exception {
