@@ -134,7 +134,9 @@ tbody tr:hover { background: color-mix(in srgb, var(--ifm-color-emphasis-200) 55
 .pagination-nav__link { border-radius: 0.7rem; border-color: var(--cc-line); background: var(--ifm-background-surface-color); }
 .pagination-nav__link:hover { border-color: var(--ifm-color-primary); }
 .footer { border-top: 1px solid var(--cc-line); }
-.footer__copyright { color: var(--ifm-color-content-secondary); font-size: 0.85rem; }
+.footer__copyright { color: var(--ifm-color-content-secondary); font-size: 0.85rem; text-align: center; line-height: 1.8; }
+.footer__copyright a { color: var(--ifm-color-content-secondary); text-decoration: underline; }
+.footer__copyright a:hover { color: var(--ifm-color-primary); }
 
 /* search box (local search plugin) */
 [class*='searchBar'] input, .navbar__search-input {

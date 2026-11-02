@@ -61,6 +61,41 @@ The reply is parsed leniently (JSON may be surrounded by prose), unknown names a
 the chosen strategies then run through the same fixed-order pipeline above. If the reply cannot be
 parsed, or no strategy is chosen, the question is searched unchanged.
 
+```mermaid
+flowchart TD
+  Q[User question] --> M{Strategies}
+  M -- Auto --> AU[Model picks strategies<br/>as JSON]
+  AU --> RW
+  M -- selected --> RW[1. rewrite]
+  RW --> SB[2. step-back]
+  SB --> SQ[3. sub-queries]
+  SQ --> DQ[Deduplicate, cut to 500 chars,<br/>max 6 queries]
+  DQ --> S1[Search query 1]
+  DQ --> S2[Search query 2]
+  DQ --> SN[Search query n]
+  S1 --> RRF[Merge with Reciprocal Rank Fusion]
+  S2 --> RRF
+  SN --> RRF
+  RRF --> LIM[Deduplicate, cut to max sources]
+  LIM --> GEN[Original question + chunks<br/>go to the answer model]
+```
+
+## Worked example
+
+A user has been talking about installing ContextCrate and then asks, in the chat, *“and how do I
+secure it and set up backups?”*. The crate has **rewrite** and **sub-queries** enabled.
+
+| Step | Model call | Result |
+|---|---|---|
+| 1. rewrite | Resolves “it” from the last messages | *How do I secure a ContextCrate installation and set up backups of its database and artifact store?* |
+| 2. sub-queries | Splits the rewritten query | *How do I secure a ContextCrate installation?* and *How do I back up the ContextCrate database and artifact store?* |
+| 3. queries searched | The rewritten query plus both sub-queries (3 searches) | Three ranked lists |
+| 4. merge | Reciprocal Rank Fusion, dedupe, cut to the source limit | One list. A chunk found by the broad and a narrow query ranks highest. |
+| 5. answer | The model receives the **original** question and the chunks | One answer covering both topics |
+
+Without transformation, the single search for the short follow-up would be dominated by the
+installation context or match nothing. The cost is two model calls plus three searches instead of one.
+
 ## Retrieval and merging
 
 Each query is searched with the same retrieval mode, source limit and filters as a normal answer

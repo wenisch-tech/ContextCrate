@@ -65,6 +65,23 @@ task:
 Identical images (same content) in a crate are described once and the description is reused.
 A failure only marks that image as failed; the run and the document are not affected.
 
+```mermaid
+flowchart TD
+  I[Image found while parsing] --> FL{Passes filter?<br/>icons, logos, badges, pixels dropped}
+  FL -- no --> SK[Skipped, reason listed]
+  FL -- yes --> REF[Stage 1: reference line<br/>alt text, caption, address<br/>indexed with surrounding text]
+  REF --> DESC{Describe images on?}
+  DESC -- no --> DONE[Done]
+  DESC -- yes --> DL[Stage 2: IMAGE_DESCRIBE task<br/>download with SSRF checks]
+  DL --> PC{Size, dimensions,<br/>shape OK?}
+  PC -- no --> SK
+  PC -- yes, SVG --> SVG[Use own title and description]
+  PC -- yes --> VM[Vision model describes image]
+  VM -- DECORATIVE --> SK
+  VM -- description --> CK[image chunk under original heading<br/>document re-indexed]
+  SVG --> CK
+```
+
 ## What is skipped
 
 Images are filtered before anything is downloaded. Skipped images are listed with the reason on
@@ -96,6 +113,25 @@ Navigation, header and footer images are already gone when the job removes `nav,
 Images referenced from Markdown in a repository are not downloaded for descriptions, because the
 checkout is gone after the run. Describe them by letting the image file itself be imported
 (include `docs/img/**` for example).
+
+## Choosing a configuration
+
+| Goal | Settings |
+|---|---|
+| Cheapest option, answers can still link to figures | Image indexing on, descriptions off (default) |
+| Questions about diagrams and screenshots should be answerable | Image indexing and **Describe images** on, with a vision-capable model |
+| No image content may leave the installation | Descriptions off, or use a vision model hosted inside your network |
+| Documentation with many decorative graphics | Keep the filter on; check the skipped list and the `kept`/`skipped` metrics |
+
+## Troubleshooting
+
+| Symptom | Likely cause | What to do |
+|---|---|---|
+| Descriptions never appear | Descriptions are off, an administrator forbade them, or no vision-capable model is configured | Check **Settings → Images** and the model policy |
+| An important figure is missing | The filter judged it an icon, logo or tracking pixel by size or name | Inspect the skipped list for its reason |
+| Images from a repository are not described | The checkout is gone after the run, so referenced images cannot be fetched | Import the image files themselves, for example include `docs/img/**` |
+| Many `failed` description outcomes | The model rejects images, the format is unsupported, or the endpoint times out | Check the model, and the `contextcrate_images_descriptions_total` metric |
+| Images behind a login are not described | Pages that need a login do not expose their images to the download | Make the images publicly reachable or import them from the repository |
 
 ## Privacy and security
 

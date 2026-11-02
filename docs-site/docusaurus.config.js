@@ -62,16 +62,10 @@ const config = {
     },
     footer: {
       style: 'dark',
-      copyright: 'ContextCrate is open source, licensed under AGPL-3.0.',
-      links: [
-        {
-          title: 'Project',
-          items: [
-            { label: 'GitHub', href: 'https://github.com/wenisch-tech/ContextCrate' },
-            { label: 'Report a bug', href: 'https://github.com/wenisch-tech/ContextCrate/issues/new' },
-          ],
-        },
-      ],
+      copyright:
+        'ContextCrate is open source, licensed under AGPL-3.0.<br/>' +
+        '<a href="https://github.com/wenisch-tech/ContextCrate">GitHub</a> · ' +
+        '<a href="https://github.com/wenisch-tech/ContextCrate/issues/new">Report a bug</a>',
     },
     docs: { sidebar: { hideable: true, autoCollapseCategories: true } },
     tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },

@@ -124,6 +124,52 @@ Every chunk records the programming language, the **qualified symbol** (`UserSer
 `Box.open`), and the first and last line. The line range makes it possible to link back to the
 exact place in the repository.
 
+```mermaid
+flowchart TD
+  F[Source file] --> CK{Within size limit,<br/>not binary or LFS pointer?}
+  CK -- no --> SKIP[Skipped]
+  CK -- yes --> L{tree-sitter<br/>language?}
+  L -- yes --> T[Parse to syntax tree<br/>3 s limit]
+  T -- ok --> U[Top-level declarations become units<br/>comments and annotations stay attached]
+  U --> FIT{Declaration<br/>fits chunk size?}
+  FIT -- yes --> PK[Pack small neighbours together]
+  FIT -- no --> RS[Split into header, members, closing<br/>up to 6 levels; huge function between lines]
+  T -- timeout, error, no native lib --> FB
+  L -- no --> FB[Fallback: split on blank lines and lines]
+  PK --> CH[Chunks with language, symbol, line range]
+  RS --> CH
+  FB --> CH
+```
+
+### Example
+
+For a small Java file:
+
+```java
+package demo;
+
+import java.util.List;
+
+/** Looks up users. */
+public class UserService {
+  public User findById(long id) { ... }
+  public List<User> findAll() { ... }
+}
+```
+
+the parser sees these units. A file this small fits into a single chunk, so they are packed together.
+In a larger file each declaration that ends up in its own chunk carries the metadata shown:
+
+| Unit | Symbol | Notes |
+|---|---|---|
+| Package and imports | (file) | Small neighbours, packed together |
+| Class header with its Javadoc | `UserService` | The comment stays with the class |
+| `findById` | `UserService.findById` | Only separate from its siblings when the class is larger than the chunk size |
+| `findAll` | `UserService.findAll` | As above |
+
+A search for `UserService.findById`, `findById` or just `find by id` can find it, because the
+symbol and language are part of the indexed text. See [Chunking](chunking.md#chunk-metadata).
+
 ### Safety and fallback
 
 Source files come from repositories ContextCrate does not control, so parsing is defensive:
@@ -192,3 +238,13 @@ run each ingestion job once more: documents are re-parsed and get a new version 
 or structure changed. Existing index entries keep the old tokenisation (no identifier splitting)
 until their documents are indexed again, which happens when a job creates a new version of the
 document or when the index is rebuilt.
+
+
+## Troubleshooting
+
+| Symptom | Cause | What to do |
+|---|---|---|
+| A file is missing from the crate | It does not match an include glob, matches an exclude glob, is larger than **Maximum bytes per file**, is binary, or is a Git LFS pointer | Check the globs and the size limit. Files skipped for size or content are skipped silently |
+| A file fails to import with an error | A single unreadable file or one the artifact store rejects does not stop the import. It is skipped, the rest of the repository continues | Look for `Skipping git file` in the logs to see which ones |
+| Code is split on blank lines and has no symbol | The language is not tree-sitter supported, or parsing hit the three second limit, or the native library is unavailable | Check the supported-language table and the startup log for the tree-sitter warning |
+| Web page text contains navigation or cookie banners | The page layout puts them in the main content | Narrow the crawl to a content path, or exclude those pages |
