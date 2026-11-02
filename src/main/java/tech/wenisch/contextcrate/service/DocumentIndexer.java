@@ -53,7 +53,7 @@ public class DocumentIndexer {
       index.delete(document.getCrateId(), previous.getId());
     for (int attempt=0;;attempt++) try {
       var current=chunks.findByDocumentIdOrderByOrdinal(document.getId());
-      var records=retrieval.prepare(document.getCrateId(),current);
+      var records=retrieval.prepare(document.getCrateId(),document,current);
       index.upsert(document, records);
       for (var generation : generations.findByCrateIdAndStatus(
           document.getCrateId(), tech.wenisch.contextcrate.domain.CrateIndexGeneration.Status.BUILDING))
@@ -63,7 +63,7 @@ public class DocumentIndexer {
       EmbeddingInputTooLargeException limit=findLimit(error);
       if(limit==null || attempt>=8) throw error;
       cm.count("ingestion.embedding.rechunks", document.getCrateId());
-      rechunk(document, limit.suggestedMaximumCharacters());
+      rechunk(document, Math.max(200, limit.suggestedMaximumCharacters() - retrieval.headerReserve(document.getCrateId())));
     }
     document.indexed();
     documents.save(document);

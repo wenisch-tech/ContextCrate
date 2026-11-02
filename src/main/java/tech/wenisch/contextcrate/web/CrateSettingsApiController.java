@@ -30,10 +30,18 @@ public class CrateSettingsApiController {
       updated=rag.updateQueryTransformation(crateId,enabled,r.queryTransformationStrategies()==null?java.util.List.of(current.getQueryTransformationStrategies()):r.queryTransformationStrategies());
     }
     if(r.hydeEnabled()!=null)updated=rag.updateHyde(crateId,r.hydeEnabled());
+    boolean headerChanged=false;
+    if(r.contextHeaderVariant()!=null||r.contextHeaderWords()!=null){
+      String variant=r.contextHeaderVariant()==null?current.getContextHeaderVariant():r.contextHeaderVariant().strip().toLowerCase(java.util.Locale.ROOT);
+      int words=r.contextHeaderWords()==null?current.getContextHeaderWords():r.contextHeaderWords();
+      String oldVariant=current.getContextHeaderVariant();int oldWords=current.getContextHeaderWords();
+      updated=rag.updateContextHeader(crateId,variant,words);
+      headerChanged=!variant.equals(oldVariant)||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(variant)&&words!=oldWords);
+    }
     if(r.imageIndexingEnabled()!=null||r.imageDescriptionEnabled()!=null||r.imageVisionModelId()!=null||r.imageMaxPerRun()!=null||r.imageMaxBytes()!=null||r.imageMinSize()!=null||r.imageSkipPatterns()!=null){
       updated=rag.updateImages(crateId,r.imageIndexingEnabled()==null?current.isImageIndexingEnabled():r.imageIndexingEnabled(),r.imageDescriptionEnabled()==null?current.isImageDescriptionEnabled():r.imageDescriptionEnabled(),r.imageVisionModelId()==null?current.getImageVisionModelId():r.imageVisionModelId(),r.imageMaxPerRun()==null?current.getImageMaxPerRun():r.imageMaxPerRun(),r.imageMaxBytes()==null?current.getImageMaxBytes():r.imageMaxBytes(),r.imageMinSize()==null?current.getImageMinSize():r.imageMinSize(),r.imageSkipPatterns()==null?current.getImageSkipPatterns():r.imageSkipPatterns());
     }
-    if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy))rebuild.rebuildAsync(crateId);return updated;
+    if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy)||headerChanged)rebuild.rebuildAsync(crateId);return updated;
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
     access.requireMutable(crateId,CrateMember.Role.OWNER);
@@ -50,11 +58,11 @@ public class CrateSettingsApiController {
     access.require(crateId,CrateMember.Role.OWNER);
     var previous=providers.effectiveEmbedding(crateId);var previousAnswer=providers.effectiveAnswer(crateId);providers.update(crateId,form);
     var current=providers.effectiveEmbedding(crateId);
-    if(!previous.toString().equals(current.toString())||("proposition".equals(rag.current(crateId).getRetrievalStrategy())&&!previousAnswer.toString().equals(providers.effectiveAnswer(crateId).toString())))rebuild.rebuildAsync(crateId);
+    if(!previous.toString().equals(current.toString())||(("proposition".equals(rag.current(crateId).getRetrievalStrategy())||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(rag.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providers.effectiveAnswer(crateId).toString())))rebuild.rebuildAsync(crateId);
     return providers(crateId);
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
-      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,
+      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,String contextHeaderVariant,Integer contextHeaderWords,
       Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,

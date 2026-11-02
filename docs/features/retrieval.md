@@ -19,9 +19,10 @@ Configure the strategy on the crate **Settings** page or with `PUT /api/v1/crate
 
 Proposition retrieval requires enabled, configured embedding and answer providers. It reuses the crate's OpenAI-compatible answer endpoint, model, credentials, headers, timeout, and output-token limit. Generation and grading are deterministic non-streaming requests with temperature zero.
 
-> **Index time or query time?** Proposition retrieval changes what is **indexed** and needs a
-> rebuild. [HyDE](hyde.md) changes what is **searched with** at question time and needs none. The
-> two can be combined.
+> **Index time or query time?** Proposition retrieval and [contextual chunk
+> headers](contextual-headers.md) change what is **indexed** and rebuild the index when switched.
+> [HyDE](hyde.md) changes what is **searched with** at question time and needs no rebuild. They can
+> be combined, except that propositions are not given a header because they already stand alone.
 
 ## Generation and grading
 

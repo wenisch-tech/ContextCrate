@@ -21,6 +21,10 @@ public class RagSettings {
   /** Comma-separated canonical list of rewrite, step-back and sub-queries, or the single value auto. */
   @Column(name="query_transformation_strategies",nullable=false,length=60) private String queryTransformationStrategies="auto";
   /** HyDE: embed an LLM-written hypothetical answer instead of the question for the vector search. */
+  /** off, title, title-summary or title-summary-sections: header put in front of every chunk before it is embedded. */
+  @Column(name="context_header_variant",nullable=false,length=30) private String contextHeaderVariant="off";
+  /** Words from the start of a document that are sent to the model to create its title. */
+  @Column(name="context_header_words",nullable=false) private int contextHeaderWords=1000;
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
   @Column(name="image_description_enabled",nullable=false) private boolean imageDescriptionEnabled;
@@ -43,6 +47,7 @@ public class RagSettings {
   public RagSettings(java.util.UUID crateId,boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,boolean structuredSources,boolean gradingEnabled,boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit){this.crateId=crateId;this.strictGrounding=strictGrounding;this.allowClientHistory=allowClientHistory;this.inlineCitations=inlineCitations;this.structuredSources=structuredSources;this.gradingEnabled=gradingEnabled;this.answerVerificationEnabled=answerVerificationEnabled;this.answerVerificationFailureAction=answerVerificationFailureAction;this.retrievalMode=retrievalMode;this.retrievalStrategy=retrievalStrategy;this.propositionFailurePolicy=propositionFailurePolicy;this.sourceLimit=sourceLimit;}
   public java.util.UUID getCrateId(){return crateId;}
   public boolean isQueryTransformationEnabled(){return queryTransformationEnabled;} public String getQueryTransformationStrategies(){return queryTransformationStrategies;}
+  public String getContextHeaderVariant(){return contextHeaderVariant;} public int getContextHeaderWords(){return contextHeaderWords;} public void updateContextHeader(String variant,int words){this.contextHeaderVariant=variant;this.contextHeaderWords=words;}
   public boolean isHydeEnabled(){return hydeEnabled;} public void updateHyde(boolean enabled){this.hydeEnabled=enabled;}
   public void updateQueryTransformation(boolean enabled,String strategies){this.queryTransformationEnabled=enabled;this.queryTransformationStrategies=strategies;}
   public boolean isStrictGrounding(){return strictGrounding;} public boolean isAllowClientHistory(){return allowClientHistory;} public boolean isInlineCitations(){return inlineCitations;} public boolean isStructuredSources(){return structuredSources;} public boolean isGradingEnabled(){return gradingEnabled;} public boolean isAnswerVerificationEnabled(){return answerVerificationEnabled;} public String getAnswerVerificationFailureAction(){return answerVerificationFailureAction;} public String getRetrievalMode(){return retrievalMode;} public String getRetrievalStrategy(){return retrievalStrategy;} public String getPropositionFailurePolicy(){return propositionFailurePolicy;} public int getSourceLimit(){return sourceLimit;}

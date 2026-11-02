@@ -117,6 +117,15 @@ This produces four chunks:
 A single 1,200 character paragraph in the *Setup* section would additionally be split in two, with
 the second half starting about 200 characters (the overlap) before the end of the first.
 
+## Contextual headers
+
+Chunking decides where a document is cut; it cannot restore what a chunk lost by being cut. With
+**contextual chunk headers** (a crate setting, off by default) the answer model writes a title for
+each document from its first words, and a header such as `Title: On-Call Strategy for engineers`,
+optionally with a summary and the chunk's heading path, is put in front of every chunk before it is
+embedded and indexed. The chunks themselves, their size and their overlap do not change, and
+answers still receive the original chunk. See [Contextual headers](contextual-headers.md).
+
 ## Chunk metadata
 
 Every chunk stores more than its text:
@@ -187,6 +196,7 @@ limit set **Maximum input characters** on the provider.
 | Answers cite the right page, but the passage is incomplete | Chunks too small for the content | Raise the chunk size, re-run the ingestion job |
 | Search finds the right page but a vague part of it | Chunks too large, so one embedding covers several topics | Lower the chunk size, re-run the job |
 | Many tiny chunks | The source has many short sections, each under its own heading | Expected, because chunks never cross headings. Flatten the headings in the source if this hurts quality |
+| Embedding errors "input too large" with contextual headers on | The header adds up to about 900 characters to the embedded text | Use the title-only variant or set **Maximum input characters**, see [Contextual headers](contextual-headers.md#troubleshooting) |
 | Embedding errors "input too large" | Chunk size exceeds the embedding model's limit | Set **Maximum input characters** on the provider, see [Embeddings](../embeddings.md#input-limits-and-chunking) |
 | Changed chunk size, nothing changed | Settings only apply to documents processed afterwards | Re-run the ingestion job |
 | Code appears split in odd places | A function longer than the chunk size is cut between lines | Raise the chunk size for code-heavy sources |

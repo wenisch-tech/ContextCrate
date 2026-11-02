@@ -51,13 +51,13 @@ public class IndexRebuildService {
     var embedding=providers.effectiveEmbedding(crateId);
     var ragSettings=rag.current(crateId);var answer=providers.effectiveAnswer(crateId);
     var record=generations.save(new CrateIndexGeneration(crateId,generation,
-        fingerprint(embedding.toString()+":"+ragSettings.getRetrievalStrategy()+":"+ragSettings.getPropositionFailurePolicy()+":"+("proposition".equals(ragSettings.getRetrievalStrategy())?answer.baseUrl()+":"+answer.model():"")),embedding.provider()+":"+embedding.localModelId()+":"+embedding.openaiModel(),
+        fingerprint(embedding.toString()+":"+ragSettings.getRetrievalStrategy()+":"+ragSettings.getPropositionFailurePolicy()+(ContextHeaderService.enabled(ragSettings.getContextHeaderVariant())?":header:"+ragSettings.getContextHeaderVariant()+":"+ragSettings.getContextHeaderWords()+":"+answer.baseUrl()+":"+answer.model():"")+":"+("proposition".equals(ragSettings.getRetrievalStrategy())?answer.baseUrl()+":"+answer.model():"")),embedding.provider()+":"+embedding.localModelId()+":"+embedding.openaiModel(),
         embedding.openaiDimensions()));
     long count=0;
     try(var ignored=CrateContext.use(crateId)){
       for(var document:documents.findByCrateIdAndCurrentVersionTrue(crateId)){
         index.upsertGeneration(crateId,generation,document,
-            retrieval.prepare(crateId,chunks.findByDocumentIdOrderByOrdinal(document.getId())));count++;
+            retrieval.prepare(crateId,document,chunks.findByDocumentIdOrderByOrdinal(document.getId())));count++;
       }
       index.commitGeneration(crateId,generation);
       long finalCount=count;

@@ -35,6 +35,7 @@ The features are listed in the order content flows through the system.
 |---|---|---|
 | **Parsing** | Turns web pages, Markdown and source code into clean documents; keeps code blocks, tables and headings; import control for Git files. | [Parsing](features/parsing.md) |
 | **Chunking** | Cuts documents into passages along their structure, with chunk size and overlap. | [Chunking](features/chunking.md) |
+| **Contextual headers** | Puts the document title, summary and section path in front of every chunk before it is embedded. | [Contextual headers](features/contextual-headers.md) |
 | **Images** | Makes meaningful images searchable and optionally describes them with a vision model. | [Images](features/images.md) |
 | **Embeddings** | Local or remote models that create the vectors for semantic search. | [Embeddings](embeddings.md) |
 | **Retrieval** | Standard and proposition retrieval, lexical, semantic or hybrid. | [Retrieval](features/retrieval.md) |

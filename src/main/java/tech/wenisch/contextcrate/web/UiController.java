@@ -662,6 +662,8 @@ public class UiController {
       @RequestParam(defaultValue = "false") boolean queryTransformationEnabled,
       @RequestParam(required = false) java.util.List<String> queryTransformationStrategies,
       @RequestParam(defaultValue = "false") boolean hydeEnabled,
+      @RequestParam(defaultValue = "off") String contextHeaderVariant,
+      @RequestParam(defaultValue = "1000") int contextHeaderWords,
       @RequestParam(defaultValue = "false") boolean imageIndexingEnabled,
       @RequestParam(defaultValue = "false") boolean imageDescriptionEnabled,
       @RequestParam(defaultValue = "") String imageVisionModelId,
@@ -670,7 +672,7 @@ public class UiController {
       @RequestParam(defaultValue = "64") int imageMinSize,
       @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous=ragSettings.current(crateId);boolean changed=!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
+    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 
@@ -704,7 +706,7 @@ public class UiController {
     if(rerankingSharedModelId!=null)rerankingProvider="cohere-compatible";
     var previous = providerSettings.effectiveEmbedding(crateId);var previousAnswer=providerSettings.effectiveAnswer(crateId);
     providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey,embeddingSharedModelId,rerankingSharedModelId,answeringSharedModelId));
-    if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))
+    if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||(("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(ragSettings.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";
   }

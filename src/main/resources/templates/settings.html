@@ -13,6 +13,7 @@
       <a href="#general" :class="{'active':active==='general'}">General</a>
       <p class="settings-nav__group">Retrieval &amp; answers</p>
       <a href="#retrieval" :class="{'active':active==='retrieval'}">Retrieval</a>
+      <a href="#context-header" :class="{'active':active==='context-header'}">Chunk headers</a>
       <a href="#query-transformation" :class="{'active':active==='query-transformation'}">Query transformation</a>
       <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
@@ -47,6 +48,17 @@
             <div class="field" id="proposition-policy-fields"><label class="field-label" for="proposition-policy">When proposition processing fails</label><select class="input" id="proposition-policy" name="propositionFailurePolicy"><option value="fail-indexing" th:selected="${rag.propositionFailurePolicy == 'fail-indexing'}">Fail indexing (default)</option><option value="skip-chunk" th:selected="${rag.propositionFailurePolicy == 'skip-chunk'}">Skip affected chunk</option><option value="embed-source-chunk" th:selected="${rag.propositionFailurePolicy == 'embed-source-chunk'}">Embed source chunk</option></select></div>
             <div class="field"><label class="field-label" for="mode">Default retrieval mode</label><select class="input" id="mode" name="retrievalMode"><option value="hybrid" th:selected="${rag.retrievalMode == 'hybrid'}">Hybrid</option><option value="semantic" th:selected="${rag.retrievalMode == 'semantic'}">Semantic</option><option value="lexical" th:selected="${rag.retrievalMode == 'lexical'}">Lexical</option></select></div>
             <div class="field"><label class="field-label" for="limit">Maximum sources per answer</label><input class="input" id="limit" name="sourceLimit" type="number" min="1" th:max="${answering.sourceLimit}" th:value="${rag.sourceLimit}"></div>
+          </div>
+        </section>
+
+        <section id="context-header" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Contextual chunk headers</h2><p class="settings-hint">The answer model writes a title for every document, and that header is put in front of each chunk before the chunk is embedded and indexed, so a passage keeps its context. Answers and citations still use the original chunk.</p></div></div>
+          <div class="panel-body space-y-1">
+            <div class="setting-row"><label for="ch-off"><strong>Off</strong><span>No header. Chunks are embedded exactly as they are.</span></label><span class="switch"><input type="radio" id="ch-off" name="contextHeaderVariant" value="off" th:checked="${rag.contextHeaderVariant == 'off'}"><span></span></span></div>
+            <div class="setting-row"><label for="ch-title"><strong>Title</strong><span>Adds “Title: …” in front of every chunk.</span></label><span class="switch"><input type="radio" id="ch-title" name="contextHeaderVariant" value="title" th:checked="${rag.contextHeaderVariant == 'title'}"><span></span></span></div>
+            <div class="setting-row"><label for="ch-title-summary"><strong>Title and summary</strong><span>Adds the title and a one or two sentence summary of the document.</span></label><span class="switch"><input type="radio" id="ch-title-summary" name="contextHeaderVariant" value="title-summary" th:checked="${rag.contextHeaderVariant == 'title-summary'}"><span></span></span></div>
+            <div class="setting-row"><label for="ch-title-summary-sections"><strong>Title, summary and sections</strong><span>Adds the title, the summary and the chunk’s heading path (for example “Guide &gt; Setup &gt; Linux”). Useful for long documents with many subheadings.</span></label><span class="switch"><input type="radio" id="ch-title-summary-sections" name="contextHeaderVariant" value="title-summary-sections" th:checked="${rag.contextHeaderVariant == 'title-summary-sections'}"><span></span></span></div>
+            <div class="field pt-3"><label class="field-label" for="ch-words">Words sent to the model</label><input class="input" id="ch-words" type="number" name="contextHeaderWords" min="100" max="5000" step="50" th:value="${rag.contextHeaderWords}"><p class="field-help">The first words of each document are used to write the title (100 to 5,000, default 1,000). One answer-model call per document, cached until the document, the model or these settings change. Those words are sent to the answer provider. Changing the variant or the number of words rebuilds the index in the background. Requires an enabled answer model and embeddings. If a title cannot be created, the document is indexed without a header.</p></div>
           </div>
         </section>
 

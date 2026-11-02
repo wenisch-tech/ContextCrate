@@ -1,6 +1,6 @@
 # Pipeline behavior
 
-During the index stage, crates using proposition retrieval add generation and grading before embedding. Matching persisted evaluations are reused. Failures follow the crate's proposition failure policy; `fail-indexing` uses the existing retry and dead-letter behavior. Generation rebuilds keep the old index active until the replacement succeeds.
+During the index stage, crates with [contextual chunk headers](features/contextual-headers.md) first obtain a title (and summary) for each document from the answer model, cached per document, and put it in front of every chunk before embedding; failures index the document without a header. Crates using proposition retrieval add generation and grading before embedding. Matching persisted evaluations are reused. Failures follow the crate's proposition failure policy; `fail-indexing` uses the existing retry and dead-letter behavior. Generation rebuilds keep the old index active until the replacement succeeds.
 
 ## Source items
 

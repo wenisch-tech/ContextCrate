@@ -28,6 +28,13 @@ public class RagSettingsService {
     if(normalized==null){if(enabled)throw new IllegalArgumentException("select at least one query transformation strategy");normalized=value.getQueryTransformationStrategies();}
     value.updateQueryTransformation(enabled,normalized);return settings.save(value);
   }
+  /** Validates and stores the contextual chunk header variant; the caller decides whether the change needs an index rebuild. */
+  @Transactional public RagSettings updateContextHeader(java.util.UUID crateId,String variant,int words){
+    String normalized=variant==null?"off":variant.strip().toLowerCase(java.util.Locale.ROOT);
+    if(!tech.wenisch.contextcrate.service.ContextHeaderService.VARIANTS.contains(normalized))throw new IllegalArgumentException("context header variant must be off, title, title-summary or title-summary-sections");
+    if(words<tech.wenisch.contextcrate.service.ContextHeaderService.MIN_WORDS||words>tech.wenisch.contextcrate.service.ContextHeaderService.MAX_WORDS)throw new IllegalArgumentException("context header words must be between "+tech.wenisch.contextcrate.service.ContextHeaderService.MIN_WORDS+" and "+tech.wenisch.contextcrate.service.ContextHeaderService.MAX_WORDS);
+    var value=current(crateId);value.updateContextHeader(normalized,words);return settings.save(value);
+  }
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);
