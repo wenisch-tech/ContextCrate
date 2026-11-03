@@ -126,6 +126,17 @@ optionally with a summary and the chunk's heading path, is put in front of every
 embedded and indexed. The chunks themselves, their size and their overlap do not change, and
 answers still receive the original chunk. See [Contextual headers](contextual-headers.md).
 
+## Chunk index and overlap
+
+Chunks are numbered **consecutively within their document**, starting at 0: the **index** shown as *Chunk #n* on
+the document details page and used by `GET …/documents/{id}/chunks/{index}`. Together with the stored overlap this
+makes it possible to read a chunk with its neighbours as continuous text; see [Context window](context-window.md).
+
+For prose that is cut in the middle of a paragraph, ContextCrate stores **how many leading characters of a
+chunk repeat the end of the previous chunk** (the overlap actually used, at most the configured value). The
+details page shows it as *first n characters repeat the previous chunk*. Chunks cut at block borders and code
+chunks have no overlap.
+
 ## Chunk metadata
 
 Every chunk stores more than its text:

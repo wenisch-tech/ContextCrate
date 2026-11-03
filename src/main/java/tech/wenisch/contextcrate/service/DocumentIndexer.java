@@ -71,9 +71,19 @@ public class DocumentIndexer {
   }
   private void rechunk(tech.wenisch.contextcrate.domain.NormalizedDocument document,int size) {
     List<DocumentChunk> replacement=new ArrayList<>();int ordinal=0;
-    for(var old:chunks.findByDocumentIdOrderByOrdinal(document.getId())) for(String part:old.isCode()?tech.wenisch.contextcrate.service.chunking.TextSplitter.lines(old.getContent(),size):split(old.getContent(),size)) {
-      var chunk=new DocumentChunk(UUID.nameUUIDFromBytes(("chunk:"+document.getId()+":"+ordinal).getBytes(java.nio.charset.StandardCharsets.UTF_8)),document.getId(),ordinal++,old.getHeading(),part,Hashing.sha256(part));
-      chunk.describe(old.getKind(),old.getLanguage(),old.getSymbol(),old.getStartLine(),null);chunk.assignCrate(document.getCrateId());replacement.add(chunk);
+    for(var old:chunks.findByDocumentIdOrderByOrdinal(document.getId())) {
+      int piece=0;
+      for(String part:old.isCode()?tech.wenisch.contextcrate.service.chunking.TextSplitter.lines(old.getContent(),size):split(old.getContent(),size)) {
+        var chunk=new DocumentChunk(UUID.nameUUIDFromBytes(("chunk:"+document.getId()+":"+ordinal).getBytes(java.nio.charset.StandardCharsets.UTF_8)),document.getId(),ordinal++,old.getHeading(),part,Hashing.sha256(part));
+        chunk.describe(old.getKind(),old.getLanguage(),old.getSymbol(),old.getStartLine(),null);chunk.assignCrate(document.getCrateId());
+        // The first piece keeps the characters its chunk repeated from the previous chunk (unknown stays unknown);
+        // the other pieces are cut without overlap.
+        Integer inherited=old.getOverlapChars();
+        if(piece==0&&inherited!=null&&inherited>0)chunk.overlap(inherited<=part.length()&&inherited<=old.getContent().length()&&part.startsWith(old.getContent().substring(0,inherited))?inherited:0);
+        else chunk.overlap(piece==0?inherited:Integer.valueOf(old.isCode()?0:tech.wenisch.contextcrate.service.chunking.TextSplitter.CONTINUES));
+        piece++;
+        replacement.add(chunk);
+      }
     }
     extraction.rebuildDocument(document.getCrateId(),document.getId());
     chunks.deleteByDocumentId(document.getId());

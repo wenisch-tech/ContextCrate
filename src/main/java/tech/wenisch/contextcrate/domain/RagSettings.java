@@ -25,6 +25,8 @@ public class RagSettings {
   @Column(name="context_header_variant",nullable=false,length=30) private String contextHeaderVariant="off";
   /** Words from the start of a document that are sent to the model to create its title. */
   @Column(name="context_header_words",nullable=false) private int contextHeaderWords=1000;
+  /** Chunks before and after a matched chunk that are added to the answer context; 0 = off. */
+  @Column(name="context_window",nullable=false) private int contextWindow;
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
   @Column(name="image_description_enabled",nullable=false) private boolean imageDescriptionEnabled;
@@ -48,6 +50,7 @@ public class RagSettings {
   public java.util.UUID getCrateId(){return crateId;}
   public boolean isQueryTransformationEnabled(){return queryTransformationEnabled;} public String getQueryTransformationStrategies(){return queryTransformationStrategies;}
   public String getContextHeaderVariant(){return contextHeaderVariant;} public int getContextHeaderWords(){return contextHeaderWords;} public void updateContextHeader(String variant,int words){this.contextHeaderVariant=variant;this.contextHeaderWords=words;}
+  public int getContextWindow(){return contextWindow;} public void updateContextWindow(int radius){this.contextWindow=radius;}
   public boolean isHydeEnabled(){return hydeEnabled;} public void updateHyde(boolean enabled){this.hydeEnabled=enabled;}
   public void updateQueryTransformation(boolean enabled,String strategies){this.queryTransformationEnabled=enabled;this.queryTransformationStrategies=strategies;}
   public boolean isStrictGrounding(){return strictGrounding;} public boolean isAllowClientHistory(){return allowClientHistory;} public boolean isInlineCitations(){return inlineCitations;} public boolean isStructuredSources(){return structuredSources;} public boolean isGradingEnabled(){return gradingEnabled;} public boolean isAnswerVerificationEnabled(){return answerVerificationEnabled;} public String getAnswerVerificationFailureAction(){return answerVerificationFailureAction;} public String getRetrievalMode(){return retrievalMode;} public String getRetrievalStrategy(){return retrievalStrategy;} public String getPropositionFailurePolicy(){return propositionFailurePolicy;} public int getSourceLimit(){return sourceLimit;}

@@ -53,6 +53,22 @@ public class DocumentChunk {
   @Column(name = "media_url", length = 2000)
   private String mediaUrl;
 
+  /**
+   * Leading characters that repeat the end of the previous chunk of the document (prose cut with
+   * overlap). {@code 0} = none, {@code null} = unknown (chunk created before this was recorded).
+   */
+  @Column(name = "overlap_chars")
+  private Integer overlapChars;
+
+  public Integer getOverlapChars() {
+    return overlapChars;
+  }
+
+  public DocumentChunk overlap(Integer characters) {
+    this.overlapChars = characters;
+    return this;
+  }
+
   public String getMediaUrl() {
     return mediaUrl;
   }

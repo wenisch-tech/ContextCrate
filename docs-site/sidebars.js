@@ -34,7 +34,7 @@ const sidebars = {
           type: 'category', label: 'Features', collapsed: true,
           items: [
             'features/parsing', 'features/chunking', 'features/contextual-headers', 'features/images', 'embeddings',
-            'features/retrieval', 'reranking', 'features/query-transformation', 'features/hyde', 'answers',
+            'features/retrieval', 'features/context-window', 'reranking', 'features/query-transformation', 'features/hyde', 'answers',
             'features/grading', 'features/answer-verification', 'features/evaluation',
           ],
         },

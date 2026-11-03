@@ -82,6 +82,7 @@ delivered).
 
 **How many relevant chunks exist** is the part that cannot be known for free. Two sources are used:
 
+- With a [context window](context-window.md) the delivered text of a source is the whole window, so the judge grades what the model actually read; the candidate pool still consists of single chunks.
 - **Live answers** use the **candidate pool**: the same search is run for the question and its top
   results (default 20, setting *Candidate pool*) are judged once. Recall is then relative to the
   relevant chunks inside this pool. It is an estimate that tells you whether better chunks were

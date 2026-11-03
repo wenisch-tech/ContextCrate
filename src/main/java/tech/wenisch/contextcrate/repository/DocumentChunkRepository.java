@@ -21,6 +21,8 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, UU
   void deleteByDocumentId(UUID documentId);
 
   List<DocumentChunk> findByDocumentIdAndCrateIdOrderByOrdinal(UUID documentId, UUID crateId);
+  List<DocumentChunk> findByDocumentIdAndCrateIdAndOrdinalBetweenOrderByOrdinal(UUID documentId, UUID crateId, int from, int to);
+  long countByDocumentIdAndCrateId(UUID documentId, UUID crateId);
   Optional<DocumentChunk> findByIdAndCrateId(UUID id, UUID crateId);
   List<DocumentChunk> findByCrateId(UUID crateId);
   long countByCrateId(UUID crateId);

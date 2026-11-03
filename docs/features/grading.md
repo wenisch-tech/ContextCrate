@@ -31,10 +31,11 @@ next one sees:
 1. **Retrieve** with the configured mode, optionally using [transformed queries](query-transformation.md).
 2. **Limit** the hits to the crate's *maximum sources per answer*.
 3. **Grade** every remaining chunk, one request after another, against the **original question**.
-4. **Fit the context budget.** Kept chunks are added in rank order until the answering context
+4. **Expand with the [context window](context-window.md)** (if enabled): each kept chunk is joined with its neighbours in the document. Grading therefore judges the matched chunk only, not the neighbours it brings along.
+5. **Fit the context budget.** Kept chunks are added in rank order until the answering context
    budget (`contextcrate.answering.context-token-budget`, default 6,000 tokens, counted as about four
    characters per token) is used up; the last chunk may be cut.
-5. **Generate** the answer from what is left, and optionally [verify](answer-verification.md) it.
+6. **Generate** the answer from what is left, and optionally [verify](answer-verification.md) it.
 
 Because grading happens before the budget, a rejected chunk does not take space away from a relevant
 one. Because it happens after the limit, grading never pulls in additional chunks. If three of

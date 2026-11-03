@@ -50,8 +50,8 @@ public final class BlockPacker {
       for (String part : TextSplitter.lines(block.text(), options.size()))
         out.add(new ChunkDraft(heading, part, ChunkDraft.CODE, block.language(), null, null, null));
     } else {
-      for (String part : TextSplitter.prose(block.text(), options.size(), options.overlap()))
-        out.add(ChunkDraft.text(heading, part));
+      for (var part : TextSplitter.proseParts(block.text(), options.size(), options.overlap()))
+        out.add(new ChunkDraft(heading, part.text(), ChunkDraft.TEXT, null, null, null, null, part.overlap()));
     }
   }
 

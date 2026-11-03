@@ -244,6 +244,7 @@ public class CratePortableService {
           node.hasNonNull("startLine") ? node.get("startLine").asInt() : null,
           node.hasNonNull("endLine") ? node.get("endLine").asInt() : null);
       value.media(nullable(node, "mediaUrl"));
+      value.overlap(node.hasNonNull("overlapChars") ? node.get("overlapChars").asInt() : null);
       value.assignCrate(crateId); chunks.save(value);
     }
     for(JsonNode node:data.path("propositionEvaluations")){UUID id=UUID.randomUUID();evaluationIds.put(uuid(node),id);propositionEvaluations.save(new PropositionEvaluation(id,crateId,chunkIds.get(UUID.fromString(text(node,"chunkId"))),text(node,"contentHash"),text(node,"fingerprint"),nullable(node,"model"),text(node,"status"),nullable(node,"errorMessage")));}
@@ -340,6 +341,7 @@ public class CratePortableService {
         nullable(p, "answeringBaseUrl"), nullable(p, "answeringModel"), null));
     rag.update(crateId,r.path("strictGrounding").asBoolean(),r.path("allowClientHistory").asBoolean(),r.path("inlineCitations").asBoolean(),r.path("structuredSources").asBoolean(),!r.has("gradingEnabled")||r.path("gradingEnabled").asBoolean(),!r.has("answerVerificationEnabled")||r.path("answerVerificationEnabled").asBoolean(),textOr(r,"answerVerificationFailureAction","revise-once"),text(r,"retrievalMode"),textOr(r,"retrievalStrategy","standard"),textOr(r,"propositionFailurePolicy","fail-indexing"),r.path("sourceLimit").asInt());
     rag.updateHyde(crateId,r.path("hydeEnabled").asBoolean(false));
+    rag.updateContextWindow(crateId,r.path("contextWindow").asInt(0));
     rag.updateContextHeader(crateId,textOr(r,"contextHeaderVariant","off"),r.path("contextHeaderWords").asInt(1000));
     rag.updateQueryTransformation(crateId,r.path("queryTransformationEnabled").asBoolean(false),java.util.List.of(textOr(r,"queryTransformationStrategies","auto")));
   }

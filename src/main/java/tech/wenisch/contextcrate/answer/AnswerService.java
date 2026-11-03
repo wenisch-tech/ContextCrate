@@ -25,6 +25,7 @@ public class AnswerService {
   private int rrfConstant = 60;
   private QueryTransformationService transformation;
   private HydeService hyde;
+  private ContextWindowService contextWindow;
   private tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation;
   private tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings;
   private CrateMetrics metrics = CrateMetrics.noop();
@@ -35,6 +36,8 @@ public class AnswerService {
   public void setQueryTransformation(QueryTransformationService transformation) { this.transformation=transformation; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setHyde(HydeService hyde) { this.hyde=hyde; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setContextWindow(ContextWindowService contextWindow) { this.contextWindow=contextWindow; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setEvaluation(tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation) { this.evaluation=evaluation; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -67,6 +70,8 @@ public class AnswerService {
     List<Source> candidates=new ArrayList<>();Set<UUID> seen=new HashSet<>();
     for(var hit:found.hits()) { if(!seen.add(hit.id()))continue;var chunk=chunks.findByIdAndCrateId(hit.id(),request.crateId()).orElse(null);String content=chunk==null?hit.snippet():chunk.displayContent();candidates.add(new Source(candidates.size()+1,hit.id(),hit.documentId(),hit.runId(),hit.title(),hit.sourceUri(),hit.chunkOrdinal(),hit.snippet(),hit.score(),content));if(candidates.size()==limit)break; }
     if(policy.isGradingEnabled()){int before=candidates.size();candidates=grade(request.crateId(),request.question(),candidates);if(before>0)metrics.summary("answer.grading.kept_ratio",request.crateId(),(double)candidates.size()/before);}
+    // Context window: each matched chunk is replaced by its chunk plus the neighbours before and after it (query time only).
+    if(policy.getContextWindow()>0&&contextWindow!=null&&!candidates.isEmpty())candidates=withContextWindow(request.crateId(),candidates,policy.getContextWindow());
     List<Source> sources=new ArrayList<>();int remaining=config.contextTokenBudget()*4;
     for(var candidate:candidates) { if(remaining<=0)break;String content=candidate.content();content=content.length()>remaining?content.substring(0,remaining):content;remaining-=content.length();sources.add(new Source(sources.size()+1,candidate.chunkId(),candidate.documentId(),candidate.runId(),candidate.title(),candidate.sourceUri(),candidate.chunkOrdinal(),candidate.snippet(),candidate.score(),content)); }
     metrics.summary("answer.sources",request.crateId(),sources.size());
@@ -102,6 +107,31 @@ public class AnswerService {
     // HyDE generation has its own timer; keep it out of the retrieval time so the latency budget does not count it twice.
     metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted-hydeNanos,"transformed",applied.isEmpty()?"false":"true");
     return new Retrieved(results,queries,applied,hydeQueries);
+  }
+  /**
+   * Replaces matched chunks by windows of consecutive chunks of their document. Windows of neighbouring
+   * hits are merged into one source, the order of the sources stays the relevance order of their best hit.
+   * Any failure keeps the matched chunks as they are.
+   */
+  private List<Source> withContextWindow(UUID crateId,List<Source> candidates,int radius) {
+    try {
+      var anchors=candidates.stream().map(c->new ContextWindowService.Anchor(c.chunkId(),c.documentId(),c.chunkOrdinal())).toList();
+      var windows=contextWindow.expand(crateId,anchors,radius);
+      if(windows.isEmpty())return candidates;
+      Map<UUID,ContextWindowService.Window> byChunk=new HashMap<>();
+      for(var w:windows)for(UUID id:w.chunkIds())byChunk.put(id,w);
+      List<Source> out=new ArrayList<>();int added=0;
+      for(int i=0;i<candidates.size();i++) {
+        var candidate=candidates.get(i);var w=byChunk.get(candidate.chunkId());
+        if(w==null){out.add(candidate);continue;}
+        if(w.primary()!=i)continue; // belongs to the window of a better ranked hit
+        added+=w.added();
+        out.add(new Source(out.size()+1,candidate.chunkId(),candidate.documentId(),candidate.runId(),candidate.title(),candidate.sourceUri(),candidate.chunkOrdinal(),candidate.snippet(),candidate.score(),w.chunks()==1?candidate.content():w.text()));
+      }
+      metrics.summary("answer.context_window.added",crateId,added);
+      metrics.summary("answer.context_window.windows",crateId,out.size());
+      return out;
+    } catch(Exception e) { contextWindow.fallback(crateId,"error",e);return candidates; }
   }
   /** Reciprocal rank fusion across the result lists of several queries, deduplicated by hit id. */
   private SearchIndex.SearchResults fuse(String query,List<SearchIndex.SearchResults> lists,int limit) {

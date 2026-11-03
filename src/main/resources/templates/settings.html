@@ -16,6 +16,7 @@
       <a href="#context-header" :class="{'active':active==='context-header'}">Chunk headers</a>
       <a href="#query-transformation" :class="{'active':active==='query-transformation'}">Query transformation</a>
       <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
+      <a href="#context-window" :class="{'active':active==='context-window'}">Context window</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
       <a href="#quality" :class="{'active':active==='quality'}">Answer quality</a>
       <p class="settings-nav__group">Model providers</p>
@@ -71,6 +72,11 @@
             <div class="setting-row"><label for="qt-sub-queries"><strong>Sub-query composition</strong><span>Splits the question into 2–4 sub-questions and searches each one independently. Best for multi-part questions such as “How do I install X and configure Y?”.</span></label><span class="switch"><input type="checkbox" id="qt-sub-queries" name="queryTransformationStrategies" value="sub-queries" th:checked="${#strings.contains(rag.queryTransformationStrategies, 'sub-queries')}"><span></span></span></div>
             <p class="field-help pt-3">Selected strategies run in this order: rewriting → step-back → sub-queries, each building on the previous result. Every active strategy adds one answer-model call before retrieval. Requires an enabled answer model.</p>
           </fieldset>
+        </section>
+
+        <section id="context-window" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Context window</h2><p class="settings-hint">Every chunk found by the search is expanded with the chunks before and after it in its document, so the answer model reads the whole passage instead of a fragment. The chunks are joined in document order and the overlap of the chunking is removed.</p></div></div>
+          <div class="panel-body"><div class="field"><label class="field-label" for="context-window-size">Chunks before and after each match</label><input class="input" id="context-window-size" type="number" name="contextWindow" min="0" max="5" step="1" th:value="${rag.contextWindow}"><p class="field-help">0 turns it off. With 1 a match at index 7 is sent together with the chunks at index 6 and 8 (a window of three). Windows of neighbouring matches are merged. Applies to answers only, not to search results, and takes effect immediately without a rebuild. A window makes the answer context larger: raise the answering context budget if sources are cut off.</p></div></div>
         </section>
 
         <section id="hyde" class="panel scroll-mt-24">

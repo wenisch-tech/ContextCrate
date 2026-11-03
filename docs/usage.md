@@ -39,6 +39,7 @@ The features are listed in the order content flows through the system.
 | **Images** | Makes meaningful images searchable and optionally describes them with a vision model. | [Images](features/images.md) |
 | **Embeddings** | Local or remote models that create the vectors for semantic search. | [Embeddings](embeddings.md) |
 | **Retrieval** | Standard and proposition retrieval, lexical, semantic or hybrid. | [Retrieval](features/retrieval.md) |
+| **Context window** | Adds the chunks before and after each matched chunk to the answer context, without the chunk overlap. | [Context window](features/context-window.md) |
 | **Reranking** | Optional cross-encoder that reorders the best candidates. | [Reranking](reranking.md) |
 | **Query transformation** | Rewrites vague, specific or multi-part questions before searching. | [Query transformation](features/query-transformation.md) |
 | **HyDE** | Searches with an embedded hypothetical answer instead of the question. | [HyDE](features/hyde.md) |

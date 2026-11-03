@@ -42,6 +42,20 @@ public class CrateOperationsApiController {
     documents.findByIdAndCrateId(id,crateId).orElseThrow();
     return chunks.findByDocumentIdAndCrateIdOrderByOrdinal(id,crateId);
   }
+  private tech.wenisch.contextcrate.answer.ContextWindowService contextWindow;
+  @org.springframework.beans.factory.annotation.Autowired(required=false)
+  void setContextWindow(tech.wenisch.contextcrate.answer.ContextWindowService contextWindow){this.contextWindow=contextWindow;}
+  /**
+   * One chunk by its index (its consecutive number in the document, starting at 0), optionally with
+   * {@code before} and {@code after} neighbours joined into continuous text without the chunk overlap.
+   */
+  @GetMapping("/documents/{documentId}/chunks/{index:\\d+}") public tech.wenisch.contextcrate.answer.ContextWindowService.Fetched chunkByIndex(@PathVariable UUID crateId,@PathVariable UUID documentId,@PathVariable int index,@RequestParam(defaultValue="0") int before,@RequestParam(defaultValue="0") int after){
+    access.require(crateId,CrateMember.Role.VIEWER);
+    documents.findByIdAndCrateId(documentId,crateId).orElseThrow(()->new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,"Unknown document"));
+    var found=contextWindow==null?null:contextWindow.fetch(crateId,documentId,index,before,after);
+    if(found==null)throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,"No chunk with index "+index+" in this document");
+    return found;
+  }
   @GetMapping("/documents/{documentId}/chunks/{chunkId}/propositions") public Map<String,Object> propositions(@PathVariable UUID crateId,@PathVariable UUID documentId,@PathVariable UUID chunkId){access.require(crateId,CrateMember.Role.VIEWER);documents.findByIdAndCrateId(documentId,crateId).orElseThrow();var chunk=chunks.findByIdAndCrateId(chunkId,crateId).filter(c->c.getDocumentId().equals(documentId)).orElseThrow();Map<String,Object> result=new LinkedHashMap<>();result.put("chunkId",chunk.getId());result.put("evaluation",propositionEvaluations.findByChunkId(chunkId).orElse(null));result.put("propositions",propositions.findByChunkIdOrderByOrdinal(chunkId));return result;}
   @GetMapping("/index") public Map<String,Object> index(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.VIEWER);

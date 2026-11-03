@@ -352,6 +352,13 @@ public class DocumentParser {
       chunk.assignCrate(document.getCrateId());
       chunk.describe(draft.kind(), draft.language(), draft.symbol(), draft.startLine(),
           draft.endLine());
+      // The overlap is only kept when it provably is the end of the previous chunk after stripping.
+      int overlap = draft.overlap();
+      String before = result.isEmpty() ? null : result.get(result.size() - 1).getContent();
+      if (before == null) overlap = 0;
+      else if (overlap > 0 && (overlap > content.length() || !before.endsWith(content.substring(0, overlap)))) overlap = 0;
+      else if (overlap < 0) overlap = TextSplitter.CONTINUES;
+      chunk.overlap(overlap);
       result.add(chunk);
     }
     return result;

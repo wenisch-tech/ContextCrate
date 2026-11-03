@@ -30,6 +30,7 @@ public class CrateSettingsApiController {
       updated=rag.updateQueryTransformation(crateId,enabled,r.queryTransformationStrategies()==null?java.util.List.of(current.getQueryTransformationStrategies()):r.queryTransformationStrategies());
     }
     if(r.hydeEnabled()!=null)updated=rag.updateHyde(crateId,r.hydeEnabled());
+    if(r.contextWindow()!=null)updated=rag.updateContextWindow(crateId,r.contextWindow());
     boolean headerChanged=false;
     if(r.contextHeaderVariant()!=null||r.contextHeaderWords()!=null){
       String variant=r.contextHeaderVariant()==null?current.getContextHeaderVariant():r.contextHeaderVariant().strip().toLowerCase(java.util.Locale.ROOT);
@@ -62,7 +63,7 @@ public class CrateSettingsApiController {
     return providers(crateId);
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
-      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,String contextHeaderVariant,Integer contextHeaderWords,
+      boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Integer contextWindow,String contextHeaderVariant,Integer contextHeaderWords,
       Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,

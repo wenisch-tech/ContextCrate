@@ -35,6 +35,11 @@ public class RagSettingsService {
     if(words<tech.wenisch.contextcrate.service.ContextHeaderService.MIN_WORDS||words>tech.wenisch.contextcrate.service.ContextHeaderService.MAX_WORDS)throw new IllegalArgumentException("context header words must be between "+tech.wenisch.contextcrate.service.ContextHeaderService.MIN_WORDS+" and "+tech.wenisch.contextcrate.service.ContextHeaderService.MAX_WORDS);
     var value=current(crateId);value.updateContextHeader(normalized,words);return settings.save(value);
   }
+  /** Chunks before and after a matched chunk (0 = off); takes effect on the next question, no rebuild. */
+  @Transactional public RagSettings updateContextWindow(java.util.UUID crateId,int radius){
+    if(radius<0||radius>ContextWindowService.MAX_RADIUS)throw new IllegalArgumentException("context window must be between 0 and "+ContextWindowService.MAX_RADIUS);
+    var value=current(crateId);value.updateContextWindow(radius);return settings.save(value);
+  }
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);
