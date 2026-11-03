@@ -75,7 +75,7 @@ The `crate` label is the crate name, so cardinality grows with the number of cra
 
 ### Grafana dashboard
 
-Import `grafana/contextcrate-dashboard.json` (Dashboards → New → Import). The dashboard has a **Data source** selector and a **Crate** selector at the top, links to the repository and to the documentation, and two sections: **Global** (installation-wide) and **Crate** (filtered by the selected crates, including the most requested documents, chunks and sources, reranker behaviour and LLM latency).
+Import [`docs/grafana/contextcrate-dashboard.json`](https://github.com/wenisch-tech/ContextCrate/blob/main/docs/grafana/contextcrate-dashboard.json) (see [Grafana dashboard](grafana/README.md)) (Dashboards → New → Import). The dashboard has a **Data source** selector and a **Crate** selector at the top, links to the repository and to the documentation, and two sections: **Global** (installation-wide) and **Crate** (filtered by the selected crates, including the most requested documents, chunks and sources, reranker behaviour and LLM latency).
 
 ## Index rebuild runbook
 

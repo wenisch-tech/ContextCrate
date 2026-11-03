@@ -24,11 +24,49 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 - **Search with hybrid retrieval** by combining BM25 keyword search and semantic vectors with reciprocal-rank fusion, filters, and optional cross-encoder reranking.
 - **Generate grounded answers** through OpenAI-compatible models, with streaming responses, stable source lists, and inline citations that lead back to the indexed evidence.
 - **Connect any OpenAI client** to a crate directly — Open WebUI, LiteLLM, the OpenAI SDKs — through a per-crate OpenAI-compatible `chat/completions` endpoint, no custom integration code required.
-- **Improve answer quality** with per-crate query transformation (rewriting, step-back, sub-queries, auto), retrieved-chunk grading, proposition retrieval, and configurable answer verification that can revise, block, or warn about unsupported claims.
+- **Tune every stage of the RAG pipeline** — chunking, retrieval, answer generation and evaluation — per crate, see the [RAG toolbox](#rag-toolbox) below.
 - **Choose your AI providers** with local ONNX models or OpenAI-compatible embedding, reranking, and answer endpoints configured per crate.
 - **Manage data safely** with document versions, background index rebuilds, archive/restore, checksummed crate export/import, and audit-aware access controls.
 - **Automate through the UI or API** using personal API keys and crate-specific Viewer or Editor service keys.
 - **Deploy from laptop to cluster** with standalone Docker or Compose for compact installs and Kubernetes with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch for production scale.
+
+## RAG toolbox
+
+Every option is switchable per crate or ingestion job, off by default, and documented with a diagram and tuning advice. Combine them and measure the effect with the built-in evaluation.
+
+### Chunking and indexing
+
+| Option | What it does |
+|---|---|
+| [Structure-aware chunking](docs/features/chunking.md) | Splits by headings, paragraphs and code blocks instead of at a fixed position; configurable size and overlap per ingestion job. |
+| [Semantic chunking](docs/features/semantic-chunking.md) | Embeds every sentence and cuts where the topic changes, using a percentile, standard-deviation or interquartile-range threshold. |
+| [Contextual chunk headers](docs/features/contextual-headers.md) | Puts an LLM-written title, summary and section path in front of each chunk before it is embedded, so fragments keep their context. |
+| [Proposition retrieval](docs/features/retrieval.md) | Indexes self-contained, graded statements extracted from each chunk instead of the raw chunk. |
+| [Images](docs/features/images.md) | Indexes images by alt text and optional vision-model descriptions. |
+
+### Retrieval
+
+| Option | What it does |
+|---|---|
+| [Hybrid search](docs/features/retrieval.md) | BM25 keyword and semantic vector search fused with reciprocal-rank fusion, plus optional cross-encoder [reranking](docs/reranking.md). |
+| [Query transformation](docs/features/query-transformation.md) | Rewrites the question, asks a step-back question or splits it into sub-queries, chosen manually or automatically. |
+| [HyDE](docs/features/hyde.md) | Embeds an LLM-written hypothetical answer instead of the question to find the real chunks. |
+
+### Answer generation
+
+| Option | What it does |
+|---|---|
+| [Context window](docs/features/context-window.md) | Adds the neighbouring chunks of each match (configurable 0 to 5) and restores the original text without overlap. |
+| [Grading](docs/features/grading.md) | Judges retrieved chunks for relevance and drops the noise before the model sees it. |
+| [Answer verification](docs/features/answer-verification.md) | Checks the answer against its sources and revises, blocks or warns about unsupported claims. |
+| Grounded, cited answers | Streaming answers with stable sources and inline citations, also via an OpenAI-compatible endpoint and MCP. |
+
+### Evaluation and observability
+
+| Option | What it does |
+|---|---|
+| [RAG evaluation](docs/features/evaluation.md) | An LLM judge scores context relevance (Precision/Recall@K, MRR, MAP, NDCG), faithfulness, answer relevance and completeness, asynchronously and per crate, with an optional golden question set. Visible to crate owners. |
+| [Prometheus and Grafana](docs/operations.md) | Metrics for every stage and a ready-made [dashboard](docs/grafana/README.md) with a crate selector. |
 
 ## Architecture
 
@@ -111,6 +149,7 @@ The first authenticated user owns the automatically migrated Legacy crate. New u
 - [Operations](docs/operations.md)
 - [Export and import](docs/backup-migration.md)
 - [Upgrade from Harvex](docs/upgrade-from-harvex.md)
+- [Chunking](docs/features/chunking.md) and the other [feature guides](#rag-toolbox)
 - [Tutorials](docs/tutorials.md)
 
 ContextCrate is licensed under AGPL-3.0.

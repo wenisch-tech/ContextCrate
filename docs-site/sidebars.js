@@ -21,7 +21,7 @@ const sidebars = {
         },
         {
           type: 'category', label: 'Operate', collapsed: true,
-          items: ['operations', 'backup-migration', 'upgrade-from-harvex', 'troubleshooting'],
+          items: ['operations', 'grafana/README', 'backup-migration', 'upgrade-from-harvex', 'troubleshooting'],
         },
       ],
     },
@@ -33,9 +33,22 @@ const sidebars = {
         {
           type: 'category', label: 'Features', collapsed: true,
           items: [
-            'features/parsing', 'features/chunking', 'features/contextual-headers', 'features/images', 'embeddings',
-            'features/retrieval', 'features/semantic-chunking', 'features/context-window', 'reranking', 'features/query-transformation', 'features/hyde', 'answers',
-            'features/grading', 'features/answer-verification', 'features/evaluation',
+            {
+              type: 'category', label: 'Chunking & indexing', collapsed: true,
+              link: { type: 'doc', id: 'features/chunking' },
+              items: ['features/parsing', 'features/semantic-chunking', 'features/contextual-headers', 'features/images', 'embeddings'],
+            },
+            {
+              type: 'category', label: 'Retrieval', collapsed: true,
+              link: { type: 'doc', id: 'features/retrieval' },
+              items: ['features/query-transformation', 'features/hyde', 'reranking'],
+            },
+            {
+              type: 'category', label: 'Answer generation', collapsed: true,
+              link: { type: 'doc', id: 'answers' },
+              items: ['features/context-window', 'features/grading', 'features/answer-verification'],
+            },
+            'features/evaluation',
           ],
         },
         {
