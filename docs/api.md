@@ -128,7 +128,7 @@ Attach any number of jobs at
       "excludePatterns": ["docs/archive/**"],
       "maxFiles": 10000,
       "maxFileBytes": 1048576,
-      "output": {"chunkSize": 1000, "chunkOverlap": 200}
+      "output": {"chunkSize": 1000, "chunkOverlap": 200, "semantic": {"enabled": false, "method": "percentile", "value": 95, "minChars": 100}}
     }
   }
 }
@@ -143,6 +143,8 @@ zone. `POST .../ingestion-jobs/{jobId}/runs` remains available for both manual a
 Start it with `POST .../ingestion-jobs/{jobId}/runs`. A Git run records its resolved commit in
 `resolvedRevision`. Website sources use `connectorType: HTTPS`; their source configuration
 owns the HTTPS URL, while each job owns crawl scope, request behavior, authentication, and output policy.
+
+`output.semantic` turns on [semantic chunking](features/semantic-chunking.md): `method` is `percentile`, `stddev` or `iqr`, `value` the percentile or multiplier (0 = the method's default) and `minChars` the smallest chunk kept on its own. Changing it re-chunks documents on the next run.
 
 The former crate-qualified `/jobs` endpoint is intentionally not retained.
 

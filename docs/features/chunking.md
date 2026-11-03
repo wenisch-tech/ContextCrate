@@ -117,7 +117,14 @@ This produces four chunks:
 A single 1,200 character paragraph in the *Setup* section would additionally be split in two, with
 the second half starting about 200 characters (the overlap) before the end of the first.
 
-## Contextual headers
+## Semantic chunking
+
+Instead of packing blocks by size, an ingestion job can cut running prose where the topic changes: every
+sentence is embedded, and the text is split where the distance between neighbouring sentences exceeds a
+threshold (percentile, standard deviation or interquartile range). Headings and code stay boundaries and
+the chunk size remains the upper bound. See [Semantic chunking](semantic-chunking.md).
+
+
 
 Chunking decides where a document is cut; it cannot restore what a chunk lost by being cut. With
 **contextual chunk headers** (a crate setting, off by default) the answer model writes a title for

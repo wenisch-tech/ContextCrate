@@ -5845,6 +5845,335 @@
     },
     {
       "type": "row",
+      "title": "✂️ Semantic chunking (Crate selector)",
+      "id": 234,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 246
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Sentences per document (1h)",
+      "id": 235,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Average number of sentences that were embedded per semantically chunked document",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_semantic_sentences_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_ingestion_semantic_sentences_count{crate=~\"$crate\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Breakpoints per document (1h)",
+      "id": 236,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Average number of semantic cuts per document",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_semantic_breakpoints_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_ingestion_semantic_breakpoints_count{crate=~\"$crate\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Average threshold (1h)",
+      "id": 237,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Average cosine-distance threshold chosen by the breakpoint method",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_semantic_threshold_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_ingestion_semantic_threshold_count{crate=~\"$crate\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Fallbacks to size chunking (1h)",
+      "id": 238,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Documents that were chunked by size although semantic chunking was on",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_semantic_fallback_total{crate=~\"$crate\"}[1h]))",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Documents chunked semantically",
+      "id": 239,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Documents per minute and sentences embedded per minute",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 251
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(contextcrate_ingestion_semantic_sentences_count{crate=~\"$crate\"}[5m])) * 60",
+          "legendFormat": "documents / min",
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(contextcrate_ingestion_semantic_sentences_sum{crate=~\"$crate\"}[5m])) * 60",
+          "legendFormat": "sentences / min",
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fallbacks by reason",
+      "id": 240,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Why semantic chunking fell back to size chunking",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 251
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (reason) (increase(contextcrate_ingestion_semantic_fallback_total{crate=~\"$crate\"}[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
       "title": "🏭 Ingestion & pipeline (Crate selector)",
       "id": 109,
       "collapsed": false,
@@ -5852,7 +6181,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 246
+        "y": 258
       },
       "panels": []
     },
@@ -5869,7 +6198,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -5928,7 +6257,7 @@
         "h": 8,
         "w": 10,
         "x": 4,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -5981,7 +6310,7 @@
         "h": 8,
         "w": 10,
         "x": 14,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -6044,7 +6373,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 255
+        "y": 267
       },
       "targets": [
         {
@@ -6107,7 +6436,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 255
+        "y": 267
       },
       "targets": [
         {
@@ -6160,7 +6489,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 263
+        "y": 275
       },
       "targets": [
         {
@@ -6223,7 +6552,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 263
+        "y": 275
       },
       "targets": [
         {
@@ -6286,7 +6615,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 263
+        "y": 275
       },
       "targets": [
         {
@@ -6349,7 +6678,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 271
+        "y": 283
       },
       "targets": [
         {
@@ -6402,7 +6731,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 271
+        "y": 283
       },
       "targets": [
         {
@@ -6465,7 +6794,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 271
+        "y": 283
       },
       "targets": [
         {
@@ -6518,7 +6847,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 278
+        "y": 290
       },
       "targets": [
         {
@@ -6571,7 +6900,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 285
+        "y": 297
       },
       "targets": [
         {
@@ -6634,7 +6963,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 292
+        "y": 304
       },
       "targets": [
         {
@@ -6687,7 +7016,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 292
+        "y": 304
       },
       "targets": [
         {
@@ -6750,7 +7079,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 292
+        "y": 304
       },
       "targets": [
         {
@@ -6799,7 +7128,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 299
+        "y": 311
       },
       "panels": []
     },
@@ -6816,7 +7145,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 300
+        "y": 312
       },
       "targets": [
         {
@@ -6869,7 +7198,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 300
+        "y": 312
       },
       "targets": [
         {
@@ -6922,7 +7251,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 300
+        "y": 312
       },
       "targets": [
         {
@@ -6971,7 +7300,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 308
+        "y": 320
       },
       "panels": []
     },
@@ -6988,7 +7317,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 309
+        "y": 321
       },
       "targets": [
         {
@@ -7067,7 +7396,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 309
+        "y": 321
       },
       "targets": [
         {
@@ -7146,7 +7475,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 318
+        "y": 330
       },
       "targets": [
         {
@@ -7224,7 +7553,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 318
+        "y": 330
       },
       "targets": [
         {
@@ -7273,7 +7602,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 327
+        "y": 339
       },
       "panels": [
         {
@@ -7289,7 +7618,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 267
+            "y": 279
           },
           "targets": [
             {
@@ -7342,7 +7671,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 267
+            "y": 279
           },
           "targets": [
             {
@@ -7395,7 +7724,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 267
+            "y": 279
           },
           "targets": [
             {

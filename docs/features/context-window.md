@@ -152,3 +152,5 @@ The Grafana dashboard has a **Context window** section with these values over ti
 | Text from the next section appears | Neighbouring chunks belong to another heading; windows follow the document order, not the heading | Use a smaller window |
 | No change in the answer | The window is 0, or the question matched chunks without neighbours (single-chunk documents) | Check **Settings → Context window** |
 | `404` on the chunk index | The index is outside the document, or the document was re-chunked | Read the chunk list of the document again |
+
+Chunks made by [semantic chunking](semantic-chunking.md) have no overlap: a chunk that continues a paragraph is joined with a space, one that starts a paragraph with a blank line.

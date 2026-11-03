@@ -22,6 +22,28 @@ class ConfigurationCodecTest {
   }
 
   @Test
+  void semanticChunkingDefaultsToOffAndIsClamped() {
+    CrawlConfiguration old = codec.read("""
+        {"scope":{"seedUrl":"https://example.com"},"output":{"chunkSize":800}}
+        """);
+    assertThat(old.output().semantic().enabled()).isFalse();
+
+    CrawlConfiguration configured = codec.read("""
+        {"scope":{"seedUrl":"https://example.com"},"output":{"chunkSize":800,
+         "semantic":{"enabled":true,"method":"bogus","value":0,"minChars":5000}}}
+        """);
+    var semantic = configured.output().semantic();
+    assertThat(semantic.enabled()).isTrue();
+    assertThat(semantic.method()).isEqualTo("percentile");
+    assertThat(semantic.value()).isEqualTo(95);
+    assertThat(semantic.minChars()).isEqualTo(400);
+
+    var stddev = new CrawlConfiguration.SemanticChunking(true, "STDDEV", 99, 100).normalized(1000);
+    assertThat(stddev.method()).isEqualTo("stddev");
+    assertThat(stddev.value()).isEqualTo(6);
+  }
+
+  @Test
   void oldConfigurationWithoutAuthenticationDefaultsToNone() {
     CrawlConfiguration config =
         codec.read(

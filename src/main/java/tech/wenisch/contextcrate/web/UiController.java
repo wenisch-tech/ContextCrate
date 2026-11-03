@@ -225,6 +225,10 @@ public class UiController {
       @RequestParam(defaultValue = "1048576") long maxFileBytes,
       @RequestParam(defaultValue = "1000") int chunkSize,
       @RequestParam(defaultValue = "200") int chunkOverlap,
+      @RequestParam(defaultValue = "false") boolean semanticChunking,
+      @RequestParam(defaultValue = "percentile") String breakpointMethod,
+      @RequestParam(defaultValue = "0") double breakpointValue,
+      @RequestParam(defaultValue = "100") int semanticMinChars,
       @RequestParam(defaultValue = "") String includeUrlPatterns,
       @RequestParam(defaultValue = "") String excludeUrlPatterns,
       @RequestParam(defaultValue = "false") boolean allowSubdomains,
@@ -266,7 +270,8 @@ public class UiController {
     ingestion.create(crateId, sourceId, name, formConfiguration(source, seedUrl, allowedHost, ref,
         gitUsername, gitToken,
         includePatterns, excludePatterns, maxDepth, maxPages, maxFiles, maxFileBytes,
-        chunkSize, chunkOverlap, includeUrlPatterns, excludeUrlPatterns, allowSubdomains,
+        chunkSize, chunkOverlap,
+        semanticChunking, breakpointMethod, breakpointValue, semanticMinChars, includeUrlPatterns, excludeUrlPatterns, allowSubdomains,
         discoverSitemaps, userAgent, contact, honorRobots, perHostConcurrency,
         minimumDelayMillis, timeoutMillis, maxAttempts, initialBackoffMillis, maxBodyBytes,
         deduplicateContent, renderMode, trustAllCertificates, rawRetentionDays, contentSelector,
@@ -292,6 +297,10 @@ public class UiController {
       @RequestParam(defaultValue = "1048576") long maxFileBytes,
       @RequestParam(defaultValue = "1000") int chunkSize,
       @RequestParam(defaultValue = "200") int chunkOverlap,
+      @RequestParam(defaultValue = "false") boolean semanticChunking,
+      @RequestParam(defaultValue = "percentile") String breakpointMethod,
+      @RequestParam(defaultValue = "0") double breakpointValue,
+      @RequestParam(defaultValue = "100") int semanticMinChars,
       @RequestParam(defaultValue = "") String includeUrlPatterns,
       @RequestParam(defaultValue = "") String excludeUrlPatterns,
       @RequestParam(defaultValue = "false") boolean allowSubdomains,
@@ -335,6 +344,7 @@ public class UiController {
         formConfiguration(source, seedUrl, allowedHost, ref, gitUsername, gitToken,
             includePatterns, excludePatterns,
             maxDepth, maxPages, maxFiles, maxFileBytes, chunkSize, chunkOverlap,
+        semanticChunking, breakpointMethod, breakpointValue, semanticMinChars,
             includeUrlPatterns, excludeUrlPatterns, allowSubdomains, discoverSitemaps, userAgent,
             contact, honorRobots, perHostConcurrency, minimumDelayMillis, timeoutMillis,
             maxAttempts, initialBackoffMillis, maxBodyBytes, deduplicateContent, renderMode,
@@ -386,7 +396,8 @@ public class UiController {
       String allowedHost, String ref, String gitUsername, String gitToken,
       String includePatterns, String excludePatterns,
       int maxDepth, int maxPages, int maxFiles, long maxFileBytes, int chunkSize,
-      int chunkOverlap, String includeUrlPatterns, String excludeUrlPatterns,
+      int chunkOverlap, boolean semanticChunking, String breakpointMethod, double breakpointValue,
+      int semanticMinChars, String includeUrlPatterns, String excludeUrlPatterns,
       boolean allowSubdomains, boolean discoverSitemaps, String userAgent, String contact,
       boolean honorRobots, int perHostConcurrency, long minimumDelayMillis, int timeoutMillis,
       int maxAttempts, long initialBackoffMillis, long maxBodyBytes, boolean deduplicateContent,
@@ -397,7 +408,9 @@ public class UiController {
       String successUrlPattern, String successContentPattern, boolean directLogin,
       String authServerUrl, String clientId, String clientSecret, String realm) {
     CrawlConfiguration.Output output = new CrawlConfiguration.Output(
-        rawRetentionDays, contentSelector, csv(removeSelectors), chunkSize, chunkOverlap, logicalIndex);
+        rawRetentionDays, contentSelector, csv(removeSelectors), chunkSize, chunkOverlap, logicalIndex,
+        new CrawlConfiguration.SemanticChunking(semanticChunking, breakpointMethod, breakpointValue,
+            semanticMinChars));
     if (source.getConnectorType() == ConnectorType.GIT)
       return IngestionConfiguration.git(new IngestionConfiguration.Git(ref, blankToNull(gitUsername),
           blankToNull(gitToken), csv(includePatterns), csv(excludePatterns), maxFiles,
@@ -468,6 +481,22 @@ public class UiController {
     this.documentImages = repository;
   }
 
+  /** One line about semantic chunking from the document metadata, or null for standard chunking. */
+  private static String semanticInfo(String metadataJson) {
+    try {
+      var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(metadataJson).path("semantic");
+      if (!node.isObject()) return null;
+      if (!node.path("applied").asBoolean(false))
+        return "Semantic chunking was requested but not applied (" + node.path("fallback").asText("unknown")
+            + "); the document was chunked by size.";
+      return "Chunked semantically (" + node.path("method").asText() + ", threshold "
+          + node.path("threshold").asText() + ", " + node.path("sentences").asInt() + " sentences, "
+          + node.path("breakpoints").asInt() + " breakpoints).";
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   @GetMapping("/documents/{id}")
   String documentDetails(@PathVariable UUID crateId, @PathVariable UUID id, Model model) {
     var document = documents.findByIdAndCrateId(id, crateId).orElseThrow();
@@ -484,6 +513,7 @@ public class UiController {
     model.addAttribute("versions", versions);
     model.addAttribute("previousVersions", previous);
     var chunks=documentChunks.findByDocumentIdAndCrateIdOrderByOrdinal(id,crateId);model.addAttribute("chunks",chunks);var propositionMap=new LinkedHashMap<UUID,List<ChunkProposition>>();for(var chunk:chunks)propositionMap.put(chunk.getId(),chunkPropositions.findByChunkIdOrderByOrdinal(chunk.getId()));model.addAttribute("chunkPropositions",propositionMap);
+    model.addAttribute("semanticInfo", semanticInfo(document.getMetadataJson()));
     return "document-details";
   }
 

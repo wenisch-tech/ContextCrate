@@ -95,7 +95,14 @@ public record CrawlConfiguration(
       List<String> removeSelectors,
       @Min(200) int chunkSize,
       @Min(0) int chunkOverlap,
-      String logicalIndex) {
+      String logicalIndex,
+      SemanticChunking semantic) {
+    /** Existing callers and stored configurations without semantic chunking. */
+    public Output(int rawRetentionDays, String contentSelector, List<String> removeSelectors,
+        int chunkSize, int chunkOverlap, String logicalIndex) {
+      this(rawRetentionDays, contentSelector, removeSelectors, chunkSize, chunkOverlap, logicalIndex, null);
+    }
+
     public Output {
       rawRetentionDays = rawRetentionDays < 0 ? 30 : rawRetentionDays;
       contentSelector = contentSelector == null ? "" : contentSelector;
@@ -106,11 +113,43 @@ public record CrawlConfiguration(
       chunkSize = chunkSize < 200 ? 1000 : chunkSize;
       chunkOverlap = Math.max(0, Math.min(chunkOverlap, chunkSize / 2));
       logicalIndex = logicalIndex == null || logicalIndex.isBlank() ? "default" : logicalIndex;
+      semantic = (semantic == null ? SemanticChunking.disabled() : semantic).normalized(chunkSize);
     }
 
     public static Output defaults() {
       return new Output(
           30, "", List.of("script", "style", "nav", "footer", "aside"), 1000, 200, "default");
+    }
+  }
+
+  /**
+   * Semantic chunking: cut where the meaning changes instead of by size. {@code method} is
+   * {@code percentile}, {@code stddev} or {@code iqr}; {@code value} is the percentile or the multiplier
+   * (0 = the method's default); {@code minChars} is the smallest chunk that is kept on its own.
+   */
+  public record SemanticChunking(boolean enabled, String method, double value, int minChars) {
+    public static final String PERCENTILE = "percentile", STDDEV = "stddev", IQR = "iqr";
+    public static final int DEFAULT_MIN_CHARS = 100;
+
+    public static SemanticChunking disabled() {
+      return new SemanticChunking(false, PERCENTILE, 0, DEFAULT_MIN_CHARS);
+    }
+
+    /** Valid method, value inside the method's range, minimum size no larger than half a chunk. */
+    public SemanticChunking normalized(int chunkSize) {
+      String m = method == null ? PERCENTILE : method.strip().toLowerCase(java.util.Locale.ROOT);
+      if (!m.equals(PERCENTILE) && !m.equals(STDDEV) && !m.equals(IQR)) m = PERCENTILE;
+      double v = value;
+      if (!(v > 0)) v = m.equals(PERCENTILE) ? 95 : m.equals(STDDEV) ? 3 : 1.5;
+      v = m.equals(PERCENTILE) ? Math.max(50, Math.min(99.9, v))
+          : m.equals(STDDEV) ? Math.max(0.5, Math.min(6, v)) : Math.max(0.5, Math.min(5, v));
+      int min = minChars < 0 ? DEFAULT_MIN_CHARS : minChars;
+      return new SemanticChunking(enabled, m, v, Math.min(min, Math.max(0, chunkSize / 2)));
+    }
+
+    /** Short text for the document details page and the chunking fingerprint. */
+    public String describe() {
+      return method + " " + (value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value));
     }
   }
 

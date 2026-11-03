@@ -213,4 +213,69 @@ class DocumentParserTest {
       }
     }
   }
+
+  @Test
+  void changingSemanticChunkingRechunksUnchangedContentAndStandardDocumentsStayUntouched() throws Exception {
+    DocumentParser parser = new DocumentParser(acquisitions, runs, documents, chunks, items,
+        artifacts, ingestion, new UrlPolicy(true), queue, extraction, new ObjectMapper(), providers);
+    var embeddings = mock(tech.wenisch.contextcrate.embedding.EmbeddingProvider.class);
+    when(embeddings.available()).thenReturn(true);
+    when(embeddings.embedDocuments(anyList())).thenAnswer(call -> {
+      List<float[]> out = new ArrayList<>();
+      for (String sentence : call.<List<String>>getArgument(0))
+        out.add(sentence.contains("cat") ? new float[] {1, 0} : new float[] {0, 1});
+      return out;
+    });
+    parser.setEmbeddings(embeddings);
+    UUID crateId = UUID.randomUUID(), runId = UUID.randomUUID(), acquisitionId = UUID.randomUUID();
+    UUID sourceId = UUID.randomUUID();
+    IngestionRun run = new IngestionRun(runId, crateId, sourceId, UUID.randomUUID(), "{}", "{}");
+    AcquisitionRecord acquisition = new AcquisitionRecord(acquisitionId, runId, UUID.randomUUID(), "notes.md");
+    acquisition.assignCrate(crateId);
+    acquisition.success("git+https://example.com/repo.git@abc/notes.md", 200, "text/markdown", "UTF-8",
+        "artifact.md", "sha", 100, 1);
+    String markdown = "# Notes\n\nA cat sat down. The cat purred loudly. Cats like warm places. "
+        + "Stocks fell today. Markets closed lower. Traders sold shares quickly.";
+    when(acquisitions.findById(acquisitionId)).thenReturn(Optional.of(acquisition));
+    when(runs.findById(runId)).thenReturn(Optional.of(run));
+    when(ingestion.connector(run)).thenReturn(ConnectorType.GIT);
+    when(artifacts.open("artifact.md")).thenAnswer(call -> new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8)));
+    when(providers.effectiveEmbedding(crateId)).thenReturn(new RuntimeProviderSettings.Embedding(
+        true, "local", "model", "revision", "url", java.nio.file.Path.of("models"), null, null, null, null, 384, 8000));
+    when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    var standard = new CrawlConfiguration.Output(30, "", List.of(), 1000, 20, "default");
+    var semantic = new CrawlConfiguration.Output(30, "", List.of(), 1000, 20, "default",
+        new CrawlConfiguration.SemanticChunking(true, "percentile", 60, 0));
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(any(), any(), anyString()))
+        .thenReturn(Optional.empty());
+
+    when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
+        new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000, standard, false)));
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    ArgumentCaptor<NormalizedDocument> saved = ArgumentCaptor.forClass(NormalizedDocument.class);
+    verify(documents, times(1)).save(saved.capture());
+    NormalizedDocument plain = saved.getValue();
+    assertThat(plain.getMetadataJson()).doesNotContain("chunking");
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(any(), any(), anyString()))
+        .thenReturn(Optional.of(plain));
+
+    // same content, same (standard) configuration: nothing to do
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    verify(documents, times(1)).save(any());
+
+    // same content, semantic chunking switched on: re-chunked as the next version
+    when(ingestion.jobConfiguration(run)).thenReturn(IngestionConfiguration.git(
+        new IngestionConfiguration.Git("", null, null, List.of("**"), List.of(), 100, 1000, semantic, false)));
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    verify(documents, times(3)).save(saved.capture());
+    NormalizedDocument rechunked = saved.getValue();
+    assertThat(rechunked.getVersionNumber()).isEqualTo(2);
+    assertThat(rechunked.getMetadataJson()).contains("semantic:percentile 60").contains("\"breakpoints\":1");
+    when(documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(any(), any(), anyString()))
+        .thenReturn(Optional.of(rechunked));
+
+    // and unchanged again afterwards
+    parser.parse(new PipelinePayload(crateId, runId, acquisitionId));
+    verify(documents, times(3)).save(any());
+  }
 }

@@ -42,6 +42,9 @@ public class DocumentParser {
     this.ragSettings = rag;
     this.imageRows = images;
   }
+  private tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setEmbeddings(tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings) { this.embeddings = embeddings; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setMetrics(tech.wenisch.contextcrate.metrics.CrateMetrics metrics) { this.cm = metrics; }
 
@@ -109,15 +112,17 @@ public class DocumentParser {
       return;
     }
     String sourceUri = canonical(page, acquisition);
-    String metadata = mapper.writeValueAsString(Map.of(
-        "openGraph", extractOpenGraph(page),
-        "headings", page.select("h1,h2,h3").eachText(),
-        "acquisitionStatus", acquisition.getStatusCode()));
+    Packed packed = pack(run, images.blocks(), config.output());
+    Map<String, Object> pageMeta = new LinkedHashMap<>();
+    pageMeta.put("openGraph", extractOpenGraph(page));
+    pageMeta.put("headings", page.select("h1,h2,h3").eachText());
+    pageMeta.put("acquisitionStatus", acquisition.getStatusCode());
+    packed.describe(pageMeta);
     persist(run, acquisition, sourceUri, blankToNull(page.title()),
         blankToNull(page.selectFirst("html") == null ? null : page.selectFirst("html").attr("lang")),
         meta(page, "meta[name=description]", "content"),
-        meta(page, "meta[name=author]", "content"), text, metadata,
-        BlockPacker.pack(images.blocks(), options(run, config.output())), config.output(), images, true);
+        meta(page, "meta[name=author]", "content"), text, mapper.writeValueAsString(pageMeta),
+        packed.drafts(), config.output(), images, true, packed.fingerprint());
     discover(run, acquisition, page, config);
   }
 
@@ -141,6 +146,7 @@ public class DocumentParser {
     String title = null;
     List<String> headings = List.of();
     List<ChunkDraft> drafts;
+    Packed packed = null;
     ImageFilter.Outcome imageOutcome = null;
     if (lowerType.startsWith("image/")) {
       parseImageFile(run, acquisition, path, config);
@@ -154,7 +160,8 @@ public class DocumentParser {
           url -> repoImageUrl(acquisition.getFinalLocator(), path, url));
       body = BlockPacker.body(imageOutcome.blocks());
       title = headings.isEmpty() ? null : headings.get(0);
-      drafts = BlockPacker.pack(imageOutcome.blocks(), options);
+      packed = pack(run, imageOutcome.blocks(), config.output());
+      drafts = packed.drafts();
     } else if (codeLanguage != null) {
       format = "code";
       body = value.stripTrailing();
@@ -165,7 +172,8 @@ public class DocumentParser {
       for (String paragraph : normalizeBlock(value).split("\n{2,}"))
         if (!paragraph.isBlank()) blocks.add(Block.prose(List.of(), paragraph.strip()));
       body = BlockPacker.body(blocks);
-      drafts = BlockPacker.pack(blocks, options);
+      packed = pack(run, blocks, config.output());
+      drafts = packed.drafts();
     }
     if (body.isBlank()) return;
     if (title == null) title = filename(path);
@@ -177,8 +185,10 @@ public class DocumentParser {
     meta.put("format", format);
     if (codeLanguage != null) meta.put("language", codeLanguage);
     meta.put("headings", headings);
+    if (packed != null) packed.describe(meta);
     persist(run, acquisition, acquisition.getFinalLocator(), title, null, null, null, body,
-        mapper.writeValueAsString(meta), drafts, config.output(), imageOutcome, false);
+        mapper.writeValueAsString(meta), drafts, config.output(), imageOutcome, false,
+        packed == null ? "" : packed.fingerprint());
   }
 
   private ImageFilter.Options imageOptions(IngestionRun run) {
@@ -229,7 +239,66 @@ public class DocumentParser {
         reason == null ? List.of(ref) : List.of(),
         reason == null ? List.of() : List.of(new ImageFilter.Skipped(ref, reason)));
     persist(run, acquisition, acquisition.getFinalLocator(), name, null, null, null, body,
-        mapper.writeValueAsString(meta), drafts, config.output(), outcome, false);
+        mapper.writeValueAsString(meta), drafts, config.output(), outcome, false, "");
+  }
+
+  /** Chunks of a document plus how they were made (empty fingerprint = standard chunking). */
+  private record Packed(List<ChunkDraft> drafts, String fingerprint, SemanticChunker.Stats stats,
+      CrawlConfiguration.SemanticChunking config) {
+    void describe(Map<String, Object> meta) {
+      if (!fingerprint.isEmpty()) meta.put("chunking", fingerprint);
+      if (stats == null) return;
+      Map<String, Object> semantic = new LinkedHashMap<>();
+      semantic.put("applied", stats.applied());
+      semantic.put("method", config.describe());
+      semantic.put("sentences", stats.sentences());
+      semantic.put("breakpoints", stats.breakpoints());
+      semantic.put("threshold", Math.round(stats.threshold() * 10_000d) / 10_000d);
+      if (stats.fallback() != null) semantic.put("fallback", stats.fallback());
+      meta.put("semantic", semantic);
+    }
+  }
+
+  /** Standard packing, or semantic chunking when the job asks for it (fail-open to standard). */
+  private Packed pack(IngestionRun run, List<Block> blocks, CrawlConfiguration.Output output) {
+    ChunkOptions options = options(run, output);
+    var semantic = output.semantic();
+    if (!semantic.enabled()) return new Packed(BlockPacker.pack(blocks, options), "", null, semantic);
+    var embedding = providers.effectiveEmbedding(run.getCrateId());
+    String fingerprint = "semantic:" + semantic.describe() + ":" + semantic.minChars() + ":"
+        + options.size() + ":" + options.overlap() + ":" + embedding.provider() + ":"
+        + embedding.localModelId() + ":" + embedding.openaiModel();
+    if (embeddings == null || !embeddings.available()) {
+      cm.count("ingestion.semantic.fallback", run.getCrateId(), "reason", "unavailable");
+      return new Packed(BlockPacker.pack(blocks, options), "semantic-fallback",
+          SemanticChunker.Stats.fallback("unavailable", 0), semantic);
+    }
+    long started = System.nanoTime();
+    SemanticChunker.Result result;
+    try (var ignored = tech.wenisch.contextcrate.config.CrateContext.use(run.getCrateId())) {
+      result = SemanticChunker.pack(blocks, options, semantic, embeddings::embedDocuments);
+    } finally {
+      cm.time("ingestion.semantic.duration", run.getCrateId(), System.nanoTime() - started);
+    }
+    var stats = result.stats();
+    if (stats.applied()) {
+      cm.summary("ingestion.semantic.sentences", run.getCrateId(), stats.sentences());
+      cm.summary("ingestion.semantic.breakpoints", run.getCrateId(), stats.breakpoints());
+      cm.summary("ingestion.semantic.threshold", run.getCrateId(), stats.threshold());
+      return new Packed(result.drafts(), fingerprint, stats, semantic);
+    }
+    cm.count("ingestion.semantic.fallback", run.getCrateId(), "reason", stats.fallback());
+    // A failure may be temporary, so the next run tries again; other reasons depend only on the content.
+    return new Packed(result.drafts(), "error".equals(stats.fallback()) ? "semantic-fallback" : fingerprint,
+        stats, semantic);
+  }
+
+  private String storedChunking(NormalizedDocument document) {
+    try {
+      return mapper.readTree(document.getMetadataJson()).path("chunking").asText("");
+    } catch (Exception e) {
+      return "";
+    }
   }
 
   private ChunkOptions options(IngestionRun run, CrawlConfiguration.Output output) {
@@ -240,13 +309,14 @@ public class DocumentParser {
   private void persist(IngestionRun run, AcquisitionRecord acquisition, String sourceUri,
       String title, String language, String description, String author, String body,
       String metadata, List<ChunkDraft> drafts, CrawlConfiguration.Output output,
-      ImageFilter.Outcome images, boolean describable) {
+      ImageFilter.Outcome images, boolean describable, String chunking) {
     String hash = Hashing.sha256(body);
     String identityUri = ingestion.connector(run) == ConnectorType.GIT
         ? acquisition.getRequestedLocator() : sourceUri;
     var current = documents.findTopByCrateIdAndSourceIdAndIdentityUriOrderByVersionNumberDesc(
         run.getCrateId(), run.getSourceId(), identityUri);
-    if (current.filter(document -> document.getContentHash().equals(hash)).isPresent()) {
+    if (current.filter(document -> document.getContentHash().equals(hash)
+        && chunking.equals(storedChunking(document))).isPresent()) {
       cm.count("ingestion.documents", run.getCrateId(), "result", "unchanged");
       return;
     }
