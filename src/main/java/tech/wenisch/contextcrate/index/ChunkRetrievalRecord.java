@@ -1,7 +1,15 @@
 package tech.wenisch.contextcrate.index;
 import java.util.UUID;
 import tech.wenisch.contextcrate.domain.DocumentChunk;
-public record ChunkRetrievalRecord(UUID recordId,UUID chunkId,int ordinal,String heading,String retrievalText,String sourceContent,String contentHash,boolean proposition){
+public record ChunkRetrievalRecord(UUID recordId,UUID chunkId,int ordinal,String heading,String retrievalText,String sourceContent,String contentHash,boolean proposition,String type){
+  public static final String CHUNK="chunk",PROPOSITION="proposition",QUESTION="question";
+  public ChunkRetrievalRecord(UUID recordId,UUID chunkId,int ordinal,String heading,String retrievalText,String sourceContent,String contentHash,boolean proposition){this(recordId,chunkId,ordinal,heading,retrievalText,sourceContent,contentHash,proposition,proposition?PROPOSITION:CHUNK);}
+  /** A generated question that points at its chunk: the question is what is embedded, the chunk is what a hit returns. */
+  public static ChunkRetrievalRecord question(DocumentChunk c,int index,String question){
+    UUID id=UUID.nameUUIDFromBytes(("question:"+c.getId()+":"+index+":"+question).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    return new ChunkRetrievalRecord(id,c.getId(),c.getOrdinal(),c.getHeading(),question,c.getContent(),c.getContentHash(),false,QUESTION);
+  }
+  public boolean isQuestion(){return QUESTION.equals(type);}
   public static ChunkRetrievalRecord standard(DocumentChunk c){return new ChunkRetrievalRecord(c.getId(),c.getId(),c.getOrdinal(),c.getHeading(),retrievalText(c),c.getContent(),c.getContentHash(),false);}
   /**
    * Standard record whose retrieval text starts with a contextual header (title, summary, section).

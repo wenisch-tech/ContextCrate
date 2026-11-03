@@ -6503,6 +6503,325 @@
     },
     {
       "type": "row",
+      "title": "❓ Document enrichment — generated questions (Crate selector)",
+      "id": 248,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 270
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Questions per chunk (1h)",
+      "id": 249,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Average number of questions the model wrote per chunk",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 271
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_enrichment_questions_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_ingestion_enrichment_questions_count{crate=~\"$crate\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Chunks enriched (1h)",
+      "id": 250,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Chunks for which questions were generated or reused from the cache",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 271
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_enrichment_chunks_total{crate=~\"$crate\",outcome=~\"generated|cached\"}[1h]))",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Failed chunks (1h)",
+      "id": 251,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Chunks indexed without questions because the model failed or returned nothing usable",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 271
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_ingestion_enrichment_chunks_total{crate=~\"$crate\",outcome=\"failed\"}[1h]))",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Searches won by a question (1h)",
+      "id": 252,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Share of searches whose best match was a generated question instead of the chunk itself",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 271
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_search_top_match_total{crate=~\"$crate\",type=\"question\"}[1h])) / clamp_min(sum(increase(contextcrate_search_top_match_total{crate=~\"$crate\",type=~\"question|chunk|proposition\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Enrichment outcomes",
+      "id": 253,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "What happened to the chunks during indexing",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 275
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (outcome) (increase(contextcrate_ingestion_enrichment_chunks_total{crate=~\"$crate\"}[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Best match by record type",
+      "id": 254,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Which kind of index record was the nearest match, per search leg",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 275
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (type, leg) (increase(contextcrate_search_top_match_total{crate=~\"$crate\"}[5m]))",
+          "legendFormat": "{{type}} ({{leg}})",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
       "title": "🏭 Ingestion & pipeline (Crate selector)",
       "id": 109,
       "collapsed": false,
@@ -6510,7 +6829,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 270
+        "y": 282
       },
       "panels": []
     },
@@ -6527,7 +6846,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 271
+        "y": 283
       },
       "targets": [
         {
@@ -6586,7 +6905,7 @@
         "h": 8,
         "w": 10,
         "x": 4,
-        "y": 271
+        "y": 283
       },
       "targets": [
         {
@@ -6639,7 +6958,7 @@
         "h": 8,
         "w": 10,
         "x": 14,
-        "y": 271
+        "y": 283
       },
       "targets": [
         {
@@ -6702,7 +7021,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 279
+        "y": 291
       },
       "targets": [
         {
@@ -6765,7 +7084,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 279
+        "y": 291
       },
       "targets": [
         {
@@ -6818,7 +7137,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 287
+        "y": 299
       },
       "targets": [
         {
@@ -6881,7 +7200,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 287
+        "y": 299
       },
       "targets": [
         {
@@ -6944,7 +7263,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 287
+        "y": 299
       },
       "targets": [
         {
@@ -7007,7 +7326,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 295
+        "y": 307
       },
       "targets": [
         {
@@ -7060,7 +7379,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 295
+        "y": 307
       },
       "targets": [
         {
@@ -7123,7 +7442,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 295
+        "y": 307
       },
       "targets": [
         {
@@ -7176,7 +7495,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 302
+        "y": 314
       },
       "targets": [
         {
@@ -7229,7 +7548,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 309
+        "y": 321
       },
       "targets": [
         {
@@ -7292,7 +7611,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 316
+        "y": 328
       },
       "targets": [
         {
@@ -7345,7 +7664,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 316
+        "y": 328
       },
       "targets": [
         {
@@ -7408,7 +7727,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 316
+        "y": 328
       },
       "targets": [
         {
@@ -7457,7 +7776,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 323
+        "y": 335
       },
       "panels": []
     },
@@ -7474,7 +7793,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 324
+        "y": 336
       },
       "targets": [
         {
@@ -7527,7 +7846,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 324
+        "y": 336
       },
       "targets": [
         {
@@ -7580,7 +7899,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 324
+        "y": 336
       },
       "targets": [
         {
@@ -7629,7 +7948,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 332
+        "y": 344
       },
       "panels": []
     },
@@ -7646,7 +7965,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 333
+        "y": 345
       },
       "targets": [
         {
@@ -7725,7 +8044,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 333
+        "y": 345
       },
       "targets": [
         {
@@ -7804,7 +8123,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 342
+        "y": 354
       },
       "targets": [
         {
@@ -7882,7 +8201,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 342
+        "y": 354
       },
       "targets": [
         {
@@ -7931,7 +8250,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 351
+        "y": 363
       },
       "panels": [
         {
@@ -7947,7 +8266,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 291
+            "y": 303
           },
           "targets": [
             {
@@ -8000,7 +8319,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 291
+            "y": 303
           },
           "targets": [
             {
@@ -8053,7 +8372,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 291
+            "y": 303
           },
           "targets": [
             {

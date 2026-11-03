@@ -18,6 +18,7 @@
       <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
       <a href="#context-window" :class="{'active':active==='context-window'}">Context window</a>
       <a href="#context-compression" :class="{'active':active==='context-compression'}">Context compression</a>
+      <a href="#enrichment" :class="{'active':active==='enrichment'}">Document enrichment</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
       <a href="#quality" :class="{'active':active==='quality'}">Answer quality</a>
       <p class="settings-nav__group">Model providers</p>
@@ -83,6 +84,11 @@
         <section id="context-compression" class="panel scroll-mt-24">
           <div class="panel-header"><div><h2 class="settings-title">Context compression</h2><p class="settings-hint">After retrieval, a model reads every retrieved chunk together with the question and keeps only the sentences that matter for the question. Chunks without a relevant sentence are dropped, and sentences that appear twice are removed. The answer model then receives the shorter, denser context.</p></div><label class="switch-labelled" for="context-compression-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="context-compression-enabled" name="contextCompression" th:checked="${rag.contextCompressionEnabled}"><span></span></span></label></div>
           <div class="panel-body"><p class="field-help">Best for large chunks, questions about specific details, and models with a small context window. It costs one extra model call per retrieved chunk (run in parallel) and adds latency to every answer. The model only selects existing sentences, so the text stays verbatim. Code chunks are kept as they are. If a call fails, that chunk is used unchanged. Needs the answer model, applies to answers only and takes effect immediately without a rebuild. With the context window, the window is built first and then compressed.</p></div>
+        </section>
+
+        <section id="enrichment" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Document enrichment</h2><p class="settings-hint">After chunking, the answer model writes questions that each chunk answers. The questions are embedded and indexed next to the chunk and point back at it. A user question is then compared with questions, which look like it, as well as with passages; when a generated question is the nearest match, the chunk it belongs to is retrieved and used as context. The mirror image of HyDE.</p></div><label class="switch-labelled" for="enrichment-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="enrichment-enabled" name="enrichmentEnabled" th:checked="${rag.enrichmentEnabled}"><span></span></span></label></div>
+          <div class="panel-body"><div class="field"><label class="field-label" for="enrichment-questions">Questions per chunk</label><input class="input" id="enrichment-questions" type="number" name="enrichmentQuestions" min="3" max="50" step="1" th:value="${rag.enrichmentQuestions}"><p class="field-help">3 to 50, default 5. More questions cover more ways to ask but make ingestion slower and the index larger. Costs one model call per chunk and one embedding per question. Changing this setting rebuilds the index in the background (questions of unchanged chunks with the same count are reused, so only new chunks call the model). If the model cannot be reached, a chunk is indexed without questions and tried again on the next rebuild.</p></div></div>
         </section>
 
         <section id="hyde" class="panel scroll-mt-24">

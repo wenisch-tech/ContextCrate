@@ -136,3 +136,7 @@ Each accepted proposition becomes a separate lexical and vector record, but reta
 ## Cost and privacy
 
 Proposition retrieval adds two LLM requests for every uncached chunk plus embedding work for every accepted proposition. Source chunks and generated propositions are sent to the configured answer provider. Prompts and credentials are not written to audit logs, but evaluations and scores are stored in the crate database. Use TLS and treat the provider as a data processor.
+
+## Generated questions as index records
+
+With [document enrichment](document-enrichment.md) the index also holds, for each chunk, the questions a model wrote for it. A hit whose best record is such a question is reported as its parent chunk: the chunk text is the content, the snippet and the reranking input, and each chunk appears once.

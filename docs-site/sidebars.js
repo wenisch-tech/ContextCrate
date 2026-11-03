@@ -36,7 +36,7 @@ const sidebars = {
             {
               type: 'category', label: 'Chunking & indexing', collapsed: true,
               link: { type: 'doc', id: 'features/chunking' },
-              items: ['features/parsing', 'features/semantic-chunking', 'features/contextual-headers', 'features/images', 'embeddings'],
+              items: ['features/parsing', 'features/semantic-chunking', 'features/contextual-headers', 'features/document-enrichment', 'features/images', 'embeddings'],
             },
             {
               type: 'category', label: 'Retrieval', collapsed: true,

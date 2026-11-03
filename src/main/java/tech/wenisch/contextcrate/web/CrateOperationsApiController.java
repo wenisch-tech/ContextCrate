@@ -42,6 +42,11 @@ public class CrateOperationsApiController {
     documents.findByIdAndCrateId(id,crateId).orElseThrow();
     return chunks.findByDocumentIdAndCrateIdOrderByOrdinal(id,crateId);
   }
+  private tech.wenisch.contextcrate.repository.ChunkQuestionRepository chunkQuestions;
+  @org.springframework.beans.factory.annotation.Autowired(required=false)
+  void setChunkQuestions(tech.wenisch.contextcrate.repository.ChunkQuestionRepository chunkQuestions){this.chunkQuestions=chunkQuestions;}
+  /** The questions the model wrote for a chunk (document enrichment); empty when enrichment is off or has not run for the chunk. */
+  @GetMapping("/documents/{documentId}/chunks/{chunkId}/questions") public Map<String,Object> questions(@PathVariable UUID crateId,@PathVariable UUID documentId,@PathVariable UUID chunkId){access.require(crateId,CrateMember.Role.VIEWER);documents.findByIdAndCrateId(documentId,crateId).orElseThrow();var chunk=chunks.findByIdAndCrateId(chunkId,crateId).filter(c->c.getDocumentId().equals(documentId)).orElseThrow();Map<String,Object> result=new LinkedHashMap<>();result.put("chunkId",chunk.getId());result.put("questions",chunkQuestions==null?List.of():chunkQuestions.findByChunkIdAndCrateIdOrderByOrdinal(chunkId,crateId).stream().map(q->q.getQuestion()).toList());return result;}
   private tech.wenisch.contextcrate.answer.ContextWindowService contextWindow;
   @org.springframework.beans.factory.annotation.Autowired(required=false)
   void setContextWindow(tech.wenisch.contextcrate.answer.ContextWindowService contextWindow){this.contextWindow=contextWindow;}

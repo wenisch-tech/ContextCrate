@@ -497,6 +497,10 @@ public class UiController {
     }
   }
 
+  private tech.wenisch.contextcrate.repository.ChunkQuestionRepository chunkQuestions;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setChunkQuestions(tech.wenisch.contextcrate.repository.ChunkQuestionRepository repository) { this.chunkQuestions = repository; }
+
   @GetMapping("/documents/{id}")
   String documentDetails(@PathVariable UUID crateId, @PathVariable UUID id, Model model) {
     var document = documents.findByIdAndCrateId(id, crateId).orElseThrow();
@@ -514,6 +518,9 @@ public class UiController {
     model.addAttribute("previousVersions", previous);
     var chunks=documentChunks.findByDocumentIdAndCrateIdOrderByOrdinal(id,crateId);model.addAttribute("chunks",chunks);var propositionMap=new LinkedHashMap<UUID,List<ChunkProposition>>();for(var chunk:chunks)propositionMap.put(chunk.getId(),chunkPropositions.findByChunkIdOrderByOrdinal(chunk.getId()));model.addAttribute("chunkPropositions",propositionMap);
     model.addAttribute("semanticInfo", semanticInfo(document.getMetadataJson()));
+    var questionMap = new LinkedHashMap<UUID, List<String>>();
+    if (chunkQuestions != null) for (var chunk : chunks) questionMap.put(chunk.getId(), chunkQuestions.findByChunkIdAndCrateIdOrderByOrdinal(chunk.getId(), crateId).stream().map(q -> q.getQuestion()).toList());
+    model.addAttribute("chunkQuestions", questionMap);
     return "document-details";
   }
 
@@ -694,6 +701,8 @@ public class UiController {
       @RequestParam(defaultValue = "false") boolean hydeEnabled,
       @RequestParam(defaultValue = "0") int contextWindow,
       @RequestParam(defaultValue = "false") boolean contextCompression,
+      @RequestParam(defaultValue = "false") boolean enrichmentEnabled,
+      @RequestParam(defaultValue = "5") int enrichmentQuestions,
       @RequestParam(defaultValue = "off") String contextHeaderVariant,
       @RequestParam(defaultValue = "1000") int contextHeaderWords,
       @RequestParam(defaultValue = "false") boolean imageIndexingEnabled,
@@ -704,7 +713,7 @@ public class UiController {
       @RequestParam(defaultValue = "64") int imageMinSize,
       @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextCompression(crateId,contextCompression);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
+    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy())||enrichmentEnabled!=previous.isEnrichmentEnabled()||(enrichmentEnabled&&enrichmentQuestions!=previous.getEnrichmentQuestions());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextCompression(crateId,contextCompression);ragSettings.updateEnrichment(crateId,enrichmentEnabled,enrichmentQuestions);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 
@@ -738,7 +747,7 @@ public class UiController {
     if(rerankingSharedModelId!=null)rerankingProvider="cohere-compatible";
     var previous = providerSettings.effectiveEmbedding(crateId);var previousAnswer=providerSettings.effectiveAnswer(crateId);
     providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey,embeddingSharedModelId,rerankingSharedModelId,answeringSharedModelId));
-    if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||(("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(ragSettings.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))
+    if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||(("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())||ragSettings.current(crateId).isEnrichmentEnabled()||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(ragSettings.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))
       rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?providersSaved";
   }

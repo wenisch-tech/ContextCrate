@@ -29,6 +29,9 @@ public class RagSettings {
   @Column(name="context_window",nullable=false) private int contextWindow;
   /** After retrieval a model keeps only the sentences of each chunk that are relevant for the question. */
   @Column(name="context_compression_enabled",nullable=false) private boolean contextCompressionEnabled;
+  /** Document enrichment: the model writes questions per chunk; they are indexed and point back to the chunk. */
+  @Column(name="enrichment_enabled",nullable=false) private boolean enrichmentEnabled;
+  @Column(name="enrichment_questions",nullable=false) private int enrichmentQuestions=5;
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
   @Column(name="image_description_enabled",nullable=false) private boolean imageDescriptionEnabled;
@@ -52,6 +55,7 @@ public class RagSettings {
   public java.util.UUID getCrateId(){return crateId;}
   public boolean isQueryTransformationEnabled(){return queryTransformationEnabled;} public String getQueryTransformationStrategies(){return queryTransformationStrategies;}
   public String getContextHeaderVariant(){return contextHeaderVariant;} public int getContextHeaderWords(){return contextHeaderWords;} public void updateContextHeader(String variant,int words){this.contextHeaderVariant=variant;this.contextHeaderWords=words;}
+  public boolean isEnrichmentEnabled(){return enrichmentEnabled;} public int getEnrichmentQuestions(){return enrichmentQuestions;} public void updateEnrichment(boolean enabled,int questions){this.enrichmentEnabled=enabled;this.enrichmentQuestions=questions;}
   public boolean isContextCompressionEnabled(){return contextCompressionEnabled;} public void updateContextCompression(boolean enabled){this.contextCompressionEnabled=enabled;}
   public int getContextWindow(){return contextWindow;} public void updateContextWindow(int radius){this.contextWindow=radius;}
   public boolean isHydeEnabled(){return hydeEnabled;} public void updateHyde(boolean enabled){this.hydeEnabled=enabled;}

@@ -51,7 +51,7 @@ public class IndexRebuildService {
     var embedding=providers.effectiveEmbedding(crateId);
     var ragSettings=rag.current(crateId);var answer=providers.effectiveAnswer(crateId);
     var record=generations.save(new CrateIndexGeneration(crateId,generation,
-        fingerprint(embedding.toString()+":"+ragSettings.getRetrievalStrategy()+":"+ragSettings.getPropositionFailurePolicy()+(ContextHeaderService.enabled(ragSettings.getContextHeaderVariant())?":header:"+ragSettings.getContextHeaderVariant()+":"+ragSettings.getContextHeaderWords()+":"+answer.baseUrl()+":"+answer.model():"")+":"+("proposition".equals(ragSettings.getRetrievalStrategy())?answer.baseUrl()+":"+answer.model():"")),embedding.provider()+":"+embedding.localModelId()+":"+embedding.openaiModel(),
+        fingerprint(embedding.toString()+":"+ragSettings.getRetrievalStrategy()+":"+ragSettings.getPropositionFailurePolicy()+(ContextHeaderService.enabled(ragSettings.getContextHeaderVariant())?":header:"+ragSettings.getContextHeaderVariant()+":"+ragSettings.getContextHeaderWords()+":"+answer.baseUrl()+":"+answer.model():"")+(ragSettings.isEnrichmentEnabled()?":enrich:"+ragSettings.getEnrichmentQuestions()+":"+answer.baseUrl()+":"+answer.model():"")+":"+("proposition".equals(ragSettings.getRetrievalStrategy())?answer.baseUrl()+":"+answer.model():"")),embedding.provider()+":"+embedding.localModelId()+":"+embedding.openaiModel(),
         embedding.openaiDimensions()));
     long count=0;
     try(var ignored=CrateContext.use(crateId)){

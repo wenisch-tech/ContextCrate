@@ -41,4 +41,29 @@ class RetrievalPreparationServiceTest {
     verifyNoInteractions(headers);
   }
   private static class Fixture{final UUID crateId=UUID.randomUUID();final DocumentChunk chunk=new DocumentChunk(UUID.randomUUID(),UUID.randomUUID(),0,null,"Source chunk",Hashing.sha256("Source chunk"));final RagSettingsService settings=mock(RagSettingsService.class);final PropositionService propositions=mock(PropositionService.class);final RetrievalPreparationService service=new RetrievalPreparationService(settings,propositions);Fixture(String policy){chunk.assignCrate(crateId);when(settings.current(crateId)).thenReturn(new RagSettings(crateId,false,true,true,true,true,true,"revise-once","hybrid","proposition",policy,8));var evaluation=new PropositionEvaluation(UUID.randomUUID(),crateId,chunk.getId(),chunk.getContentHash(),"fingerprint","model","failed","offline");when(propositions.evaluate(chunk)).thenReturn(new PropositionService.Outcome(evaluation,List.of(),false));}}
+  @Test void enrichmentAddsOneQuestionRecordPerQuestionNextToTheChunkRecord(){
+    var crateId=UUID.randomUUID();var settings=mock(RagSettingsService.class);var questions=mock(QuestionGenerationService.class);
+    var rag=new RagSettings(crateId,false,true,true,true,true,true,"revise-once","hybrid","standard","fail-indexing",8);rag.updateEnrichment(true,3);
+    when(settings.current(crateId)).thenReturn(rag);
+    var chunk=new DocumentChunk(UUID.randomUUID(),UUID.randomUUID(),4,"Guide","Engineers hand the pager over on Monday.",Hashing.sha256("x"));chunk.assignCrate(crateId);
+    when(questions.questionsFor(crateId,List.of(chunk),3)).thenReturn(Map.of(chunk.getId(),List.of("When is the handover?","Who holds the pager?")));
+    var service=new RetrievalPreparationService(settings,mock(PropositionService.class));service.setQuestions(questions);
+
+    var records=service.prepare(crateId,List.of(chunk));
+
+    assertThat(records).hasSize(3);
+    assertThat(records.get(0).isQuestion()).isFalse();
+    assertThat(records.get(0).retrievalText()).isEqualTo(chunk.getContent());
+    assertThat(records.subList(1,3)).allSatisfy(r->{assertThat(r.isQuestion()).isTrue();assertThat(r.chunkId()).isEqualTo(chunk.getId());assertThat(r.recordId()).isNotEqualTo(chunk.getId());assertThat(r.sourceContent()).isEqualTo(chunk.getContent());assertThat(r.ordinal()).isEqualTo(4);});
+    assertThat(records.subList(1,3)).extracting(r->r.retrievalText()).containsExactly("When is the handover?","Who holds the pager?");
+    assertThat(records.stream().map(r->r.recordId()).distinct().count()).isEqualTo(3);
+  }
+  @Test void enrichmentOffNeverAsksForQuestions(){
+    var crateId=UUID.randomUUID();var settings=mock(RagSettingsService.class);var questions=mock(QuestionGenerationService.class);
+    when(settings.current(crateId)).thenReturn(new RagSettings(crateId,false,true,true,true,true,true,"revise-once","hybrid","standard","fail-indexing",8));
+    var chunk=new DocumentChunk(UUID.randomUUID(),UUID.randomUUID(),0,null,"Plain chunk",Hashing.sha256("Plain chunk"));chunk.assignCrate(crateId);
+    var service=new RetrievalPreparationService(settings,mock(PropositionService.class));service.setQuestions(questions);
+    assertThat(service.prepare(crateId,List.of(chunk))).singleElement();
+    verifyNoInteractions(questions);
+  }
 }

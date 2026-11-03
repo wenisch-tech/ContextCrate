@@ -342,6 +342,7 @@ public class CratePortableService {
     rag.update(crateId,r.path("strictGrounding").asBoolean(),r.path("allowClientHistory").asBoolean(),r.path("inlineCitations").asBoolean(),r.path("structuredSources").asBoolean(),!r.has("gradingEnabled")||r.path("gradingEnabled").asBoolean(),!r.has("answerVerificationEnabled")||r.path("answerVerificationEnabled").asBoolean(),textOr(r,"answerVerificationFailureAction","revise-once"),text(r,"retrievalMode"),textOr(r,"retrievalStrategy","standard"),textOr(r,"propositionFailurePolicy","fail-indexing"),r.path("sourceLimit").asInt());
     rag.updateHyde(crateId,r.path("hydeEnabled").asBoolean(false));
     rag.updateContextWindow(crateId,r.path("contextWindow").asInt(0));
+    rag.updateEnrichment(crateId,r.path("enrichmentEnabled").asBoolean(false),r.path("enrichmentQuestions").asInt(RagSettingsService.DEFAULT_ENRICHMENT_QUESTIONS));
     rag.updateContextCompression(crateId,r.path("contextCompression").asBoolean(r.path("contextCompressionEnabled").asBoolean(false)));
     rag.updateContextHeader(crateId,textOr(r,"contextHeaderVariant","off"),r.path("contextHeaderWords").asInt(1000));
     rag.updateQueryTransformation(crateId,r.path("queryTransformationEnabled").asBoolean(false),java.util.List.of(textOr(r,"queryTransformationStrategies","auto")));

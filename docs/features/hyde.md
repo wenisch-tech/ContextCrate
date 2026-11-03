@@ -166,3 +166,7 @@ retrieval returns fewer irrelevant chunks.
 | Many `skipped` with `answer-model-unavailable` or `embeddings-unavailable` | No answer model or embedding provider is configured and enabled for the crate | Configure one under the provider settings |
 | Answers got slower | The extra call runs before retrieval | Use a faster model, or turn HyDE off for latency-sensitive crates |
 | Exact identifiers are found worse | The vector leg drifts to the guess | Keep hybrid mode, so the keyword leg still matches exact terms |
+
+## The mirror image: document enrichment
+
+HyDE turns the question into a document at question time. [Document enrichment](document-enrichment.md) solves the same mismatch in the opposite direction, once at indexing time: the model writes the questions each chunk answers and those are indexed next to the chunk. HyDE needs no re-indexing; enrichment adds no model call per question. Both can be on at the same time.

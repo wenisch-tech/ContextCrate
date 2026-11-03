@@ -36,6 +36,11 @@ public class RagSettingsService {
     var value=current(crateId);value.updateContextHeader(normalized,words);return settings.save(value);
   }
   /** Chunks before and after a matched chunk (0 = off); takes effect on the next question, no rebuild. */
+  public static final int MIN_ENRICHMENT_QUESTIONS=3,MAX_ENRICHMENT_QUESTIONS=50,DEFAULT_ENRICHMENT_QUESTIONS=5;
+  @Transactional public RagSettings updateEnrichment(java.util.UUID crateId,boolean enabled,int questions){
+    if(questions<MIN_ENRICHMENT_QUESTIONS||questions>MAX_ENRICHMENT_QUESTIONS)throw new IllegalArgumentException("enrichment questions must be between "+MIN_ENRICHMENT_QUESTIONS+" and "+MAX_ENRICHMENT_QUESTIONS);
+    var value=current(crateId);value.updateEnrichment(enabled,questions);return settings.save(value);
+  }
   @Transactional public RagSettings updateContextCompression(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateContextCompression(enabled);return settings.save(value);}
   @Transactional public RagSettings updateContextWindow(java.util.UUID crateId,int radius){
     if(radius<0||radius>ContextWindowService.MAX_RADIUS)throw new IllegalArgumentException("context window must be between 0 and "+ContextWindowService.MAX_RADIUS);
