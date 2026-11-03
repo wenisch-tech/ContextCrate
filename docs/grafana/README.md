@@ -25,6 +25,7 @@ The dashboard is grouped by topic, one row per topic, ordered from overview to d
 | HyDE | Calls per answer, failure rate, hypothetical answer length, generation time and outcomes |
 | Answer timing | Stacked breakdown of where answer time goes, p50/p95 per phase |
 | Context window | Neighbour chunks added per answer, windows per answer and fallbacks |
+| Context compression | Share of the context kept, characters saved, discarded chunks, failures and compression time |
 | Semantic chunking | Sentences and breakpoints per document, average threshold, fallbacks by reason |
 | RAG evaluation | Faithfulness, answer relevance, completeness, Precision/Recall@K, MRR, MAP, NDCG, outcomes and judge latency |
 | Ingestion & pipeline | Queue depth, throughput, stage duration, retries, ingestion runs, contextual header outcomes and timing |

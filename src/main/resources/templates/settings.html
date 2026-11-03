@@ -17,6 +17,7 @@
       <a href="#query-transformation" :class="{'active':active==='query-transformation'}">Query transformation</a>
       <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
       <a href="#context-window" :class="{'active':active==='context-window'}">Context window</a>
+      <a href="#context-compression" :class="{'active':active==='context-compression'}">Context compression</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
       <a href="#quality" :class="{'active':active==='quality'}">Answer quality</a>
       <p class="settings-nav__group">Model providers</p>
@@ -77,6 +78,11 @@
         <section id="context-window" class="panel scroll-mt-24">
           <div class="panel-header"><div><h2 class="settings-title">Context window</h2><p class="settings-hint">Every chunk found by the search is expanded with the chunks before and after it in its document, so the answer model reads the whole passage instead of a fragment. The chunks are joined in document order and the overlap of the chunking is removed.</p></div></div>
           <div class="panel-body"><div class="field"><label class="field-label" for="context-window-size">Chunks before and after each match</label><input class="input" id="context-window-size" type="number" name="contextWindow" min="0" max="5" step="1" th:value="${rag.contextWindow}"><p class="field-help">0 turns it off. With 1 a match at index 7 is sent together with the chunks at index 6 and 8 (a window of three). Windows of neighbouring matches are merged. Applies to answers only, not to search results, and takes effect immediately without a rebuild. A window makes the answer context larger: raise the answering context budget if sources are cut off.</p></div></div>
+        </section>
+
+        <section id="context-compression" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Context compression</h2><p class="settings-hint">After retrieval, a model reads every retrieved chunk together with the question and keeps only the sentences that matter for the question. Chunks without a relevant sentence are dropped, and sentences that appear twice are removed. The answer model then receives the shorter, denser context.</p></div><label class="switch-labelled" for="context-compression-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="context-compression-enabled" name="contextCompression" th:checked="${rag.contextCompressionEnabled}"><span></span></span></label></div>
+          <div class="panel-body"><p class="field-help">Best for large chunks, questions about specific details, and models with a small context window. It costs one extra model call per retrieved chunk (run in parallel) and adds latency to every answer. The model only selects existing sentences, so the text stays verbatim. Code chunks are kept as they are. If a call fails, that chunk is used unchanged. Needs the answer model, applies to answers only and takes effect immediately without a rebuild. With the context window, the window is built first and then compressed.</p></div>
         </section>
 
         <section id="hyde" class="panel scroll-mt-24">

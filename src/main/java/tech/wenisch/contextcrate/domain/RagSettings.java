@@ -27,6 +27,8 @@ public class RagSettings {
   @Column(name="context_header_words",nullable=false) private int contextHeaderWords=1000;
   /** Chunks before and after a matched chunk that are added to the answer context; 0 = off. */
   @Column(name="context_window",nullable=false) private int contextWindow;
+  /** After retrieval a model keeps only the sentences of each chunk that are relevant for the question. */
+  @Column(name="context_compression_enabled",nullable=false) private boolean contextCompressionEnabled;
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
   @Column(name="image_description_enabled",nullable=false) private boolean imageDescriptionEnabled;
@@ -50,6 +52,7 @@ public class RagSettings {
   public java.util.UUID getCrateId(){return crateId;}
   public boolean isQueryTransformationEnabled(){return queryTransformationEnabled;} public String getQueryTransformationStrategies(){return queryTransformationStrategies;}
   public String getContextHeaderVariant(){return contextHeaderVariant;} public int getContextHeaderWords(){return contextHeaderWords;} public void updateContextHeader(String variant,int words){this.contextHeaderVariant=variant;this.contextHeaderWords=words;}
+  public boolean isContextCompressionEnabled(){return contextCompressionEnabled;} public void updateContextCompression(boolean enabled){this.contextCompressionEnabled=enabled;}
   public int getContextWindow(){return contextWindow;} public void updateContextWindow(int radius){this.contextWindow=radius;}
   public boolean isHydeEnabled(){return hydeEnabled;} public void updateHyde(boolean enabled){this.hydeEnabled=enabled;}
   public void updateQueryTransformation(boolean enabled,String strategies){this.queryTransformationEnabled=enabled;this.queryTransformationStrategies=strategies;}

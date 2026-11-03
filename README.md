@@ -57,6 +57,7 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 | Option | What it does |
 |---|---|
 | [Context window](docs/features/context-window.md) | Adds the neighbouring chunks of each match (configurable 0 to 5) and restores the original text without overlap. |
+| [Contextual compression](docs/features/contextual-compression.md) | A model keeps only the sentences of each theyretrieved chunk that are relevant for the question, dropping tangents, transitions and duplicates to save tokens. |
 | [Grading](docs/features/grading.md) | Judges retrieved chunks for relevance and drops the noise before the model sees it. |
 | [Answer verification](docs/features/answer-verification.md) | Checks the answer against its sources and revises, blocks or warns about unsupported claims. |
 | Grounded, cited answers | Streaming answers with stable sources and inline citations, also via an OpenAI-compatible endpoint and MCP. |

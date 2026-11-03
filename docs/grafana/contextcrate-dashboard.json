@@ -5845,6 +5845,335 @@
     },
     {
       "type": "row",
+      "title": "🗜️ Context compression (Crate selector)",
+      "id": 241,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 246
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Context kept (1h)",
+      "id": 242,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Share of the retrieved characters that reached the answer model after compression (lower = more compressed)",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_compression_kept_ratio_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_compression_kept_ratio_count{crate=~\"$crate\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Characters saved per answer (1h)",
+      "id": 243,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Average characters removed from the answer context per answer",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_compression_characters_saved_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_compression_characters_saved_count{crate=~\"$crate\"}[1h])), 1)",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Chunks discarded (1h)",
+      "id": 244,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Retrieved chunks without any relevant sentence, plus chunks that only repeated earlier sentences",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_compression_chunks_total{crate=~\"$crate\",outcome=~\"discarded|duplicate\"}[1h]))",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Compression failures (1h)",
+      "id": 245,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Chunks that were used unchanged because the model call failed or its reply was unusable",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 247
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(increase(contextcrate_answer_compression_chunks_total{crate=~\"$crate\",outcome=\"failed\"}[1h]))",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Chunk outcomes",
+      "id": 246,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "What happened to the retrieved chunks",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 251
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (outcome) (increase(contextcrate_answer_compression_chunks_total{crate=~\"$crate\"}[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Compression time per answer",
+      "id": 247,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "p50 and p95 of the time spent compressing the retrieved chunks",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 251
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(contextcrate_answer_compression_duration_seconds_bucket{crate=~\"$crate\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(contextcrate_answer_compression_duration_seconds_bucket{crate=~\"$crate\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
       "title": "✂️ Semantic chunking (Crate selector)",
       "id": 234,
       "collapsed": false,
@@ -5852,7 +6181,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 246
+        "y": 258
       },
       "panels": []
     },
@@ -5869,7 +6198,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -5924,7 +6253,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -5979,7 +6308,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -6034,7 +6363,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 247
+        "y": 259
       },
       "targets": [
         {
@@ -6089,7 +6418,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 251
+        "y": 263
       },
       "targets": [
         {
@@ -6142,7 +6471,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 251
+        "y": 263
       },
       "targets": [
         {
@@ -6181,7 +6510,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 258
+        "y": 270
       },
       "panels": []
     },
@@ -6198,7 +6527,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 259
+        "y": 271
       },
       "targets": [
         {
@@ -6257,7 +6586,7 @@
         "h": 8,
         "w": 10,
         "x": 4,
-        "y": 259
+        "y": 271
       },
       "targets": [
         {
@@ -6310,7 +6639,7 @@
         "h": 8,
         "w": 10,
         "x": 14,
-        "y": 259
+        "y": 271
       },
       "targets": [
         {
@@ -6373,7 +6702,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 267
+        "y": 279
       },
       "targets": [
         {
@@ -6436,7 +6765,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 267
+        "y": 279
       },
       "targets": [
         {
@@ -6489,7 +6818,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 275
+        "y": 287
       },
       "targets": [
         {
@@ -6552,7 +6881,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 275
+        "y": 287
       },
       "targets": [
         {
@@ -6615,7 +6944,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 275
+        "y": 287
       },
       "targets": [
         {
@@ -6678,7 +7007,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 283
+        "y": 295
       },
       "targets": [
         {
@@ -6731,7 +7060,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 283
+        "y": 295
       },
       "targets": [
         {
@@ -6794,7 +7123,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 283
+        "y": 295
       },
       "targets": [
         {
@@ -6847,7 +7176,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 290
+        "y": 302
       },
       "targets": [
         {
@@ -6900,7 +7229,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 297
+        "y": 309
       },
       "targets": [
         {
@@ -6963,7 +7292,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 304
+        "y": 316
       },
       "targets": [
         {
@@ -7016,7 +7345,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 304
+        "y": 316
       },
       "targets": [
         {
@@ -7079,7 +7408,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 304
+        "y": 316
       },
       "targets": [
         {
@@ -7128,7 +7457,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 311
+        "y": 323
       },
       "panels": []
     },
@@ -7145,7 +7474,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 312
+        "y": 324
       },
       "targets": [
         {
@@ -7198,7 +7527,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 312
+        "y": 324
       },
       "targets": [
         {
@@ -7251,7 +7580,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 312
+        "y": 324
       },
       "targets": [
         {
@@ -7300,7 +7629,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 320
+        "y": 332
       },
       "panels": []
     },
@@ -7317,7 +7646,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 321
+        "y": 333
       },
       "targets": [
         {
@@ -7396,7 +7725,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 321
+        "y": 333
       },
       "targets": [
         {
@@ -7475,7 +7804,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 330
+        "y": 342
       },
       "targets": [
         {
@@ -7553,7 +7882,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 330
+        "y": 342
       },
       "targets": [
         {
@@ -7602,7 +7931,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 339
+        "y": 351
       },
       "panels": [
         {
@@ -7618,7 +7947,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 279
+            "y": 291
           },
           "targets": [
             {
@@ -7671,7 +8000,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 279
+            "y": 291
           },
           "targets": [
             {
@@ -7724,7 +8053,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 279
+            "y": 291
           },
           "targets": [
             {

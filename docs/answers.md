@@ -74,4 +74,4 @@ For Kubernetes, configure `answering.enabled`, `answering.openaiCompatible.baseU
 
 ## See also
 
-- [Using ContextCrate](usage.md#features) lists all features. See also [Retrieval](features/retrieval.md), [Grading](features/grading.md) and [Answer verification](features/answer-verification.md).
+- [Using ContextCrate](usage.md#features) lists all features. See also [Retrieval](features/retrieval.md), [Contextual compression](features/contextual-compression.md), [Grading](features/grading.md) and [Answer verification](features/answer-verification.md).

@@ -124,7 +124,7 @@ sentence is embedded, and the text is split where the distance between neighbour
 threshold (percentile, standard deviation or interquartile range). Headings and code stay boundaries and
 the chunk size remains the upper bound. See [Semantic chunking](semantic-chunking.md).
 
-
+## Contextual headers
 
 Chunking decides where a document is cut; it cannot restore what a chunk lost by being cut. With
 **contextual chunk headers** (a crate setting, off by default) the answer model writes a title for

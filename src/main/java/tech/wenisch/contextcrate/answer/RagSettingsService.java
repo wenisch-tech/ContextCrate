@@ -36,6 +36,7 @@ public class RagSettingsService {
     var value=current(crateId);value.updateContextHeader(normalized,words);return settings.save(value);
   }
   /** Chunks before and after a matched chunk (0 = off); takes effect on the next question, no rebuild. */
+  @Transactional public RagSettings updateContextCompression(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateContextCompression(enabled);return settings.save(value);}
   @Transactional public RagSettings updateContextWindow(java.util.UUID crateId,int radius){
     if(radius<0||radius>ContextWindowService.MAX_RADIUS)throw new IllegalArgumentException("context window must be between 0 and "+ContextWindowService.MAX_RADIUS);
     var value=current(crateId);value.updateContextWindow(radius);return settings.save(value);

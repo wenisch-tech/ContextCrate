@@ -40,7 +40,8 @@ The features are listed in the order content flows through the system.
 | **Embeddings** | Local or remote models that create the vectors for semantic search. | [Embeddings](embeddings.md) |
 | **Retrieval** | Standard and proposition retrieval, lexical, semantic or hybrid. | [Retrieval](features/retrieval.md) |
 | **Semantic chunking** | Optional per ingestion job: cuts text where the topic changes, based on sentence embeddings, instead of by size. | [Semantic chunking](features/semantic-chunking.md) |
- Adds the chunks before and after each matched chunk to the answer context, without the chunk overlap. | [Context window](features/context-window.md) |
+| **Contextual compression** | A model keeps only the sentences of each retrieved chunk that matter for the question and drops the rest, to save tokens. | [Contextual compression](features/contextual-compression.md) |
+| **Context window** | Adds the chunks before and after each matched chunk to the answer context, without the chunk overlap. | [Context window](features/context-window.md) |
 | **Reranking** | Optional cross-encoder that reorders the best candidates. | [Reranking](reranking.md) |
 | **Query transformation** | Rewrites vague, specific or multi-part questions before searching. | [Query transformation](features/query-transformation.md) |
 | **HyDE** | Searches with an embedded hypothetical answer instead of the question. | [HyDE](features/hyde.md) |

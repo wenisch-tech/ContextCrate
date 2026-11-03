@@ -26,6 +26,7 @@ public class AnswerService {
   private QueryTransformationService transformation;
   private HydeService hyde;
   private ContextWindowService contextWindow;
+  private ContextCompressionService compression;
   private tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation;
   private tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings;
   private CrateMetrics metrics = CrateMetrics.noop();
@@ -38,6 +39,8 @@ public class AnswerService {
   public void setHyde(HydeService hyde) { this.hyde=hyde; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setContextWindow(ContextWindowService contextWindow) { this.contextWindow=contextWindow; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setCompression(ContextCompressionService compression) { this.compression=compression; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setEvaluation(tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation) { this.evaluation=evaluation; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -72,6 +75,8 @@ public class AnswerService {
     if(policy.isGradingEnabled()){int before=candidates.size();candidates=grade(request.crateId(),request.question(),candidates);if(before>0)metrics.summary("answer.grading.kept_ratio",request.crateId(),(double)candidates.size()/before);}
     // Context window: each matched chunk is replaced by its chunk plus the neighbours before and after it (query time only).
     if(policy.getContextWindow()>0&&contextWindow!=null&&!candidates.isEmpty())candidates=withContextWindow(request.crateId(),candidates,policy.getContextWindow());
+    // Contextual compression: a model keeps only the sentences of each chunk that matter for the question; irrelevant chunks are dropped.
+    if(policy.isContextCompressionEnabled()&&compression!=null&&!candidates.isEmpty())candidates=compression.compress(request.crateId(),request.question(),candidates);
     List<Source> sources=new ArrayList<>();int remaining=config.contextTokenBudget()*4;
     for(var candidate:candidates) { if(remaining<=0)break;String content=candidate.content();content=content.length()>remaining?content.substring(0,remaining):content;remaining-=content.length();sources.add(new Source(sources.size()+1,candidate.chunkId(),candidate.documentId(),candidate.runId(),candidate.title(),candidate.sourceUri(),candidate.chunkOrdinal(),candidate.snippet(),candidate.score(),content)); }
     metrics.summary("answer.sources",request.crateId(),sources.size());

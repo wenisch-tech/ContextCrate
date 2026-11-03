@@ -693,6 +693,7 @@ public class UiController {
       @RequestParam(required = false) java.util.List<String> queryTransformationStrategies,
       @RequestParam(defaultValue = "false") boolean hydeEnabled,
       @RequestParam(defaultValue = "0") int contextWindow,
+      @RequestParam(defaultValue = "false") boolean contextCompression,
       @RequestParam(defaultValue = "off") String contextHeaderVariant,
       @RequestParam(defaultValue = "1000") int contextHeaderWords,
       @RequestParam(defaultValue = "false") boolean imageIndexingEnabled,
@@ -703,7 +704,7 @@ public class UiController {
       @RequestParam(defaultValue = "64") int imageMinSize,
       @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
+    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextCompression(crateId,contextCompression);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 
