@@ -137,22 +137,28 @@ The first authenticated user owns the automatically migrated Legacy crate. New u
 
 ## Documentation
 
-- [Installation overview](docs/installation/README.md)
-- [Docker installation](docs/installation/docker.md)
-- [Docker Compose installation](docs/installation/compose.md)
-- [Kubernetes installation](docs/installation/kubernetes.md)
-- [JAR installation](docs/installation/jar.md)
-- [Crates and lifecycle](docs/crates.md)
-- [Authorization](docs/authorization.md)
-- [Architecture](docs/architecture.md)
-- [Search backends: Lucene, OpenSearch, Qdrant](docs/search-backends.md)
-- [Configuration](docs/configuration.md)
-- [REST API](docs/api.md)
-- [OpenAI-compatible API](docs/integrations/openai.md)
-- [Operations](docs/operations.md)
-- [Export and import](docs/backup-migration.md)
-- [Upgrade from Harvex](docs/upgrade-from-harvex.md)
-- [Chunking](docs/features/chunking.md) and the other [feature guides](#rag-toolbox)
-- [Tutorials](docs/tutorials.md)
+The full documentation is available at **[contextcrate.eu/docs](https://contextcrate.eu/docs/)**.
+
+**Get started**
+- [Installation overview](https://contextcrate.eu/docs/installation/) · [Docker](https://contextcrate.eu/docs/installation/docker/) · [Docker Compose](https://contextcrate.eu/docs/installation/compose/) · [Kubernetes](https://contextcrate.eu/docs/installation/kubernetes/) · [JAR](https://contextcrate.eu/docs/installation/jar/)
+- [Using ContextCrate](https://contextcrate.eu/docs/usage/) and [Tutorials](https://contextcrate.eu/docs/tutorials/)
+
+**Concepts and architecture**
+- [Architecture](https://contextcrate.eu/docs/architecture/) · [Crates and lifecycle](https://contextcrate.eu/docs/crates/) · [Pipeline](https://contextcrate.eu/docs/pipeline/) · [Authorization](https://contextcrate.eu/docs/authorization/)
+- [Search backends: Lucene, OpenSearch, Qdrant](https://contextcrate.eu/docs/search-backends/)
+
+**RAG features**
+- Chunking and indexing: [Parsing](https://contextcrate.eu/docs/features/parsing/) · [Chunking](https://contextcrate.eu/docs/features/chunking/) · [Semantic chunking](https://contextcrate.eu/docs/features/semantic-chunking/) · [Contextual headers](https://contextcrate.eu/docs/features/contextual-headers/) · [Document enrichment](https://contextcrate.eu/docs/features/document-enrichment/) · [Images](https://contextcrate.eu/docs/features/images/) · [Embeddings](https://contextcrate.eu/docs/embeddings/)
+- Retrieval: [Retrieval](https://contextcrate.eu/docs/features/retrieval/) · [Query transformation](https://contextcrate.eu/docs/features/query-transformation/) · [HyDE](https://contextcrate.eu/docs/features/hyde/) · [Reranking](https://contextcrate.eu/docs/reranking/)
+- Answer generation: [Answers](https://contextcrate.eu/docs/answers/) · [Context window](https://contextcrate.eu/docs/features/context-window/) · [Contextual compression](https://contextcrate.eu/docs/features/contextual-compression/) · [Grading](https://contextcrate.eu/docs/features/grading/) · [Answer verification](https://contextcrate.eu/docs/features/answer-verification/)
+- Evaluation: [RAG evaluation](https://contextcrate.eu/docs/features/evaluation/)
+
+**Integrations and API**
+- [REST API](https://contextcrate.eu/docs/api/) · [OpenAI-compatible API](https://contextcrate.eu/docs/integrations/openai/) · [MCP](https://contextcrate.eu/docs/integrations/mcp/)
+
+**Operate**
+- [Configuration](https://contextcrate.eu/docs/configuration/) · [Security](https://contextcrate.eu/docs/security/) · [Operations and metrics](https://contextcrate.eu/docs/operations/) · [Grafana dashboard](https://contextcrate.eu/docs/grafana/) · [Export and import](https://contextcrate.eu/docs/backup-migration/) · [Troubleshooting](https://contextcrate.eu/docs/troubleshooting/) · [Upgrade from Harvex](https://contextcrate.eu/docs/upgrade-from-harvex/)
+
+The same pages live in the [`docs/`](docs/) folder of this repository.
 
 ContextCrate is licensed under AGPL-3.0.
