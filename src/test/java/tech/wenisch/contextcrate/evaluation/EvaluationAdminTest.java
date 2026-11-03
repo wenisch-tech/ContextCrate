@@ -201,4 +201,14 @@ class EvaluationAdminTest {
     assertThat(rows.getFirst().faithfulness()).isEqualTo(1.0);
     assertThat(rows.getFirst().text().question()).isEqualTo("secret question");
   }
+
+  @Test
+  void theApiJsonCarriesPlainDataNotJacksonTreeNodes() throws Exception {
+    var logged = done(EvaluationCase.Source.LIVE, 1.0, 1.0);
+    String json = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(EvaluationAdminService.view(logged, true));
+
+    // The web layer uses a different Jackson version than the internals; a tree node would be serialised as a bean.
+    assertThat(json).doesNotContain("nodeType").doesNotContain("containerNode");
+    assertThat(json).contains("\"details\":{\"x\":1}").contains("secret question");
+  }
 }

@@ -3829,7 +3829,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_llm_duration_seconds_sum{crate=~\\\"$crate\\\",purpose=\\\"hyde\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_answer_requests_total{crate=~\\\"$crate\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_llm_duration_seconds_sum{crate=~\"$crate\",purpose=\"hyde\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_answer_requests_total{crate=~\"$crate\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "HyDE hypothetical answer",
           "refId": "F",
           "format": "time_series"
@@ -4263,7 +4263,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\",outcome=\\\"ok\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_requests_total{crate=~\\\"$crate\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_answer_hyde_total{crate=~\"$crate\",outcome=\"ok\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_requests_total{crate=~\"$crate\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4318,7 +4318,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\",outcome=\\\"failed\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\",outcome=~\\\"ok|failed\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_answer_hyde_total{crate=~\"$crate\",outcome=\"failed\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_total{crate=~\"$crate\",outcome=~\"ok|failed\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4373,7 +4373,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_answer_hyde_length_sum{crate=~\\\"$crate\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_length_count{crate=~\\\"$crate\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_answer_hyde_length_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_length_count{crate=~\"$crate\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4428,7 +4428,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_answer_hyde_duration_seconds_sum{crate=~\\\"$crate\\\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_duration_seconds_count{crate=~\\\"$crate\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_answer_hyde_duration_seconds_sum{crate=~\"$crate\"}[1h])) / clamp_min(sum(increase(contextcrate_answer_hyde_duration_seconds_count{crate=~\"$crate\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4483,7 +4483,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (outcome,reason) (increase(contextcrate_answer_hyde_total{crate=~\\\"$crate\\\"}[$__rate_interval]))",
+          "expr": "sum by (outcome,reason) (increase(contextcrate_answer_hyde_total{crate=~\"$crate\"}[$__rate_interval]))",
           "legendFormat": "{{outcome}} ({{reason}})",
           "refId": "A",
           "format": "time_series"
@@ -4536,7 +4536,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_answer_hyde_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_answer_hyde_duration_seconds_bucket{crate=~\"$crate\"}[$__rate_interval])))",
           "legendFormat": "p50 {{crate}}",
           "refId": "A",
           "format": "time_series"
@@ -4546,7 +4546,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_answer_hyde_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_answer_hyde_duration_seconds_bucket{crate=~\"$crate\"}[$__rate_interval])))",
           "legendFormat": "p95 {{crate}}",
           "refId": "B",
           "format": "time_series"
@@ -4612,7 +4612,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_faithfulness_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_faithfulness_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_faithfulness_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_faithfulness_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4668,7 +4668,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_answer_relevance_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_answer_relevance_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_answer_relevance_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_answer_relevance_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4724,7 +4724,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_completeness_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_completeness_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_completeness_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_completeness_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4780,7 +4780,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_cases_total{crate=~\\\"$crate\\\",outcome=\\\"done\\\",source=\\\"live\\\"}[1h]))",
+          "expr": "sum(increase(contextcrate_evaluation_cases_total{crate=~\"$crate\",outcome=\"done\",source=\"live\"}[1h]))",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4836,7 +4836,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_context_precision_at_k_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_precision_at_k_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_context_precision_at_k_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_precision_at_k_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4892,7 +4892,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_context_recall_at_k_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_recall_at_k_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_context_recall_at_k_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_recall_at_k_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -4948,7 +4948,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_context_mrr_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_mrr_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_context_mrr_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_mrr_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -5004,7 +5004,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_context_map_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_map_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_context_map_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_map_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -5060,7 +5060,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_context_ndcg_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_ndcg_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_context_ndcg_sum{crate=~\"$crate\",source=\"live\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_context_ndcg_count{crate=~\"$crate\",source=\"live\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -5116,7 +5116,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(contextcrate_evaluation_reference_recall_sum{crate=~\\\"$crate\\\",source=\\\"golden\\\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_reference_recall_count{crate=~\\\"$crate\\\",source=\\\"golden\\\"}[1h])), 1)",
+          "expr": "sum(increase(contextcrate_evaluation_reference_recall_sum{crate=~\"$crate\",source=\"golden\"}[1h])) / clamp_min(sum(increase(contextcrate_evaluation_reference_recall_count{crate=~\"$crate\",source=\"golden\"}[1h])), 1)",
           "legendFormat": "",
           "refId": "A",
           "format": "time_series"
@@ -5172,7 +5172,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_context_precision_at_k_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_precision_at_k_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_context_precision_at_k_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_precision_at_k_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "Precision@K",
           "refId": "A",
           "format": "time_series"
@@ -5182,7 +5182,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_context_recall_at_k_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_recall_at_k_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_context_recall_at_k_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_recall_at_k_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "Recall@K",
           "refId": "B",
           "format": "time_series"
@@ -5192,7 +5192,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_context_mrr_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_mrr_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_context_mrr_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_mrr_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "MRR",
           "refId": "C",
           "format": "time_series"
@@ -5202,7 +5202,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_context_map_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_map_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_context_map_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_map_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "MAP",
           "refId": "D",
           "format": "time_series"
@@ -5212,7 +5212,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_context_ndcg_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_ndcg_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_context_ndcg_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_context_ndcg_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "NDCG",
           "refId": "E",
           "format": "time_series"
@@ -5265,7 +5265,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_faithfulness_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_faithfulness_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_faithfulness_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_faithfulness_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "Faithfulness",
           "refId": "A",
           "format": "time_series"
@@ -5275,7 +5275,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_answer_relevance_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_answer_relevance_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_answer_relevance_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_answer_relevance_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "Answer relevance",
           "refId": "B",
           "format": "time_series"
@@ -5285,7 +5285,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_evaluation_completeness_sum{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_completeness_count{crate=~\\\"$crate\\\",source=\\\"live\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_evaluation_completeness_sum{crate=~\"$crate\",source=\"live\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_evaluation_completeness_count{crate=~\"$crate\",source=\"live\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "Completeness",
           "refId": "C",
           "format": "time_series"
@@ -5338,7 +5338,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (outcome,source) (increase(contextcrate_evaluation_cases_total{crate=~\\\"$crate\\\"}[$__rate_interval]))",
+          "expr": "sum by (outcome,source) (increase(contextcrate_evaluation_cases_total{crate=~\"$crate\"}[$__rate_interval]))",
           "legendFormat": "{{outcome}} {{source}}",
           "refId": "A",
           "format": "time_series"
@@ -5391,7 +5391,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_evaluation_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_evaluation_duration_seconds_bucket{crate=~\"$crate\"}[$__rate_interval])))",
           "legendFormat": "p50 {{crate}}",
           "refId": "A",
           "format": "time_series"
@@ -5401,7 +5401,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_evaluation_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_evaluation_duration_seconds_bucket{crate=~\"$crate\"}[$__rate_interval])))",
           "legendFormat": "p95 {{crate}}",
           "refId": "B",
           "format": "time_series"
@@ -5454,7 +5454,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_llm_duration_seconds_bucket{crate=~\\\"$crate\\\",purpose=\\\"judge\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_llm_duration_seconds_bucket{crate=~\"$crate\",purpose=\"judge\"}[$__rate_interval])))",
           "legendFormat": "p50 {{crate}}",
           "refId": "A",
           "format": "time_series"
@@ -5464,7 +5464,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_llm_duration_seconds_bucket{crate=~\\\"$crate\\\",purpose=\\\"judge\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_llm_duration_seconds_bucket{crate=~\"$crate\",purpose=\"judge\"}[$__rate_interval])))",
           "legendFormat": "p95 {{crate}}",
           "refId": "B",
           "format": "time_series"
@@ -5517,7 +5517,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (dimension) (increase(contextcrate_evaluation_judge_failures_total{crate=~\\\"$crate\\\"}[$__rate_interval]))",
+          "expr": "sum by (dimension) (increase(contextcrate_evaluation_judge_failures_total{crate=~\"$crate\"}[$__rate_interval]))",
           "legendFormat": "{{dimension}}",
           "refId": "A",
           "format": "time_series"
@@ -6348,7 +6348,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (variant,outcome) (increase(contextcrate_ingestion_context_header_total{crate=~\\\"$crate\\\"}[$__rate_interval]))",
+          "expr": "sum by (variant,outcome) (increase(contextcrate_ingestion_context_header_total{crate=~\"$crate\"}[$__rate_interval]))",
           "legendFormat": "{{variant}} {{outcome}}",
           "refId": "A",
           "format": "time_series"
@@ -6401,7 +6401,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_ingestion_context_header_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le,crate) (rate(contextcrate_ingestion_context_header_duration_seconds_bucket{crate=~\"$crate\"}[$__rate_interval])))",
           "legendFormat": "p50 {{crate}}",
           "refId": "A",
           "format": "time_series"
@@ -6411,7 +6411,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_ingestion_context_header_duration_seconds_bucket{crate=~\\\"$crate\\\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le,crate) (rate(contextcrate_ingestion_context_header_duration_seconds_bucket{crate=~\"$crate\"}[$__rate_interval])))",
           "legendFormat": "p95 {{crate}}",
           "refId": "B",
           "format": "time_series"
@@ -6464,7 +6464,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(contextcrate_ingestion_context_header_length_sum{crate=~\\\"$crate\\\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_ingestion_context_header_length_count{crate=~\\\"$crate\\\"}[$__rate_interval])), 1e-9)",
+          "expr": "sum(rate(contextcrate_ingestion_context_header_length_sum{crate=~\"$crate\"}[$__rate_interval])) / clamp_min(sum(rate(contextcrate_ingestion_context_header_length_count{crate=~\"$crate\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "avg characters",
           "refId": "A",
           "format": "time_series"

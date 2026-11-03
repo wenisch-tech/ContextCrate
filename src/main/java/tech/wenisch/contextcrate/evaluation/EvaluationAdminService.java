@@ -43,7 +43,7 @@ public class EvaluationAdminService {
       String judgeModel, String error, TextView text) {}
 
   /** Only present while the case still carries its text (per-question logging) and the viewer may see it. */
-  public record TextView(String question, String answer, JsonNode snapshot, JsonNode details) {}
+  public record TextView(String question, String answer, Map<String, Object> snapshot, Map<String, Object> details, String detailsText) {}
 
   public record GoldenView(UUID id, String question, String referenceAnswer, List<String> relevantUris, Instant createdAt) {}
 
@@ -93,15 +93,22 @@ public class EvaluationAdminService {
 
   static CaseView view(EvaluationCase c, boolean includeText) {
     TextView text = null;
-    if (includeText && c.hasText()) text = new TextView(c.getQuestion(), c.getAnswer(), json(c.getSnapshotJson()), json(c.getDetailsJson()));
+    if (includeText && c.hasText()) text = new TextView(c.getQuestion(), c.getAnswer(), map(c.getSnapshotJson()), map(c.getDetailsJson()), pretty(c.getDetailsJson()));
     return new CaseView(c.getId(), c.getCreatedAt(), c.getSource().name(), c.getStatus().name(), c.getK(), c.getPrecisionAtK(),
         c.getRecallAtK(), c.getMrr(), c.getAveragePrecision(), c.getNdcg(), c.getFaithfulness(), c.getStatementsTotal(),
         c.getStatementsSupported(), c.getAnswerRelevance(), c.getCompleteness(), c.getReferenceRecall(), c.getJudgeModel(), c.getError(), text);
   }
 
-  private static JsonNode json(String value) {
+  /** Plain maps, not Jackson tree nodes: the web layer serialises with its own Jackson version. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> map(String value) {
     if (value == null || value.isBlank()) return null;
-    try { return MAPPER.readTree(value); } catch (Exception e) { return null; }
+    try { return MAPPER.readValue(value, Map.class); } catch (Exception e) { return null; }
+  }
+
+  private static String pretty(String value) {
+    if (value == null || value.isBlank()) return null;
+    try { return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(MAPPER.readTree(value)); } catch (Exception e) { return null; }
   }
 
   // ------------------------------------------------------------------ golden set

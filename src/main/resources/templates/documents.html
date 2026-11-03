@@ -20,7 +20,7 @@
   </tr></thead><tbody>
     <tr th:each="row:${documentPage.content}" th:with="doc=${row.document}">
       <td><a th:href="@{/crates/{crateId}/documents/{id}(crateId=${crate.id},id=${doc.id})}" th:text="${doc.title ?: '(untitled)'}"></a></td>
-      <td><a th:if="${T(tech.wenisch.contextcrate.util.GitWebLinks).viewUrl(doc.sourceUri) != null}" th:href="${T(tech.wenisch.contextcrate.util.GitWebLinks).viewUrl(doc.sourceUri)}" target="_blank" rel="noopener noreferrer" th:text="${doc.sourceUri}" class="text-truncate d-inline-block url-cell"></a><span th:unless="${T(tech.wenisch.contextcrate.util.GitWebLinks).viewUrl(doc.sourceUri) != null}" th:text="${doc.sourceUri}" class="text-truncate d-inline-block url-cell"></span></td>
+      <td th:with="viewLink=${T(tech.wenisch.contextcrate.util.GitWebLinks).viewUrl(doc.sourceUri)}"><a th:if="${viewLink != null}" th:href="${viewLink}" target="_blank" rel="noopener noreferrer" th:text="${doc.sourceUri}" class="text-truncate d-inline-block url-cell"></a><span th:unless="${viewLink != null}" th:text="${doc.sourceUri}" class="text-truncate d-inline-block url-cell"></span></td>
       <td th:text="|v${doc.versionNumber}|"></td><td th:text="${doc.language ?: '—'}"></td><td th:text="${row.chunkCount}"></td>
       <td><span class="visually-hidden" th:text="${doc.indexed ? 'Indexed' : 'Not indexed'}"></span></td>
     </tr>

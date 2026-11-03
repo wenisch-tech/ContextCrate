@@ -146,9 +146,9 @@
           <details><summary>Answer, sources and judge reasoning</summary>
             <p class="mt-2"><strong>Answer:</strong> <span th:text="${c.text.answer}"></span></p>
             <p class="mb-1"><strong>Judge notes</strong></p>
-            <pre class="small mb-2" style="white-space:pre-wrap" th:text="${c.text.details == null ? '' : c.text.details.toPrettyString()}"></pre>
+            <pre class="small mb-2" style="white-space:pre-wrap" th:text="${c.text.detailsText}"></pre>
             <p class="mb-1"><strong>Delivered sources</strong></p>
-            <ol class="mb-0"><li th:each="chunk:${c.text.snapshot?.path('chunks')}"><span th:text="${chunk.path('uri').asText()}"></span>: <span th:text="${#strings.abbreviate(chunk.path('content').asText(), 200)}"></span></li></ol>
+            <ol class="mb-0"><li th:each="chunk:${c.text.snapshot?.get('chunks')}"><span th:text="${chunk.get('uri')}"></span>: <span th:text="${#strings.abbreviate(chunk.get('content'), 200)}"></span></li></ol>
           </details></td></tr>
         </th:block>
         <tr th:if="${cases.empty}"><td colspan="11" class="empty-state">Nothing evaluated yet.</td></tr>

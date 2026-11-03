@@ -57,7 +57,7 @@ class EvaluationPageTest {
         null, null, "https://judge.example/v1", "judge-1", true, 120, true));
     when(admin.summary(crateId, 7)).thenReturn(new EvaluationAdminService.Summary(7, 1, 0, averages(12, 0.8), averages(0, null),
         List.of(new EvaluationAdminService.Day(LocalDate.of(2026, 11, 1), averages(12, 0.8)))));
-    var text = new EvaluationAdminService.TextView("Who is on call?", "The secondary.", new ObjectMapper().readTree("{\"chunks\":[{\"uri\":\"u1\",\"content\":\"alpha\"}]}"), new ObjectMapper().readTree("{\"errors\":[]}"));
+    var text = new EvaluationAdminService.TextView("Who is on call?", "The secondary.", new ObjectMapper().readValue("{\"chunks\":[{\"uri\":\"u1\",\"content\":\"alpha\"}]}", java.util.Map.class), new ObjectMapper().readValue("{\"errors\":[]}", java.util.Map.class), "{ \"errors\" : [ ] }");
     when(admin.cases(crateId, 50, true)).thenReturn(List.of(new EvaluationAdminService.CaseView(UUID.randomUUID(), Instant.now(), "LIVE", "DONE", 5,
         0.6, 0.5, 1.0, 0.7, 0.9, 0.75, 4, 3, 0.8, 0.6, null, "judge-1", null, text)));
     when(admin.golden(crateId)).thenReturn(List.of(new EvaluationAdminService.GoldenView(UUID.randomUUID(), "How to escalate?", "Page the secondary.", List.of("docs/oncall.md"), Instant.now())));
