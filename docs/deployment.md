@@ -8,7 +8,7 @@ Run the JAR or `compose.yml`. Persist `/app/data`, set a strong admin password, 
 
 ## Distributed
 
-Use `compose.distributed.yml` for evaluation or `charts/contextcrate` for Kubernetes. Production PostgreSQL, RabbitMQ, object storage, and OpenSearch should be operated independently. Scale `source-web`, `source-git`, and parser workers horizontally. Keep Lucene indexers at one replica; OpenSearch indexers may scale.
+Use `compose.distributed.yml` for evaluation or `charts/contextcrate` for Kubernetes. Production PostgreSQL, RabbitMQ, object storage, and OpenSearch or Qdrant should be operated independently. Scale `source-web`, `source-git`, and parser workers horizontally. Keep Lucene indexers at one replica; OpenSearch indexers may scale.
 
 The Helm chart defaults to standalone. For distributed mode:
 

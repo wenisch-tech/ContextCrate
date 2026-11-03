@@ -7,8 +7,10 @@
 | `contextcrate.queue.backend` | `local`, `rabbitmq` | local | rabbitmq |
 | `contextcrate.database.backend` | `h2`, `postgresql` | h2 | postgresql |
 | `contextcrate.artifacts.backend` | `filesystem`, `s3` | filesystem | s3 |
-| `contextcrate.index.backend` | `lucene`, `opensearch` | lucene | opensearch |
+| `contextcrate.index.backend` | `lucene`, `opensearch`, `qdrant` | lucene | opensearch (or qdrant) |
 | `contextcrate.role` | `all`, stage role | all | control-plane |
+
+Endpoint, API key and prefix of the OpenSearch and Qdrant backends are described in [Search backends](search-backends.md).
 
 Local queue and file-backed H2 require `role=all`. Lucene requires a singleton indexer and a local or correctly shared index path. Filesystem artifacts need a shared volume when accessed by multiple processes.
 

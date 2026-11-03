@@ -18,7 +18,7 @@ public class BackendConfigurationValidator implements ApplicationRunner {
     require("queue", properties.queue().backend(), Set.of("local", "rabbitmq"));
     require("database", properties.database().backend(), Set.of("h2", "postgresql"));
     require("artifacts", properties.artifacts().backend(), Set.of("filesystem", "s3"));
-    require("index", properties.index().backend(), Set.of("lucene", "opensearch"));
+    require("index", properties.index().backend(), Set.of("lucene", "opensearch", "qdrant"));
     require("embeddings provider", properties.embeddings().provider(), Set.of("local", "openai-compatible"));
     require("reranking provider", properties.reranking().provider(), Set.of("local", "cohere-compatible"));
     require("retrieval mode", properties.retrieval().defaultMode(), Set.of("lexical", "semantic", "hybrid"));

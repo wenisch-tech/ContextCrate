@@ -68,11 +68,23 @@ public record ContextCrateProperties(
     }
   }
 
-  public record Index(String backend, Path path, String endpoint, String prefix) {
+  /**
+   * @param endpoint base URL of the OpenSearch or Qdrant service; defaults to that backend's usual local port
+   * @param apiKey optional API key sent to Qdrant ({@code api-key} header); blank means none
+   */
+  public record Index(String backend, Path path, String endpoint, String prefix, String apiKey) {
+    @ConstructorBinding
     public Index {
       backend = defaulted(backend, "lucene");
       path = path == null ? Path.of("data/index") : path;
       prefix = defaulted(prefix, "contextcrate");
+      if (endpoint == null || endpoint.isBlank())
+        endpoint = "qdrant".equals(backend) ? "http://localhost:6333" : "http://localhost:9200";
+      apiKey = apiKey == null || apiKey.isBlank() ? null : apiKey.strip();
+    }
+
+    public Index(String backend, Path path, String endpoint, String prefix) {
+      this(backend, path, endpoint, prefix, null);
     }
   }
 

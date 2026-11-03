@@ -29,7 +29,7 @@ are removed after success or failure.
 JSoup normalizes website HTML and extracts titles, language, description, author, headings, Open
 Graph values, and links. Markdown normalization produces readable text, chooses the first heading
 as title, and retains heading context on chunks; plain text preserves readable line and paragraph
-boundaries. Chunks use deterministic identifiers and overlap. Lucene and OpenSearch receive
+boundaries. Chunks use deterministic identifiers and overlap. Lucene, OpenSearch and Qdrant receive
 equivalent field names and separate document/chunk records.
 
 For OpenAI-compatible embedding providers, parsing also applies the configured maximum embedding
@@ -41,7 +41,7 @@ Extraction is derived work over normalized `DocumentChunk.content`. Enabled extr
 
 Extraction results are rebuildable. Rebuilding a run or document deletes the scoped derived matches and enqueues fresh extraction work with a new work idempotency key, while automatic extraction uses stable document-level idempotency. Rule deletion disables the rule so historical result rows keep their rule reference.
 
-Search is query-side retrieval over the same Lucene/OpenSearch records created by indexing. Lexical mode uses BM25 scoring across title, heading, URL text, and normalized text fields; semantic mode embeds the query and uses nearest-neighbour vector search; hybrid mode fuses both ranked lists with RRF. Optional run and kind filters apply to every mode. Search does not create crawl or extraction work; it reads the latest committed index. Rebuild the derived vector index from canonical records with `POST /api/v1/index/rebuild` after changing embedding models.
+Search is query-side retrieval over the same Lucene/OpenSearch/Qdrant records created by indexing. Lexical mode uses BM25 scoring across title, heading, URL text, and normalized text fields; semantic mode embeds the query and uses nearest-neighbour vector search; hybrid mode fuses both ranked lists with RRF. Optional run and kind filters apply to every mode. Search does not create crawl or extraction work; it reads the latest committed index. Rebuild the derived vector index from canonical records with `POST /api/v1/index/rebuild` after changing embedding models.
 
 ## Document versions
 

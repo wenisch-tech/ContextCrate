@@ -56,10 +56,13 @@ contextcrate:
     backend: filesystem
     path: data/artifacts
   index:
-    backend: lucene
+    backend: ${CONTEXTCRATE_INDEX_BACKEND:lucene}
     path: data/index
-    endpoint: http://localhost:9200
-    prefix: contextcrate
+    # Base URL of OpenSearch (default http://localhost:9200) or Qdrant (default http://localhost:6333).
+    endpoint: ${CONTEXTCRATE_INDEX_ENDPOINT:}
+    # Optional Qdrant API key.
+    api-key: ${CONTEXTCRATE_INDEX_API_KEY:}
+    prefix: ${CONTEXTCRATE_INDEX_PREFIX:contextcrate}
   embeddings:
     enabled: ${CONTEXTCRATE_EMBEDDINGS_ENABLED:true}
     provider: ${CONTEXTCRATE_EMBEDDINGS_PROVIDER:local}
@@ -156,9 +159,10 @@ contextcrate:
     bucket: ${S3_BUCKET:contextcrate}
     prefix: ${S3_PREFIX:artifacts}
   index:
-    backend: opensearch
-    endpoint: ${OPENSEARCH_ENDPOINT:http://localhost:9200}
-    prefix: ${OPENSEARCH_PREFIX:contextcrate}
+    backend: ${CONTEXTCRATE_INDEX_BACKEND:opensearch}
+    endpoint: ${CONTEXTCRATE_INDEX_ENDPOINT:${OPENSEARCH_ENDPOINT:http://localhost:9200}}
+    api-key: ${CONTEXTCRATE_INDEX_API_KEY:}
+    prefix: ${CONTEXTCRATE_INDEX_PREFIX:${OPENSEARCH_PREFIX:contextcrate}}
 management:
   health:
     rabbit:

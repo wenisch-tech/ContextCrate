@@ -26,7 +26,7 @@ All methods require a non-default `CONTEXTCRATE_ADMIN_PASSWORD`. The default ini
 
 The standalone profile runs every pipeline stage in one process using H2, filesystem artifacts, and Lucene. Persist `/app/data` because it contains application data and the local embedding-model cache.
 
-The distributed profile separates the control plane, source workers, browser crawler, parser, and indexer. It uses PostgreSQL, RabbitMQ, S3-compatible object storage, and OpenSearch. Use independently operated backing services, durable volumes, Kubernetes Secrets, and an Ingress with TLS for production.
+The distributed profile separates the control plane, source workers, browser crawler, parser, and indexer. It uses PostgreSQL, RabbitMQ, S3-compatible object storage, and OpenSearch or Qdrant (see [Search backends](../search-backends.md)). Use independently operated backing services, durable volumes, Kubernetes Secrets, and an Ingress with TLS for production.
 
 See [Deployment Notes](../deployment.md), [Configuration](../configuration.md), and [Operations](../operations.md) for topology, environment variables, backups, and scaling guidance.
 

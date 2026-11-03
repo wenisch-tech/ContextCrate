@@ -92,7 +92,7 @@ Archive before purging. Confirm durable database/object-store backups, submit th
 
 ## Disaster recovery
 
-Crate export is portability, not installation disaster recovery. Back up PostgreSQL/H2, the filesystem or S3 bucket, and deployment secrets using infrastructure-native tools. OpenSearch/Lucene data is derived and may be rebuilt from normalized documents.
+Crate export is portability, not installation disaster recovery. Back up PostgreSQL/H2, the filesystem or S3 bucket, and deployment secrets using infrastructure-native tools. OpenSearch/Qdrant/Lucene data is derived and may be rebuilt from normalized documents.
 
 ## See also
 

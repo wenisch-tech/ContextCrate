@@ -16,7 +16,7 @@ For installing it see [Installation](installation/README.md); for working with i
 - **Delivery is at least once.** Work is idempotent, and every stage verifies the crate it
   operates on.
 - **Backends are interchangeable.** The same domain code runs on H2 or PostgreSQL, a database
-  queue or RabbitMQ, the filesystem or S3, Lucene or OpenSearch.
+  queue or RabbitMQ, the filesystem or S3, Lucene, OpenSearch or Qdrant.
 - **Retrieved content is untrusted.** Crawled text, code and image descriptions are given to the
   answer model as data, never as instructions.
 
@@ -32,7 +32,7 @@ For installing it see [Installation](installation/README.md); for working with i
 | **Relational database** | Configuration, normalized documents, chunks, members | H2 | PostgreSQL |
 | **Work queue** | Coordinates the stages | database | RabbitMQ |
 | **Artifact store** | Raw fetched bodies | filesystem | S3-compatible storage |
-| **Search index** | Keyword and vector search | Lucene | OpenSearch |
+| **Search index** | Keyword and vector search | Lucene | OpenSearch or Qdrant (see [Search backends](search-backends.md)) |
 | **Model providers** | Embeddings, reranking, answers, optional vision | local ONNX or any OpenAI-compatible endpoint | same |
 
 The roles and the backends are selected by configuration, see [Configuration](configuration.md)
@@ -95,7 +95,7 @@ extraction, and indexing are source-neutral.
 
 ## Storage adapters
 
-The relational database owns canonical configuration and normalized content. Raw bodies use `ArtifactStore` with filesystem or S3 implementations. Search uses `SearchIndex` with Lucene or OpenSearch implementations. Index data and embeddings are derived and rebuildable.
+The relational database owns canonical configuration and normalized content. Raw bodies use `ArtifactStore` with filesystem or S3 implementations. Search uses `SearchIndex` with Lucene, OpenSearch or Qdrant implementations. Index data and embeddings are derived and rebuildable.
 
 Backends are installation-wide services, while prefixes/directories and configuration are crate-specific.
 

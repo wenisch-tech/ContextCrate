@@ -5,7 +5,7 @@ const sidebars = {
     {
       type: 'category', label: 'Architecture', collapsed: true,
       link: { type: 'doc', id: 'architecture' },
-      items: ['crates', 'pipeline', 'authorization'],
+      items: ['crates', 'pipeline', 'search-backends', 'authorization'],
     },
     {
       type: 'category', label: 'Installation & administration', collapsed: true,

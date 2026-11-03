@@ -13,6 +13,10 @@ x-contextcrate: &contextcrate
     S3_ENDPOINT: http://minio:9000
     S3_BUCKET: contextcrate
     OPENSEARCH_ENDPOINT: http://opensearch:9200
+    # Search index: opensearch (default) or qdrant, see docs/search-backends.md
+    CONTEXTCRATE_INDEX_BACKEND: ${CONTEXTCRATE_INDEX_BACKEND:-opensearch}
+    CONTEXTCRATE_INDEX_ENDPOINT: ${CONTEXTCRATE_INDEX_ENDPOINT:-http://opensearch:9200}
+    CONTEXTCRATE_INDEX_API_KEY: ${CONTEXTCRATE_INDEX_API_KEY:-}
     CONTEXTCRATE_ADMIN_EMAIL: ${CONTEXTCRATE_ADMIN_EMAIL:-admin@contextcrate.local}
     CONTEXTCRATE_ADMIN_PASSWORD: ${CONTEXTCRATE_ADMIN_PASSWORD:-admin}
     CONTEXTCRATE_EMBEDDINGS_PROVIDER: ${CONTEXTCRATE_EMBEDDINGS_PROVIDER:-local}
@@ -65,4 +69,10 @@ services:
     image: opensearchproject/opensearch:3.9.0
     environment: { discovery.type: single-node, DISABLE_SECURITY_PLUGIN: "true", OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m" }
     volumes: ["opensearch:/usr/share/opensearch/data"]
-volumes: { postgres: {}, rabbitmq: {}, minio: {}, opensearch: {} }
+  # Optional: start with `--profile qdrant` and set CONTEXTCRATE_INDEX_BACKEND=qdrant CONTEXTCRATE_INDEX_ENDPOINT=http://qdrant:6333
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    profiles: ["qdrant"]
+    ports: ["6333:6333"]
+    volumes: ["qdrant:/qdrant/storage"]
+volumes: { postgres: {}, rabbitmq: {}, minio: {}, opensearch: {}, qdrant: {} }

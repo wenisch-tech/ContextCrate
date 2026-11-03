@@ -28,7 +28,7 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 - **Choose your AI providers** with local ONNX models or OpenAI-compatible embedding, reranking, and answer endpoints configured per crate.
 - **Manage data safely** with document versions, background index rebuilds, archive/restore, checksummed crate export/import, and audit-aware access controls.
 - **Automate through the UI or API** using personal API keys and crate-specific Viewer or Editor service keys.
-- **Deploy from laptop to cluster** with standalone Docker or Compose for compact installs and Kubernetes with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch for production scale.
+- **Deploy from laptop to cluster** with standalone Docker or Compose for compact installs and Kubernetes with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch or Qdrant for production scale.
 
 ## RAG toolbox
 
@@ -81,13 +81,13 @@ flowchart LR
   C --> Q[Crate-aware queue]
   Q --> W["Source, browser, parser,<br/>extractor, and indexer workers"]
   W --> A[(Artifact storage)]
-  W --> I[(Lucene or OpenSearch)]
+  W --> I[(Lucene, OpenSearch or Qdrant)]
   C --> I
 ```
 
 **Standalone** runs the control plane, workers, queue, H2 database, filesystem artifacts, and Lucene in one JVM. It is designed for local use and compact single-instance deployments. 
 
-**Distributed** runs the control plane and worker roles separately, with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch; each workload can then scale independently. 
+**Distributed** runs the control plane and worker roles separately, with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch or Qdrant; each workload can then scale independently. 
 
 Kubernetes is the intended production deployment. See the [architecture documentation](docs/architecture.md) and [Kubernetes installation guide](docs/installation/kubernetes.md) for the complete design.
 
@@ -145,6 +145,7 @@ The first authenticated user owns the automatically migrated Legacy crate. New u
 - [Crates and lifecycle](docs/crates.md)
 - [Authorization](docs/authorization.md)
 - [Architecture](docs/architecture.md)
+- [Search backends: Lucene, OpenSearch, Qdrant](docs/search-backends.md)
 - [Configuration](docs/configuration.md)
 - [REST API](docs/api.md)
 - [OpenAI-compatible API](docs/integrations/openai.md)
