@@ -15,6 +15,7 @@
   <div class="alert alert-success" th:if="${param.onboardingPolicySaved != null}">Onboarding policy saved.</div>
   <div class="alert alert-success" th:if="${param.timeZoneSaved != null}">Time zone saved.</div>
   <div class="alert alert-success" th:if="${param.modelPolicySaved != null}">Model policy saved.</div>
+  <div class="alert alert-success" th:if="${param.systemPromptsSaved != null}">System prompt settings saved.</div>
   <div class="alert alert-success" th:if="${param.backendPolicySaved != null}">Storage and search policy saved.</div>
   <div class="alert alert-success" th:if="${param.modelSaved != null}">Shared model saved.</div>
   <div class="alert alert-success" th:if="${param.modelDeleted != null}">Shared model deleted.</div>
@@ -117,6 +118,19 @@
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-local" name="allowLocalModels" value="true" th:checked="${systemSetting.allowLocalModels}"><label class="form-check-label" for="allow-local">Users may configure their own local ONNX models (model id, revision, download URL, paths)</label></div>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-vision" name="allowVisionDescriptions" value="true" th:checked="${systemSetting.allowVisionDescriptions}"><label class="form-check-label" for="allow-vision">Crates may send images to a vision model to have them described</label></div>
         <button class="btn btn-primary mt-4">Save model policy</button>
+      </form>
+      <form class="card panel p-4 mb-4" method="post" action="/admin/settings/system-prompts" x-data="{text: $el.querySelector('textarea').value, max: 4000}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <h2 class="h5">System prompts</h2>
+        <p class="text-secondary small">The answer model always follows ContextCrate's built-in rules (grounding, citations, untrusted sources). On top of them you can add an installation-wide prompt, and let crate owners add their own. Each layer is added after the previous one and cannot override it.</p>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="allow-crate-prompts" name="allowCrateSystemPrompts" value="true" th:checked="${systemSetting.allowCrateSystemPrompts}"><label class="form-check-label" for="allow-crate-prompts">Crate owners may add their own system prompt</label></div>
+        <div class="form-text">Turning this off keeps the prompts crate owners already wrote, but they are no longer applied.</div>
+        <div class="field mt-4">
+          <label class="field-label" for="global-system-prompt">Installation-wide system prompt <span class="font-normal text-ink-500">(optional)</span></label>
+          <textarea class="input" id="global-system-prompt" name="globalSystemPrompt" rows="6" maxlength="4000" x-model="text" th:text="${systemSetting.globalSystemPrompt}" aria-describedby="global-prompt-help"></textarea>
+          <p class="field-help" id="global-prompt-help"><span x-text="text.length">0</span> / <span x-text="max">4000</span> characters. Applies to every crate, always comes before a crate's own prompt, and is visible to crate owners in their settings. Use it for tone, language or company rules, not for secrets.</p>
+        </div>
+        <button class="btn btn-primary mt-4">Save system prompt settings</button>
       </form>
       <form class="card panel p-4 mb-4" method="post" action="/admin/settings/backend-policy">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

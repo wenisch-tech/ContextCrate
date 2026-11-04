@@ -115,7 +115,8 @@ and does not appear in the reference list — there is nothing accurate to point
 - A **`system` message is dropped**, not rejected. ContextCrate supplies its own system prompt and
   treats retrieved sources and history as untrusted data, never instructions; honouring a client
   system message would undo that. Clients that always attach a boilerplate system prompt keep
-  working without configuration.
+  working without configuration. To give a crate its own instructions, use the crate's
+  [system prompt](../features/system-prompts.md) (if the administrator allows it).
 - Retrieval mode, source count, citations, strict grounding, and answer verification come from the
   crate's RAG settings (**Settings → RAG** in the UI) — there is no OpenAI request field for them.
   `temperature`, `max_tokens`, and `top_p` are accepted but ignored; they are the crate's

@@ -33,6 +33,15 @@ public class SystemSetting {
   public void backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend) {
     this.allowCustomStorage = allowCustomStorage; this.allowCustomSearchBackend = allowCustomSearchBackend;
   }
+  @Column(name = "allow_crate_system_prompts", nullable = false)
+  private boolean allowCrateSystemPrompts;
+  @Column(name = "global_system_prompt", columnDefinition = "text")
+  private String globalSystemPrompt;
+  public boolean isAllowCrateSystemPrompts() { return allowCrateSystemPrompts; }
+  public String getGlobalSystemPrompt() { return globalSystemPrompt; }
+  public void systemPromptPolicy(boolean allowCrateSystemPrompts, String globalSystemPrompt) {
+    this.allowCrateSystemPrompts = allowCrateSystemPrompts; this.globalSystemPrompt = globalSystemPrompt;
+  }
   public boolean isAllowVisionDescriptions() { return allowVisionDescriptions; }
   public void allowVisionDescriptions(boolean value) { this.allowVisionDescriptions = value; }
   protected SystemSetting() {}

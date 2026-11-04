@@ -36,6 +36,8 @@ public class RagSettingsService {
     var value=current(crateId);value.updateContextHeader(normalized,words);return settings.save(value);
   }
   /** Chunks before and after a matched chunk (0 = off); takes effect on the next question, no rebuild. */
+  /** Stores the crate's system prompt (cleaned, length-checked). Whether it is allowed is decided by the caller. */
+  @Transactional public RagSettings updateSystemPrompt(java.util.UUID crateId,String prompt){var value=current(crateId);value.updateSystemPrompt(SystemPrompts.validated(prompt));return settings.save(value);}
   public static final int MIN_ENRICHMENT_QUESTIONS=3,MAX_ENRICHMENT_QUESTIONS=50,DEFAULT_ENRICHMENT_QUESTIONS=5;
   @Transactional public RagSettings updateEnrichment(java.util.UUID crateId,boolean enabled,int questions){
     if(questions<MIN_ENRICHMENT_QUESTIONS||questions>MAX_ENRICHMENT_QUESTIONS)throw new IllegalArgumentException("enrichment questions must be between "+MIN_ENRICHMENT_QUESTIONS+" and "+MAX_ENRICHMENT_QUESTIONS);

@@ -58,6 +58,7 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 
 | Option | What it does |
 |---|---|
+| [System prompts](docs/features/system-prompts.md) | Built-in rules, an optional installation-wide prompt and an optional crate prompt (if the administrator allows it) adjust tone, language and focus; later layers cannot override earlier ones. |
 | [Context window](docs/features/context-window.md) | Adds the neighbouring chunks of each match (configurable 0 to 5) and restores the original text without overlap. |
 | [Contextual compression](docs/features/contextual-compression.md) | A model keeps only the sentences of each theyretrieved chunk that are relevant for the question, dropping tangents, transitions and duplicates to save tokens. |
 | [Grading](docs/features/grading.md) | Judges retrieved chunks for relevance and drops the noise before the model sees it. |

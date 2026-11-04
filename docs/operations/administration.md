@@ -93,6 +93,12 @@ model to have them described (see [Images](../features/images.md)). Shared model
 Turning a switch off does not break crates that already use such a setup; it only makes that part
 of their provider settings read-only. Downloading the already-configured local model stays possible.
 
+## System prompts
+
+Under **Policies → System prompts**, an administrator can write an installation-wide system prompt for the answer model and allow
+(off by default) or forbid crate owners to add their own. The built-in rules always come first, then the installation-wide prompt, then the crate's prompt; a later layer cannot
+override an earlier one. See [System prompts](../features/system-prompts.md).
+
 ## Dedicated storage and search policy
 
 Under **Policies → Dedicated storage and search**, two switches (both **off** by default) decide whether crate creators may

@@ -497,6 +497,9 @@ public class UiController {
     }
   }
 
+  private tech.wenisch.contextcrate.service.SystemPromptService systemPromptService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setSystemPromptService(tech.wenisch.contextcrate.service.SystemPromptService service) { this.systemPromptService = service; }
   private tech.wenisch.contextcrate.service.CrateBackendService backendService;
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   void setBackendService(tech.wenisch.contextcrate.service.CrateBackendService backendService) { this.backendService = backendService; }
@@ -629,6 +632,7 @@ public class UiController {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     model.addAttribute("rag", ragSettings.current(crateId));
     if (backendService != null) model.addAttribute("backends", backendService.view(crateId));
+    if (systemPromptService != null) model.addAttribute("systemPrompt", systemPromptService.view(crateId));
     model.addAttribute("answering", properties.answering());
     var sharedSelection = providerSettings.selection(crateId);
     model.addAttribute("sharedSelection", sharedSelection);
@@ -685,6 +689,16 @@ public class UiController {
       @RequestParam(defaultValue = "") String description) {
     crates.update(crateId, name, description);
     return "redirect:/crates/" + crateId + "/settings?generalSaved";
+  }
+
+  @PostMapping("/settings/system-prompt")
+  String saveSystemPrompt(@PathVariable UUID crateId, @RequestParam(defaultValue = "") String systemPrompt) {
+    try {
+      systemPromptService.update(crateId, systemPrompt);
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      return "redirect:/crates/" + crateId + "/settings?systemPromptError=" + java.net.URLEncoder.encode(e.getMessage(), java.nio.charset.StandardCharsets.UTF_8) + "#system-prompt";
+    }
+    return "redirect:/crates/" + crateId + "/settings?systemPromptSaved#system-prompt";
   }
 
   @PostMapping("/settings/rag")

@@ -28,6 +28,7 @@ public class AdminApiController {
   @PostMapping("/users/{id}/password-reset") public AppUser resetPassword(@PathVariable UUID id,@RequestBody PasswordReset r){return administration.resetPassword(id,r.temporaryPassword());}
   @PutMapping("/settings/crate-creation") public SystemSetting creation(@RequestBody CreationMode r){return administration.crateCreationMode(r.mode());}
   @PutMapping("/settings/backend-policy") public SystemSetting backendPolicy(@RequestBody BackendPolicyRequest r){return administration.backendPolicy(r.allowCustomStorage(),r.allowCustomSearchBackend());}
+  @PutMapping("/settings/system-prompts") public SystemSetting systemPrompts(@RequestBody SystemPromptsRequest r){return administration.systemPromptPolicy(r.allowCrateSystemPrompts(),r.globalSystemPrompt());}
   @PutMapping("/settings/time-zone") public SystemSetting timeZone(@RequestBody TimeZoneRequest r){return administration.timeZone(r.timeZone());}
   @PutMapping("/settings/onboarding-policy") public SystemSetting onboardingPolicy(@RequestBody OnboardingPolicyRequest r){return administration.onboardingPolicy(r.policy(),r.crateId());}
   @GetMapping("/crates") public List<CrateOverviewService.CrateCard> crates(){administration.requireAdmin();return overview.all();}
@@ -38,6 +39,7 @@ public class AdminApiController {
   }
   @PostMapping("/crates/{crateId}/elevations") public AdminElevation elevate(@PathVariable UUID crateId,@RequestBody Elevation r){return elevations.start(crateId,r.reason());}
   @DeleteMapping("/elevations/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void end(@PathVariable UUID id){elevations.end(id);}
+  public record SystemPromptsRequest(boolean allowCrateSystemPrompts,String globalSystemPrompt){}
   public record BackendPolicyRequest(boolean allowCustomStorage,boolean allowCustomSearchBackend){}
   public record UserRequest(String email,String temporaryPassword){}
   public record Entitlement(boolean allowed){}

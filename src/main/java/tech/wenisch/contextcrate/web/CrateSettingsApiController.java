@@ -16,6 +16,13 @@ public class CrateSettingsApiController {
       RuntimeProviderSettings providers,IndexRebuildService rebuild,SharedModelService sharedModels){this.sharedModels=sharedModels;
     this.access=access;this.rag=rag;this.providers=providers;this.rebuild=rebuild;
   }
+  private SystemPromptService systemPrompts;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) void setSystemPrompts(SystemPromptService systemPrompts){this.systemPrompts=systemPrompts;}
+  /** The crate's system prompt and whether the administrator allows it (owners). */
+  @GetMapping("/system-prompt") public SystemPromptService.View systemPrompt(@PathVariable UUID crateId){return systemPrompts.view(crateId);}
+  /** Sets the crate's system prompt; refused while the administrator has not enabled crate system prompts. */
+  @PutMapping("/system-prompt") public SystemPromptService.View systemPrompt(@PathVariable UUID crateId,@RequestBody SystemPromptRequest r){return systemPrompts.update(crateId,r.systemPrompt());}
+  public record SystemPromptRequest(String systemPrompt){}
   @GetMapping("/rag") public RagSettings rag(@PathVariable UUID crateId){
     access.require(crateId,CrateMember.Role.VIEWER);return rag.current(crateId);
   }

@@ -137,6 +137,17 @@ public class AdminUiController {
     return "redirect:/admin?backendPolicySaved#policies";
   }
 
+  @PostMapping("/settings/system-prompts")
+  String systemPrompts(@RequestParam(defaultValue = "false") boolean allowCrateSystemPrompts,
+      @RequestParam(defaultValue = "") String globalSystemPrompt) {
+    try {
+      administration.systemPromptPolicy(allowCrateSystemPrompts, globalSystemPrompt);
+    } catch (IllegalArgumentException e) {
+      return "redirect:/admin?error=" + java.net.URLEncoder.encode(e.getMessage(), java.nio.charset.StandardCharsets.UTF_8) + "#policies";
+    }
+    return "redirect:/admin?systemPromptsSaved#policies";
+  }
+
   @PostMapping("/settings/onboarding-policy")
   String onboardingPolicy(@RequestParam SystemSetting.OnboardingPolicy policy,
       @RequestParam(required = false) UUID crateId) {

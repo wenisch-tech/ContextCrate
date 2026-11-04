@@ -139,6 +139,14 @@ public class UserAdministrationService {
   }
 
   @Transactional
+  public SystemSetting systemPromptPolicy(boolean allowCrateSystemPrompts, String globalSystemPrompt) {
+    requireAdmin();
+    SystemSetting setting = settings.findById(1).orElseThrow();
+    setting.systemPromptPolicy(allowCrateSystemPrompts, tech.wenisch.contextcrate.answer.SystemPrompts.validated(globalSystemPrompt));
+    return settings.save(setting);
+  }
+
+  @Transactional
   public SystemSetting timeZone(String timeZone) {
     requireAdmin();
     try { java.time.ZoneId.of(timeZone); }

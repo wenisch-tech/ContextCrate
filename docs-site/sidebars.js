@@ -46,7 +46,7 @@ const sidebars = {
             {
               type: 'category', label: 'Answer generation', collapsed: true,
               link: { type: 'doc', id: 'answers' },
-              items: ['features/context-window', 'features/contextual-compression', 'features/grading', 'features/answer-verification'],
+              items: ['features/system-prompts', 'features/context-window', 'features/contextual-compression', 'features/grading', 'features/answer-verification'],
             },
             'features/evaluation',
           ],
