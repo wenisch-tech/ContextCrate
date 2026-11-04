@@ -10,7 +10,7 @@
 | `contextcrate.index.backend` | `lucene`, `opensearch`, `elasticsearch`, `qdrant`, `pgvector` | lucene | opensearch (or elasticsearch, qdrant, pgvector) |
 | `contextcrate.role` | `all`, stage role | all | control-plane |
 
-Endpoint, credentials and prefix of the OpenSearch, Elasticsearch, Qdrant and pgvector backends are described in [Search backends](search-backends.md).
+Whether crates may bring their own S3 storage or search backend is an administrator policy, see [Dedicated storage and search per crate](features/crate-backends.md). Endpoint, credentials and prefix of the OpenSearch, Elasticsearch, Qdrant and pgvector backends are described in [Search backends](search-backends.md).
 
 Local queue and file-backed H2 require `role=all`. Lucene requires a singleton indexer and a local or correctly shared index path. Filesystem artifacts need a shared volume when accessed by multiple processes.
 

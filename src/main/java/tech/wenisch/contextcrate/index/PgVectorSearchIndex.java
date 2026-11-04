@@ -90,6 +90,7 @@ public class PgVectorSearchIndex implements SearchIndex {
     config.setUsername(user);
     config.setPassword(password);
     config.setMaximumPoolSize(4);
+    config.setConnectionTimeout(15_000);
     config.setPoolName("contextcrate-pgvector");
     config.setInitializationFailTimeout(-1); // connect on first use, not at startup
     return new HikariDataSource(config);

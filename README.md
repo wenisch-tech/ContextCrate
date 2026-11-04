@@ -25,6 +25,7 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 - **Generate grounded answers** through OpenAI-compatible models, with streaming responses, stable source lists, and inline citations that lead back to the indexed evidence.
 - **Connect any OpenAI client** to a crate directly — Open WebUI, LiteLLM, the OpenAI SDKs — through a per-crate OpenAI-compatible `chat/completions` endpoint, no custom integration code required.
 - **Tune every stage of the RAG pipeline** — chunking, retrieval, answer generation and evaluation — per crate, see the [RAG toolbox](#rag-toolbox) below.
+- **Give a crate its own storage or search backend** when the administrator allows it: a dedicated S3-compatible bucket and/or an OpenSearch, Elasticsearch, Qdrant or pgvector service, chosen and connection-tested in the create dialog, with the installation's providers as the default.
 - **Choose your AI providers** with local ONNX models or OpenAI-compatible embedding, reranking, and answer endpoints configured per crate.
 - **Manage data safely** with document versions, background index rebuilds, archive/restore, checksummed crate export/import, and audit-aware access controls.
 - **Automate through the UI or API** using personal API keys and crate-specific Viewer or Editor service keys.
@@ -145,7 +146,7 @@ The full documentation is available at **[contextcrate.eu/docs](https://contextc
 
 **Concepts and architecture**
 - [Architecture](https://contextcrate.eu/docs/architecture/) · [Crates and lifecycle](https://contextcrate.eu/docs/crates/) · [Pipeline](https://contextcrate.eu/docs/pipeline/) · [Authorization](https://contextcrate.eu/docs/authorization/)
-- [Search backends: Lucene, OpenSearch, Elasticsearch, Qdrant, pgvector](https://contextcrate.eu/docs/search-backends/)
+- [Search backends: Lucene, OpenSearch, Elasticsearch, Qdrant, pgvector](https://contextcrate.eu/docs/search-backends/) · [Dedicated storage and search per crate](https://contextcrate.eu/docs/features/crate-backends/)
 
 **RAG features**
 - Chunking and indexing: [Parsing](https://contextcrate.eu/docs/features/parsing/) · [Chunking](https://contextcrate.eu/docs/features/chunking/) · [Semantic chunking](https://contextcrate.eu/docs/features/semantic-chunking/) · [Contextual headers](https://contextcrate.eu/docs/features/contextual-headers/) · [Document enrichment](https://contextcrate.eu/docs/features/document-enrichment/) · [Images](https://contextcrate.eu/docs/features/images/) · [Embeddings](https://contextcrate.eu/docs/embeddings/)

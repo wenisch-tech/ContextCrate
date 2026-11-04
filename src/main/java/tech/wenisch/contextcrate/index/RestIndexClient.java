@@ -58,7 +58,8 @@ final class RestIndexClient {
     return new Response(response.statusCode(), response.body());
   }
 
-  private static SSLContext trustAll() {
+  /** An SSL context that accepts every certificate. For development only. */
+  static SSLContext trustAll() {
     try {
       SSLContext context = SSLContext.getInstance("TLS");
       context.init(null, new TrustManager[] {new X509TrustManager() {

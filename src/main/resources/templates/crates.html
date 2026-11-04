@@ -50,16 +50,167 @@
     </div>
   </div>
 
-  <div th:if="${canCreateCrate or onboardingCrateCreationRequired}" class="modal fade" id="create-crate" tabindex="-1" aria-hidden="true" th:attr="data-onboarding-required=${onboardingCrateCreationRequired}">
-    <div class="modal-dialog modal-dialog-centered"><form class="modal-content panel" method="post" action="/crates">
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-      <div class="modal-header border-0"><h2 class="h5 modal-title">Create a crate</h2><button th:unless="${onboardingCrateCreationRequired}" type="button" class="btn-close" data-ui-dismiss="modal" aria-label="Close"></button></div>
-      <div class="modal-body">
-        <p th:if="${onboardingCrateCreationRequired}" class="text-secondary small">Create your first crate to continue.</p>
-        <label class="form-label" for="crate-name">Name</label><input class="form-control" id="crate-name" name="name" required maxlength="200">
-        <label class="form-label mt-3" for="crate-description">Description</label><textarea class="form-control" id="crate-description" name="description" rows="3" maxlength="2000"></textarea>
-      </div>
-      <div class="modal-footer border-0"><button th:unless="${onboardingCrateCreationRequired}" type="button" class="btn btn-outline-secondary" data-ui-dismiss="modal">Cancel</button><button class="btn btn-primary">Create crate</button></div>
-    </form></div>
+  <div th:if="${canCreateCrate or onboardingCrateCreationRequired}" class="modal fade" id="create-crate" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="create-crate-title" th:attr="data-onboarding-required=${onboardingCrateCreationRequired}">
+    <div class="modal-dialog modal-dialog-centered" :class="hasChoices &amp;&amp; 'modal-dialog--wide'" th:attr="x-data=|createCrate({ allowStorage: ${allowCustomStorage}, allowSearch: ${allowCustomSearchBackend} })|">
+      <form class="modal-content panel dialog" method="post" action="/crates" @submit.prevent="create()" novalidate>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <div class="dialog-header">
+          <div>
+            <h2 class="dialog-title" id="create-crate-title">Create a crate</h2>
+            <p class="dialog-copy" th:if="${onboardingCrateCreationRequired}">Create your first crate to continue.</p>
+            <p class="dialog-copy" th:unless="${onboardingCrateCreationRequired}">A crate keeps its own sources, documents, members and settings.</p>
+          </div>
+          <button th:unless="${onboardingCrateCreationRequired}" type="button" class="btn-ghost btn-sm" data-ui-dismiss="modal" aria-label="Close"><i data-lucide="x" class="size-4"></i></button>
+        </div>
+
+        <div class="dialog-body">
+          <p class="alert-error" x-show="formError" x-cloak x-text="formError" role="alert"></p>
+
+          <div class="dialog-grid">
+            <div class="field span-2">
+              <label class="field-label" for="crate-name">Name</label>
+              <input class="input" id="crate-name" name="name" x-model="name" required maxlength="200" autocomplete="off" data-autofocus>
+            </div>
+            <div class="field span-2">
+              <label class="field-label" for="crate-description">Description <span class="font-normal text-ink-500">(optional)</span></label>
+              <textarea class="input" id="crate-description" name="description" x-model="description" rows="2" maxlength="2000"></textarea>
+            </div>
+          </div>
+
+          <p class="dialog-copy" x-show="hasChoices" x-cloak>Crates use the installation's storage and search backend unless you choose your own. You cannot change this after the crate is created.</p>
+
+          <fieldset class="dialog-section" x-show="allowStorage" x-cloak>
+            <legend>Document storage</legend>
+            <div class="choice-group">
+              <label class="choice"><input type="radio" name="storage-mode" value="GLOBAL" x-model="storage.mode" @change="stale('storage')"><span>Global storage provider</span></label>
+              <label class="choice"><input type="radio" name="storage-mode" value="S3" x-model="storage.mode" @change="stale('storage')"><span>Custom S3 storage</span></label>
+            </div>
+            <p class="field-help" x-show="storage.mode === 'GLOBAL'">Downloaded pages and files are kept in the installation's <span th:text="${globalStorage}">storage</span>.</p>
+
+            <div class="space-y-4" x-show="storage.mode === 'S3'" x-cloak>
+              <div class="dialog-grid">
+                <div class="field span-2">
+                  <label class="field-label" for="s3-endpoint">Endpoint <span class="font-normal text-ink-500">(empty for AWS S3)</span></label>
+                  <input class="input" id="s3-endpoint" type="url" x-model="storage.endpoint" @input="stale('storage')" placeholder="https://s3.example.com" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="s3-bucket">Bucket</label>
+                  <input class="input" id="s3-bucket" x-model="storage.bucket" @input="stale('storage')" autocomplete="off" spellcheck="false" aria-describedby="s3-bucket-help">
+                  <p class="field-help" id="s3-bucket-help">The bucket must exist already.</p>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="s3-region">Region</label>
+                  <input class="input" id="s3-region" x-model="storage.region" @input="stale('storage')" placeholder="us-east-1" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="s3-access">Access key</label>
+                  <input class="input" id="s3-access" x-model="storage.accessKey" @input="stale('storage')" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="s3-secret">Secret key</label>
+                  <input class="input" id="s3-secret" type="password" x-model="storage.secretKey" @input="stale('storage')" autocomplete="new-password" aria-describedby="s3-secret-help">
+                  <p class="field-help" id="s3-secret-help">Stored with the crate and never shown again.</p>
+                </div>
+                <div class="field span-2">
+                  <label class="field-label" for="s3-prefix">Folder in the bucket <span class="font-normal text-ink-500">(optional)</span></label>
+                  <input class="input" id="s3-prefix" x-model="storage.prefix" @input="stale('storage')" placeholder="contextcrate" autocomplete="off" spellcheck="false">
+                </div>
+                <label class="switch-labelled span-2" for="s3-path-style">
+                  <span class="switch"><input type="checkbox" id="s3-path-style" x-model="storage.pathStyle" @change="stale('storage')"><span></span></span>
+                  <span>Use path-style addresses <span class="text-ink-500">(MinIO and most S3-compatible services need this)</span></span>
+                </label>
+              </div>
+              <div class="test-bar">
+                <button type="button" class="btn-secondary btn-sm" @click="test('storage')" :disabled="!storageReady || testing.storage">
+                  <svg x-show="testing.storage" viewBox="0 0 16 16" class="size-4 animate-spin motion-reduce:animate-none" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M8 1.75a6.25 6.25 0 1 0 6.25 6.25"/></svg>
+                  <span x-text="testing.storage ? 'Testing…' : 'Test connection'">Test connection</span>
+                </button>
+                <span class="field-help" x-show="!storageReady">Enter bucket, access key and secret key to test.</span>
+                <span class="field-help" x-show="storageReady &amp;&amp; !tests.storage &amp;&amp; !failure.storage &amp;&amp; !testing.storage">Checks that the bucket can be reached and written.</span>
+              </div>
+          <div x-show="failure.storage || tests.storage" x-cloak class="space-y-2" x-ref="storageResult" tabindex="-1" role="status" aria-live="polite">
+            <p class="alert-error" x-show="failure.storage" x-text="failure.storage"></p>
+            <ol class="test-steps" x-show="tests.storage" aria-label="Connection test steps">
+              <template x-for="step in (tests.storage ? tests.storage.steps : [])" :key="step.id">
+                <li class="test-step" :data-status="step.status"><svg x-show="step.status === 'OK'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="m5.25 8.25 1.9 1.9 3.6-3.9"/></svg><svg x-show="step.status === 'FAILED'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="m5.9 5.9 4.2 4.2m0-4.2-4.2 4.2"/></svg><svg x-show="step.status === 'SKIPPED'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M5.5 8h5"/></svg><span><span x-text="step.label"></span><span class="test-step__detail" x-show="step.detail" x-text="step.detail"></span></span></li>
+              </template>
+            </ol>
+            <p class="text-sm font-medium text-good-500" x-show="tests.storage &amp;&amp; tests.storage.ok">The bucket can be reached and written.</p>
+          </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="dialog-section" x-show="allowSearch" x-cloak>
+            <legend>Search backend</legend>
+            <div class="choice-group">
+              <label class="choice"><input type="radio" name="search-mode" value="GLOBAL" x-model="search.mode" @change="stale('searchBackend')"><span>Global search backend</span></label>
+              <label class="choice"><input type="radio" name="search-mode" value="CUSTOM" x-model="search.mode" @change="stale('searchBackend')"><span>Custom search backend</span></label>
+            </div>
+            <p class="field-help" x-show="search.mode === 'GLOBAL'">Searches use the installation's <span th:text="${globalSearch}">search index</span>.</p>
+
+            <div class="space-y-4" x-show="search.mode === 'CUSTOM'" x-cloak>
+              <div class="dialog-grid">
+                <div class="field span-2">
+                  <label class="field-label" for="search-backend">Backend</label>
+                  <select class="input" id="search-backend" x-model="search.backend" @change="backendChanged()">
+                    <template x-for="(entry, key) in searchBackends" :key="key"><option :value="key" x-text="entry.label" :selected="key === search.backend"></option></template>
+                  </select>
+                </div>
+                <div class="field span-2">
+                  <label class="field-label" for="search-endpoint" x-text="search.backend === 'pgvector' ? 'JDBC URL' : 'Endpoint'">Endpoint</label>
+                  <input class="input" id="search-endpoint" x-model="search.endpoint" @input="stale('searchBackend')" :placeholder="backend.endpoint" autocomplete="off" spellcheck="false" aria-describedby="search-endpoint-help">
+                  <p class="field-help" id="search-endpoint-help" x-text="backend.hint"></p>
+                </div>
+                <div class="field" x-show="backend.auth === 'key' || backend.auth === 'key-or-basic'">
+                  <label class="field-label" for="search-key">API key <span class="font-normal text-ink-500" x-show="backend.auth === 'key-or-basic'">(or user and password)</span></label>
+                  <input class="input" id="search-key" type="password" x-model="search.apiKey" @input="stale('searchBackend')" autocomplete="new-password">
+                </div>
+                <div class="field" x-show="backend.auth !== 'key'">
+                  <label class="field-label" for="search-user">User <span class="font-normal text-ink-500" x-show="backend.auth !== 'basic' || search.backend !== 'pgvector'">(optional)</span></label>
+                  <input class="input" id="search-user" x-model="search.username" @input="stale('searchBackend')" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field" x-show="backend.auth !== 'key'">
+                  <label class="field-label" for="search-password">Password</label>
+                  <input class="input" id="search-password" type="password" x-model="search.password" @input="stale('searchBackend')" autocomplete="new-password">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="search-prefix">Prefix <span class="font-normal text-ink-500">(optional)</span></label>
+                  <input class="input" id="search-prefix" x-model="search.prefix" @input="stale('searchBackend')" placeholder="contextcrate" autocomplete="off" spellcheck="false" :aria-invalid="!prefixValid" aria-describedby="search-prefix-help">
+                  <p class="field-help" id="search-prefix-help" :class="!prefixValid &amp;&amp; 'text-bad-500'" x-text="backend.prefixHint"></p>
+                </div>
+                <label class="switch-labelled span-2" for="search-trust" x-show="search.backend !== 'pgvector' &amp;&amp; search.endpoint.trim().startsWith('https')">
+                  <span class="switch"><input type="checkbox" id="search-trust" x-model="search.trust" @change="stale('searchBackend')"><span></span></span>
+                  <span>Accept a self-signed certificate <span class="text-ink-500">(for testing only; the certificate is not verified)</span></span>
+                </label>
+              </div>
+              <div class="test-bar">
+                <button type="button" class="btn-secondary btn-sm" @click="test('searchBackend')" :disabled="!searchReady || !prefixValid || testing.searchBackend">
+                  <svg x-show="testing.searchBackend" viewBox="0 0 16 16" class="size-4 animate-spin motion-reduce:animate-none" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M8 1.75a6.25 6.25 0 1 0 6.25 6.25"/></svg>
+                  <span x-text="testing.searchBackend ? 'Testing…' : 'Test connection'">Test connection</span>
+                </button>
+                <span class="field-help" x-show="!searchReady" x-text="search.backend === 'pgvector' ? 'Enter the JDBC URL and a user to test.' : 'Enter the endpoint to test.'"></span>
+                <span class="field-help" x-show="searchReady &amp;&amp; !tests.searchBackend &amp;&amp; !failure.searchBackend &amp;&amp; !testing.searchBackend">Writes and removes a test document in a temporary index.</span>
+              </div>
+          <div x-show="failure.searchBackend || tests.searchBackend" x-cloak class="space-y-2" x-ref="searchResult" tabindex="-1" role="status" aria-live="polite">
+            <p class="alert-error" x-show="failure.searchBackend" x-text="failure.searchBackend"></p>
+            <ol class="test-steps" x-show="tests.searchBackend" aria-label="Connection test steps">
+              <template x-for="step in (tests.searchBackend ? tests.searchBackend.steps : [])" :key="step.id">
+                <li class="test-step" :data-status="step.status"><svg x-show="step.status === 'OK'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="m5.25 8.25 1.9 1.9 3.6-3.9"/></svg><svg x-show="step.status === 'FAILED'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="m5.9 5.9 4.2 4.2m0-4.2-4.2 4.2"/></svg><svg x-show="step.status === 'SKIPPED'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M5.5 8h5"/></svg><span><span x-text="step.label"></span><span class="test-step__detail" x-show="step.detail" x-text="step.detail"></span></span></li>
+              </template>
+            </ol>
+            <p class="text-sm font-medium text-good-500" x-show="tests.searchBackend &amp;&amp; tests.searchBackend.ok">The backend accepts documents and finds them again.</p>
+          </div>
+            </div>
+          </fieldset>
+
+          <p class="field-help" x-show="storage.mode === 'S3' || search.mode === 'CUSTOM'" x-cloak>Dedicated settings are tested again when you create the crate. If a test fails, the crate is not created.</p>
+        </div>
+
+        <div class="dialog-footer">
+          <button th:unless="${onboardingCrateCreationRequired}" type="button" class="btn-secondary" data-ui-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-primary" :disabled="!canCreate"><span x-text="creating ? 'Creating…' : 'Create crate'">Create crate</span></button>
+        </div>
+      </form>
+    </div>
   </div>
 </main></body></html>

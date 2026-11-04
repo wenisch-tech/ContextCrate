@@ -11,6 +11,7 @@
     <nav class="settings-nav" aria-label="Settings sections">
       <p class="settings-nav__group">Crate</p>
       <a href="#general" :class="{'active':active==='general'}">General</a>
+      <a href="#backends" :class="{'active':active==='backends'}" th:if="${backends != null}">Storage &amp; search</a>
       <p class="settings-nav__group">Retrieval &amp; answers</p>
       <a href="#retrieval" :class="{'active':active==='retrieval'}">Retrieval</a>
       <a href="#context-header" :class="{'active':active==='context-header'}">Chunk headers</a>
@@ -40,6 +41,41 @@
           <div class="panel-footer"><span class="badge-warn" x-show="dirty" x-cloak>Unsaved changes</span><button class="btn-primary ml-auto">Save general settings</button></div>
         </section>
       </form>
+
+      <section id="backends" class="panel scroll-mt-24" th:if="${backends != null}" th:with="custom=${backends.storage.mode == 'S3' or backends.searchBackend.mode == 'CUSTOM'}" th:attr="x-data=|backendRetest('${crate.id}')|">
+        <div class="panel-header"><div><h2 class="settings-title">Storage &amp; search</h2><p class="settings-hint">Where this crate keeps its documents and its search index. Chosen when the crate was created; it cannot be changed afterwards.</p></div></div>
+        <div class="panel-body">
+          <div class="kv-row"><span>Document storage</span>
+            <span class="text-right" th:if="${backends.storage.mode == 'S3'}"><strong class="block text-white">Custom S3 storage</strong><span class="block break-all text-xs text-ink-500" th:text="|${backends.storage.endpoint != null ? backends.storage.endpoint : 'AWS S3'} · bucket ${backends.storage.bucket}${backends.storage.prefix != null ? ' / ' + backends.storage.prefix : ''}|"></span><span class="block text-xs text-ink-500" th:text="|Access key ${backends.storage.accessKey} · secret key ${backends.storage.secretKeyConfigured ? 'stored' : 'missing'}|"></span></span>
+            <strong class="text-white" th:unless="${backends.storage.mode == 'S3'}">Global storage provider</strong></div>
+          <div class="kv-row"><span>Search backend</span>
+            <span class="text-right" th:if="${backends.searchBackend.mode == 'CUSTOM'}"><strong class="block text-white" th:text="|Custom: ${backends.searchBackend.backend}|"></strong><span class="block break-all text-xs text-ink-500" th:text="${backends.searchBackend.endpoint}"></span><span class="block text-xs text-ink-500" th:text="|Prefix ${backends.searchBackend.prefix != null ? backends.searchBackend.prefix : 'contextcrate'}|"></span></span>
+            <strong class="text-white" th:unless="${backends.searchBackend.mode == 'CUSTOM'}">Global search backend</strong></div>
+          <div th:if="${custom}" class="mt-4 space-y-3">
+            <div class="test-bar">
+              <button type="button" class="btn-secondary btn-sm" @click="run()" :disabled="busy"><span x-text="busy ? 'Testing…' : 'Test connections'">Test connections</span></button>
+              <span class="field-help">Writes and removes a small test object. Does not touch the crate's data.</span>
+            </div>
+            <p class="alert-error" x-show="error" x-cloak x-text="error" role="alert"></p>
+            <div class="space-y-3" role="status" aria-live="polite" x-show="results" x-cloak>
+              <template x-for="(test, kind) in (results || {})" :key="kind">
+                <div>
+                  <p class="mb-1 text-xs font-semibold text-ink-300" x-text="kind === 'storage' ? 'Document storage' : 'Search backend'"></p>
+                  <ol class="test-steps">
+                    <template x-for="step in test.steps" :key="step.id">
+                      <li class="test-step" :data-status="step.status">
+                        <svg x-show="step.status === 'OK'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="m5.25 8.25 1.9 1.9 3.6-3.9"/></svg><svg x-show="step.status === 'FAILED'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="m5.9 5.9 4.2 4.2m0-4.2-4.2 4.2"/></svg><svg x-show="step.status === 'SKIPPED'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M5.5 8h5"/></svg>
+                        <span><span x-text="step.label"></span><span class="test-step__detail" x-show="step.detail" x-text="step.detail"></span></span>
+                      </li>
+                    </template>
+                  </ol>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       <!-- Retrieval & answers -->
       <form method="post" class="space-y-4" th:action="@{/crates/{id}/settings/rag(id=${crate.id})}" x-data="{dirty:false,qt:false}" x-init="qt=$el.querySelector('#query-transformation-enabled').checked" @input="dirty=true" @change="dirty=true; if($event.target.id==='query-transformation-enabled') qt=$event.target.checked; if($event.target.name==='queryTransformationStrategies' && $event.target.checked){ $el.querySelectorAll('[name=queryTransformationStrategies]').forEach(c=>{ if(c!==$event.target && ($event.target.value==='auto' || c.value==='auto')) c.checked=false }) }">

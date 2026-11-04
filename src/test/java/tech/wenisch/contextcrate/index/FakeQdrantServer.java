@@ -40,6 +40,7 @@ final class FakeQdrantServer implements AutoCloseable {
     JsonNode body = e.getRequestBody().available() >= 0 ? read(e) : null;
     if (failWith != 0) { reply(e, failWith, "{\"status\":{\"error\":\"boom\"}}"); return; }
     String[] p = path.split("/");
+    if (path.equals("/")) { reply(e, 200, "{\"title\":\"qdrant - vector search engine\",\"version\":\"1.15.0\"}"); return; }
     synchronized (this) {
       if (p.length == 2 && method.equals("GET")) { // /collections
         List<Map<String, String>> list = new ArrayList<>();

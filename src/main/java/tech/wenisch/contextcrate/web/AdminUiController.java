@@ -130,6 +130,13 @@ public class AdminUiController {
     return "redirect:/admin?modelPolicySaved#policies";
   }
 
+  @PostMapping("/settings/backend-policy")
+  String backendPolicy(@RequestParam(defaultValue = "false") boolean allowCustomStorage,
+      @RequestParam(defaultValue = "false") boolean allowCustomSearchBackend) {
+    administration.backendPolicy(allowCustomStorage, allowCustomSearchBackend);
+    return "redirect:/admin?backendPolicySaved#policies";
+  }
+
   @PostMapping("/settings/onboarding-policy")
   String onboardingPolicy(@RequestParam SystemSetting.OnboardingPolicy policy,
       @RequestParam(required = false) UUID crateId) {

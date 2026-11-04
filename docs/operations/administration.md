@@ -93,6 +93,15 @@ model to have them described (see [Images](../features/images.md)). Shared model
 Turning a switch off does not break crates that already use such a setup; it only makes that part
 of their provider settings read-only. Downloading the already-configured local model stays possible.
 
+## Dedicated storage and search policy
+
+Under **Policies → Dedicated storage and search**, two switches (both **off** by default) decide whether crate creators may
+create a crate with its own S3-compatible storage and/or its own search backend (OpenSearch, Elasticsearch, Qdrant, pgvector)
+instead of the installation's providers. The choice is made in the **Create a crate** dialog, is tested before the crate is
+created, and is fixed afterwards. Endpoints in private networks are refused unless `contextcrate.crawler.allow-private-networks`
+is on. Turning a switch off does not affect existing crates. See
+[Dedicated storage and search per crate](../features/crate-backends.md).
+
 ## Models
 
 The **Models** tab manages **shared models**: named embedding, reranking, answer and judge endpoints that

@@ -24,6 +24,15 @@ public class SystemSetting {
   private boolean allowLocalModels = true;
   @Column(name = "allow_vision_descriptions", nullable = false)
   private boolean allowVisionDescriptions = true;
+  @Column(name = "allow_custom_storage", nullable = false)
+  private boolean allowCustomStorage;
+  @Column(name = "allow_custom_search_backend", nullable = false)
+  private boolean allowCustomSearchBackend;
+  public boolean isAllowCustomStorage() { return allowCustomStorage; }
+  public boolean isAllowCustomSearchBackend() { return allowCustomSearchBackend; }
+  public void backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend) {
+    this.allowCustomStorage = allowCustomStorage; this.allowCustomSearchBackend = allowCustomSearchBackend;
+  }
   public boolean isAllowVisionDescriptions() { return allowVisionDescriptions; }
   public void allowVisionDescriptions(boolean value) { this.allowVisionDescriptions = value; }
   protected SystemSetting() {}

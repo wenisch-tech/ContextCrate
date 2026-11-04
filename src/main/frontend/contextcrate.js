@@ -138,6 +138,112 @@ Alpine.data('asyncAction', () => ({
   }
 }));
 
+
+// "Create a crate" dialog: name and description, and, when the administrator allows it, a dedicated S3 storage
+// and/or search backend with a connection test for each. Talks to the REST API with the session cookie.
+const SEARCH_BACKENDS = {
+  opensearch: { label: 'OpenSearch', endpoint: 'https://opensearch.example.com:9200', hint: 'Base URL of the cluster.', auth: 'basic', prefixHint: 'Index names start with this prefix.' },
+  elasticsearch: { label: 'Elasticsearch', endpoint: 'https://elasticsearch.example.com:9200', hint: 'Base URL of the cluster (Elasticsearch 8 or newer).', auth: 'key-or-basic', prefixHint: 'Index names start with this prefix.' },
+  qdrant: { label: 'Qdrant', endpoint: 'https://qdrant.example.com:6333', hint: 'Base URL of the REST API (Qdrant 1.10 or newer).', auth: 'key', prefixHint: 'Collection names start with this prefix.' },
+  pgvector: { label: 'PostgreSQL with pgvector', endpoint: 'jdbc:postgresql://db.example.com:5432/contextcrate', hint: 'JDBC URL of a database that has the pgvector extension.', auth: 'basic', prefixHint: 'Lowercase letters, digits and underscores, up to 20 characters.' }
+};
+
+Alpine.data('createCrate', (config = {}) => ({
+  allowStorage: !!config.allowStorage, allowSearch: !!config.allowSearch, searchBackends: SEARCH_BACKENDS,
+  name: '', description: '',
+  storage: { mode: 'GLOBAL', endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '', pathStyle: true },
+  search: { mode: 'GLOBAL', backend: 'elasticsearch', endpoint: '', apiKey: '', username: '', password: '', prefix: '', trust: false },
+  tests: { storage: null, searchBackend: null }, testing: { storage: false, searchBackend: false },
+  failure: { storage: '', searchBackend: '' }, creating: false, formError: '',
+  get hasChoices() { return this.allowStorage || this.allowSearch; },
+  get backend() { return this.searchBackends[this.search.backend]; },
+  get storageReady() { const s = this.storage; return !!(s.bucket.trim() && s.accessKey.trim() && s.secretKey); },
+  get searchReady() {
+    const s = this.search;
+    if (!s.endpoint.trim()) return false;
+    return s.backend !== 'pgvector' || !!s.username.trim();
+  },
+  get prefixValid() { return this.search.backend !== 'pgvector' || !this.search.prefix || /^[a-z][a-z0-9_]{0,19}$/.test(this.search.prefix); },
+  get canCreate() {
+    if (!this.name.trim() || this.creating) return false;
+    if (this.storage.mode === 'S3' && !this.storageReady) return false;
+    if (this.search.mode === 'CUSTOM' && !(this.searchReady && this.prefixValid)) return false;
+    return true;
+  },
+  // Another backend needs another endpoint and other credentials, so the fields of the previous one are cleared.
+  backendChanged() {
+    Object.assign(this.search, { endpoint: '', apiKey: '', username: '', password: '', prefix: '', trust: false });
+    this.stale('searchBackend');
+  },
+  // A changed field makes an earlier test result stale.
+  stale(kind) { this.tests[kind] = null; this.failure[kind] = ''; },
+  storagePayload() {
+    const s = this.storage;
+    return { mode: s.mode, endpoint: s.endpoint, region: s.region, bucket: s.bucket, prefix: s.prefix, accessKey: s.accessKey, secretKey: s.secretKey, pathStyle: s.pathStyle };
+  },
+  searchPayload() {
+    const s = this.search;
+    return { mode: s.mode, backend: s.backend, endpoint: s.endpoint, apiKey: s.apiKey, username: s.username, password: s.password, prefix: s.prefix, trustAllCertificates: s.trust };
+  },
+  async request(url, body) {
+    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+    let result = {};
+    try { result = await response.json(); } catch { /* an empty or non-JSON answer */ }
+    return { ok: response.ok, status: response.status, result };
+  },
+  async test(kind) {
+    this.testing[kind] = true; this.tests[kind] = null; this.failure[kind] = '';
+    try {
+      const url = kind === 'storage' ? '/api/v1/crates/test-storage' : '/api/v1/crates/test-search-backend';
+      const { ok, result } = await this.request(url, kind === 'storage' ? this.storagePayload() : this.searchPayload());
+      if (ok) this.tests[kind] = result;
+      else this.failure[kind] = result.error || 'The test could not be run.';
+    } catch { this.failure[kind] = 'The server could not be reached. Check your connection and try again.'; }
+    finally {
+      this.testing[kind] = false;
+      // The result can land below the fold of the scrolling dialog body.
+      this.$nextTick(() => this.$refs[kind === 'storage' ? 'storageResult' : 'searchResult']?.scrollIntoView({ block: 'nearest' }));
+    }
+  },
+  async create() {
+    if (!this.canCreate) return;
+    this.creating = true; this.formError = ''; this.failure.storage = ''; this.failure.searchBackend = '';
+    const body = { name: this.name.trim(), description: this.description.trim() };
+    if (this.storage.mode === 'S3') body.storage = this.storagePayload();
+    if (this.search.mode === 'CUSTOM') body.searchBackend = this.searchPayload();
+    try {
+      const { ok, status, result } = await this.request('/api/v1/crates', body);
+      if (ok) { window.location.assign(`/crates/${result.id}`); return; }
+      if (status === 422 && result.field) {
+        // The steps below name the failed check; the message above only has to say what happened to the crate.
+        this.failure[result.field] = result.steps
+          ? `The crate was not created because the ${result.field === 'storage' ? 'storage' : 'search backend'} test failed. Fix the step marked in red and try again.`
+          : result.error;
+        this.tests[result.field] = result.steps ? { ok: false, steps: result.steps } : null;
+        this.$nextTick(() => this.$refs[result.field === 'storage' ? 'storageResult' : 'searchResult']?.focus());
+      } else {
+        this.formError = status === 403 ? 'You are not allowed to create crates.' : (result.error || 'The crate could not be created.');
+      }
+    } catch { this.formError = 'The server could not be reached. Check your connection and try again.'; }
+    this.creating = false;
+  }
+}));
+
+// Re-tests the dedicated backends of an existing crate (crate settings page).
+Alpine.data('backendRetest', crateId => ({
+  busy: false, error: '', results: null,
+  async run() {
+    this.busy = true; this.error = ''; this.results = null;
+    try {
+      const response = await fetch(`/api/v1/crates/${crateId}/backends/test`, { method: 'POST', headers: { Accept: 'application/json' } });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'The test could not be run.');
+      this.results = result;
+    } catch (e) { this.error = e.message || 'The test could not be run.'; }
+    finally { this.busy = false; }
+  }
+}));
+
 window.Alpine = Alpine;
 document.addEventListener('alpine:initialized', () => createIcons({ icons }));
 Alpine.start();
@@ -153,6 +259,7 @@ document.addEventListener('click', event => {
   if (modalTrigger) {
     const modal = document.querySelector(modalTrigger.dataset.uiTarget);
     modal?.classList.add('show');
+    modal?.querySelector('[data-autofocus], input:not([type=hidden]), textarea')?.focus();
   }
   const dismiss = event.target.closest('[data-ui-dismiss="modal"]');
   if (dismiss) dismiss.closest('.modal')?.classList.remove('show');
@@ -169,6 +276,11 @@ document.addEventListener('click', event => {
 });
 document.addEventListener('click', event => {
   if (event.target.classList.contains('modal') && event.target.dataset.onboardingRequired !== 'true') event.target.classList.remove('show');
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  document.querySelectorAll('.modal.show').forEach(modal => { if (modal.dataset.onboardingRequired !== 'true') modal.classList.remove('show'); });
 });
 
 const requiredOnboardingModal = document.querySelector('.modal[data-onboarding-required="true"]');

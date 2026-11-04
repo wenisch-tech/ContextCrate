@@ -16,7 +16,7 @@ keyword index and the vectors live.
 | Authentication | Not applicable | Not configured (secure the network) | API key or user and password | Optional API key | PostgreSQL user and password |
 | Requires | Nothing | OpenSearch 2 or 3 | Elasticsearch 8 or 9 | Qdrant 1.10 or newer | PostgreSQL 13 or newer with the `vector` extension (pgvector 0.5 or newer) |
 
-The backend is a **deployment** setting, not a crate setting. All crates of an installation use the same backend;
+The backend is a **deployment** setting. All crates of an installation use the same backend unless the administrator allows [dedicated search backends per crate](features/crate-backends.md), where a crate can be created with an OpenSearch, Elasticsearch, Qdrant or pgvector service of its own;
 each crate and each index generation has its own physical index, collection or table (see [Crates](crates.md)).
 
 ## Choosing the backend

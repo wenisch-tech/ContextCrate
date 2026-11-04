@@ -76,13 +76,84 @@ public class CrateService {
     return crates.save(crate);
   }
 
+  // Dedicated storage / search backend (optional collaborators keep the service usable without them).
+  private tech.wenisch.contextcrate.repository.CrateBackendSettingsRepository backendSettings;
+  private tech.wenisch.contextcrate.storage.StorageConnectionTester storageTester;
+  private tech.wenisch.contextcrate.index.SearchBackendTester searchTester;
+  private tech.wenisch.contextcrate.storage.RoutingArtifactStore routingStore;
+  private tech.wenisch.contextcrate.index.RoutingSearchIndex routingIndex;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setBackends(tech.wenisch.contextcrate.repository.CrateBackendSettingsRepository repository,
+      tech.wenisch.contextcrate.storage.StorageConnectionTester storageTester, tech.wenisch.contextcrate.index.SearchBackendTester searchTester,
+      tech.wenisch.contextcrate.storage.RoutingArtifactStore store, tech.wenisch.contextcrate.index.RoutingSearchIndex index) {
+    this.backendSettings = repository; this.storageTester = storageTester; this.searchTester = searchTester;
+    this.routingStore = store; this.routingIndex = index;
+  }
+
+  public Crate create(String name, String description) { return create(name, description, null); }
+
+  /** Tests a storage configuration before the crate exists (the dialog's "Test connection"). */
+  public tech.wenisch.contextcrate.backend.ConnectionTest testStorage(tech.wenisch.contextcrate.backend.BackendChoice.StorageChoice choice) {
+    requireBackendPolicy(true, false);
+    return storageTester.test(choice.toConfig());
+  }
+
+  public tech.wenisch.contextcrate.backend.ConnectionTest testSearchBackend(tech.wenisch.contextcrate.backend.BackendChoice.SearchChoice choice) {
+    requireBackendPolicy(false, true);
+    return searchTester.test(choice.toConfig());
+  }
+
+  /** The creation right and the matching policy are required to even test a configuration, so the test cannot be used to probe the network. */
+  private void requireBackendPolicy(boolean storage, boolean search) {
+    if (!canCreate()) throw new org.springframework.security.access.AccessDeniedException("Crate creation is restricted");
+    SystemSetting policy = settings.findById(1).orElseThrow();
+    if (storage && !policy.isAllowCustomStorage())
+      throw new tech.wenisch.contextcrate.backend.BackendValidationException("storage", "Dedicated storage is not enabled by the administrator", null);
+    if (search && !policy.isAllowCustomSearchBackend())
+      throw new tech.wenisch.contextcrate.backend.BackendValidationException("searchBackend", "A dedicated search backend is not enabled by the administrator", null);
+  }
+
+  /** Checks the choice against the policy and the connection tests; returns the settings to store, or {@code null} for the global providers. */
+  private CrateBackendSettings validatedBackends(tech.wenisch.contextcrate.backend.BackendChoice choice, UUID crateId) {
+    if (choice == null || !(choice.customStorage() || choice.customSearch())) return null;
+    if (backendSettings == null) throw new IllegalStateException("Dedicated backends are not available");
+    requireBackendPolicy(choice.customStorage(), choice.customSearch());
+    CrateBackendSettings row = new CrateBackendSettings(crateId);
+    if (choice.customStorage()) {
+      var config = choice.storage().toConfig();
+      var test = storageTester.test(config);
+      if (!test.ok()) throw new tech.wenisch.contextcrate.backend.BackendValidationException("storage", failure("The storage cannot be used", test), test);
+      row.s3(config);
+    }
+    if (choice.customSearch()) {
+      var config = choice.searchBackend().toConfig();
+      var test = searchTester.test(config);
+      if (!test.ok()) throw new tech.wenisch.contextcrate.backend.BackendValidationException("searchBackend", failure("The search backend cannot be used", test), test);
+      row.index(config);
+    }
+    return row;
+  }
+
+  private static String failure(String prefix, tech.wenisch.contextcrate.backend.ConnectionTest test) {
+    return test.steps().stream().filter(s -> s.status() == tech.wenisch.contextcrate.backend.ConnectionTest.Status.FAILED).findFirst()
+        .map(s -> prefix + ": " + s.label() + " failed. " + (s.detail() == null ? "" : s.detail())).orElse(prefix);
+  }
+
   @Transactional
-  public Crate create(String name, String description) {
+  public Crate create(String name, String description, tech.wenisch.contextcrate.backend.BackendChoice choice) {
     AppUser user = access.currentUser();
     if (!canCreate()) throw new org.springframework.security.access.AccessDeniedException("Crate creation is restricted");
+    UUID crateId = UUID.randomUUID();
+    CrateBackendSettings backend = validatedBackends(choice, crateId);
     // Flushed rather than saved: initializeConfiguration writes through JdbcTemplate, which does
     // not trigger a Hibernate flush, so the crate row must already exist for its foreign keys.
-    Crate crate = crates.saveAndFlush(new Crate(UUID.randomUUID(), name, description, user.getId()));
+    Crate crate = crates.saveAndFlush(new Crate(crateId, name, description, user.getId()));
+    if (backend != null) {
+      backendSettings.save(backend);
+      if (routingStore != null) routingStore.invalidate(crateId);
+      if (routingIndex != null) routingIndex.invalidate(crateId);
+    }
     members.save(new CrateMember(crate.getId(), user.getId(), CrateMember.Role.OWNER, user.getId()));
     initializeConfiguration(crate.getId());
     audits.save(new AuditLog(crate.getId(), user.getEmail(), "CRATE_CREATED", crate.getId().toString(), name));

@@ -13,9 +13,13 @@ public class HomeUiController {
   private final CrateService crates;
   private final CrateOverviewService overview;
   private final CrateAccessService access;
+  private tech.wenisch.contextcrate.service.SystemSettingsService systemSettings;
+  private tech.wenisch.contextcrate.config.ContextCrateProperties properties;
   public HomeUiController(CrateService crates,CrateOverviewService overview,CrateAccessService access){
     this.crates=crates;this.overview=overview;this.access=access;
   }
+  @org.springframework.beans.factory.annotation.Autowired(required=false)
+  void setBackendSupport(tech.wenisch.contextcrate.service.SystemSettingsService systemSettings,tech.wenisch.contextcrate.config.ContextCrateProperties properties){this.systemSettings=systemSettings;this.properties=properties;}
   @GetMapping("/login") String login(){return "login";}
   @GetMapping("/") String home(Model model){
     var accessible=crates.accessible();
@@ -34,5 +38,12 @@ public class HomeUiController {
     model.addAttribute("onboardingCrateCreationRequired",access.currentUser().isOnboardingCrateCreationRequired());
     model.addAttribute("isAdmin",access.isAdmin());
     model.addAttribute("currentUser",access.currentUser());
+    // The create dialog offers a dedicated storage / search backend only when the administrator allows it.
+    var policy=systemSettings==null?null:systemSettings.current();
+    model.addAttribute("allowCustomStorage",policy!=null&&policy.isAllowCustomStorage());
+    model.addAttribute("allowCustomSearchBackend",policy!=null&&policy.isAllowCustomSearchBackend());
+    model.addAttribute("globalStorage",properties==null||!"s3".equals(properties.artifacts().backend())?"local file storage":"S3 storage");
+    model.addAttribute("globalSearch",properties==null?"search index":switch(properties.index().backend()){
+      case "opensearch"->"OpenSearch cluster";case "elasticsearch"->"Elasticsearch cluster";case "qdrant"->"Qdrant server";case "pgvector"->"PostgreSQL pgvector index";default->"built-in Lucene index";});
   }
 }

@@ -131,6 +131,14 @@ public class UserAdministrationService {
   }
 
   @Transactional
+  public SystemSetting backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend) {
+    requireAdmin();
+    SystemSetting setting = settings.findById(1).orElseThrow();
+    setting.backendPolicy(allowCustomStorage, allowCustomSearchBackend);
+    return settings.save(setting);
+  }
+
+  @Transactional
   public SystemSetting timeZone(String timeZone) {
     requireAdmin();
     try { java.time.ZoneId.of(timeZone); }

@@ -94,6 +94,10 @@ User payloads never include the password hash. Two changes are always rejected: 
 
 Errors use the standard API exception envelope and never redirect a REST client to another crate. The previous unscoped `/api/v1/jobs`, `/search`, `/answers`, and `/backups` contracts were removed.
 
+## Dedicated storage and search
+
+`POST /api/v1/crates` accepts optional `storage` (`mode` `S3`) and `searchBackend` (`mode` `CUSTOM`) objects, which are only allowed when the administrator enabled them (`PUT /api/v1/admin/settings/backend-policy`). `POST /api/v1/crates/test-storage` and `POST /api/v1/crates/test-search-backend` test a configuration before the crate exists; `GET /api/v1/crates/{crateId}/backends` returns a crate's configuration without secrets and `POST /api/v1/crates/{crateId}/backends/test` tests it again. A refused configuration answers `422` with the failed steps. See [Dedicated storage and search per crate](features/crate-backends.md).
+
 ## Sources and ingestion jobs
 
 Create a Git source:

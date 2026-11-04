@@ -26,6 +26,11 @@ public record ContextCrateProperties(
     this(profile, role, queue, database, artifacts, index, null, null, null, null, worker, security);
   }
 
+  /** The same properties with another search index configuration, used for a crate's dedicated backend. */
+  public ContextCrateProperties withIndex(Index index) {
+    return new ContextCrateProperties(profile, role, queue, database, artifacts, index, embeddings, reranking, retrieval, answering, worker, security);
+  }
+
   @ConstructorBinding
   public ContextCrateProperties {
     profile = defaulted(profile, "standalone");

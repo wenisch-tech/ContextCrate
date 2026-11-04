@@ -18,6 +18,17 @@ public class ApiExceptionHandler {
                 e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
   }
 
+  /** A refused or failed dedicated backend: which part, why, and the steps of the connection test. */
+  @ExceptionHandler(tech.wenisch.contextcrate.backend.BackendValidationException.class)
+  ResponseEntity<Map<String, Object>> backend(tech.wenisch.contextcrate.backend.BackendValidationException e) {
+    Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("timestamp", Instant.now().toString());
+    body.put("error", e.getMessage());
+    body.put("field", e.field());
+    if (e.test() != null) body.put("steps", e.test().steps());
+    return ResponseEntity.unprocessableEntity().body(body);
+  }
+
   @ExceptionHandler(java.util.NoSuchElementException.class)
   ResponseEntity<Map<String, Object>> notFound(RuntimeException e) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)

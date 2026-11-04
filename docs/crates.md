@@ -73,3 +73,7 @@ entered by the new owner, and imported documents are queued for indexing into a 
 - [Using ContextCrate](usage.md) and [Tutorials](tutorials.md): creating and working with crates.
 - [Export, import and recovery](backup-migration.md): moving crates between installations.
 - [Administration](operations/administration.md): the crate-creation policy.
+
+## Dedicated storage and search
+
+A crate normally uses the installation's artifact storage and search backend. If the administrator allows it, a crate can be created with its own S3-compatible storage and/or its own search backend; the choice is fixed afterwards. See [Dedicated storage and search per crate](features/crate-backends.md).

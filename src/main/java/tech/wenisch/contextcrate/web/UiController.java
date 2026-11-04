@@ -497,6 +497,9 @@ public class UiController {
     }
   }
 
+  private tech.wenisch.contextcrate.service.CrateBackendService backendService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setBackendService(tech.wenisch.contextcrate.service.CrateBackendService backendService) { this.backendService = backendService; }
   private tech.wenisch.contextcrate.repository.ChunkQuestionRepository chunkQuestions;
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   void setChunkQuestions(tech.wenisch.contextcrate.repository.ChunkQuestionRepository repository) { this.chunkQuestions = repository; }
@@ -625,6 +628,7 @@ public class UiController {
   String settings(@PathVariable UUID crateId,Model model) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     model.addAttribute("rag", ragSettings.current(crateId));
+    if (backendService != null) model.addAttribute("backends", backendService.view(crateId));
     model.addAttribute("answering", properties.answering());
     var sharedSelection = providerSettings.selection(crateId);
     model.addAttribute("sharedSelection", sharedSelection);
