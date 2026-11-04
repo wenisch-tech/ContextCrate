@@ -69,22 +69,34 @@ public record ContextCrateProperties(
   }
 
   /**
-   * @param endpoint base URL of the OpenSearch or Qdrant service; defaults to that backend's usual local port
-   * @param apiKey optional API key sent to Qdrant ({@code api-key} header); blank means none
+   * @param endpoint base URL of OpenSearch, Elasticsearch or Qdrant (defaults to that backend's usual local port);
+   *     for {@code pgvector} a JDBC URL, blank meaning the application's own PostgreSQL database
+   * @param apiKey optional API key (Qdrant {@code api-key} header, Elasticsearch {@code Authorization: ApiKey})
+   * @param username optional user for Elasticsearch (basic authentication) and pgvector (JDBC)
+   * @param password password belonging to {@code username}
+   * @param trustAllCertificates accept any TLS certificate of the Elasticsearch/Qdrant endpoint (development only)
    */
-  public record Index(String backend, Path path, String endpoint, String prefix, String apiKey) {
+  public record Index(String backend, Path path, String endpoint, String prefix, String apiKey,
+      String username, String password, boolean trustAllCertificates) {
     @ConstructorBinding
     public Index {
       backend = defaulted(backend, "lucene");
       path = path == null ? Path.of("data/index") : path;
       prefix = defaulted(prefix, "contextcrate");
-      if (endpoint == null || endpoint.isBlank())
+      if ("pgvector".equals(backend)) endpoint = endpoint == null ? "" : endpoint.strip();
+      else if (endpoint == null || endpoint.isBlank())
         endpoint = "qdrant".equals(backend) ? "http://localhost:6333" : "http://localhost:9200";
       apiKey = apiKey == null || apiKey.isBlank() ? null : apiKey.strip();
+      username = username == null || username.isBlank() ? null : username.strip();
+      password = password == null || password.isEmpty() ? null : password;
+    }
+
+    public Index(String backend, Path path, String endpoint, String prefix, String apiKey) {
+      this(backend, path, endpoint, prefix, apiKey, null, null, false);
     }
 
     public Index(String backend, Path path, String endpoint, String prefix) {
-      this(backend, path, endpoint, prefix, null);
+      this(backend, path, endpoint, prefix, null, null, null, false);
     }
   }
 

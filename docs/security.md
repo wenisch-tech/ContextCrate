@@ -6,7 +6,7 @@
 - Run browser workers with minimal Kubernetes permissions, no service-account token, constrained egress, and separate resource limits.
 - Artifact keys are normalized and cannot escape the configured filesystem root.
 - Queue messages contain references and identifiers, never raw content or credentials.
-- S3, database, RabbitMQ, OpenSearch and Qdrant credentials (the Qdrant API key is `CONTEXTCRATE_INDEX_API_KEY`) come from environment/secret stores. Git
+- S3, database, RabbitMQ and search-service credentials (`CONTEXTCRATE_INDEX_API_KEY`, `CONTEXTCRATE_INDEX_USERNAME`, `CONTEXTCRATE_INDEX_PASSWORD` for Elasticsearch, Qdrant and pgvector) come from environment/secret stores. Git
   HTTPS tokens currently live in Git ingestion-job configuration JSON; they are redacted externally but not
   encrypted at rest, so protect database access and backups.
 - [RAG evaluation](features/evaluation.md) is off by default and managed by crate owners. When enabled, the judge model receives the question, the retrieved chunks and the answer, so approve its endpoint as a data processor. Text is kept only until a case is scored (or for the retention period with per-question logging); judge API keys entered by an owner on the evaluation page are database-resident, like answer-model overrides.

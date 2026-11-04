@@ -3,11 +3,6 @@ package tech.wenisch.contextcrate.index;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,9 +31,9 @@ public class QdrantSearchIndex implements SearchIndex {
   static final String DENSE = "dense", SPARSE = "text";
   static final int UPSERT_BATCH = 64, EMBED_BATCH = 32, MAX_DOCUMENT_TEXT = 200_000;
 
-  private final HttpClient client = HttpClient.newHttpClient();
   private final ObjectMapper mapper;
-  private final String endpoint, prefix, apiKey;
+  private final RestIndexClient http;
+  private final String prefix;
   private final EmbeddingProvider embeddings;
   private final RerankingProvider reranking;
   private final ContextCrateProperties.Retrieval retrieval;
@@ -49,9 +44,8 @@ public class QdrantSearchIndex implements SearchIndex {
   public QdrantSearchIndex(ContextCrateProperties properties, ObjectMapper mapper, EmbeddingProvider embeddings,
       RerankingProvider reranking, CrateRepository crates) {
     this.mapper = mapper;
-    this.endpoint = properties.index().endpoint().replaceAll("/+$", "");
+    this.http = new RestIndexClient("Qdrant", properties.index(), "api-key");
     this.prefix = properties.index().prefix();
-    this.apiKey = properties.index().apiKey();
     this.embeddings = embeddings;
     this.reranking = reranking;
     this.retrieval = properties.retrieval();
@@ -116,7 +110,7 @@ public class QdrantSearchIndex implements SearchIndex {
     try {
       String name = collection(crateId, generation(crateId));
       JsonNode info = mapper.readTree(request("GET", "/collections/" + name, null, Set.of(200)).body()).path("result");
-      return new IndexHealth(crateId, "qdrant", true, info.path("points_count").asLong(), endpoint + "; embeddings=" + embeddings.available());
+      return new IndexHealth(crateId, "qdrant", true, info.path("points_count").asLong(), http.endpoint() + "; embeddings=" + embeddings.available());
     } catch (Exception e) {
       return new IndexHealth(crateId, "qdrant", false, 0, e.getMessage());
     }
@@ -311,23 +305,11 @@ public class QdrantSearchIndex implements SearchIndex {
     if (chunk && "question".equals(s.path("record_type").asText(""))) retrieval = source;
     float score = (float) point.path("score").asDouble();
     return new SearchHit(id, document, UUID.fromString(s.path("run_id").asText()), kind, s.path("title").asText(null), s.path("url").asText(null),
-        chunk ? s.path("ordinal").asInt() : null, snippet(retrieval, query), score, lexical ? score : null, lexical ? null : score, null, source, retrieval);
+        chunk ? s.path("ordinal").asInt() : null, SearchSnippets.snippet(retrieval, query), score, lexical ? score : null, lexical ? null : score, null, source, retrieval);
   }
 
-  private List<SearchHit> fuse(List<SearchHit> a, List<SearchHit> b, int limit) {
-    Map<UUID, SearchHit> all = new LinkedHashMap<>();
-    Map<UUID, Float> score = new HashMap<>();
-    for (int i = 0; i < a.size(); i++) { all.put(a.get(i).id(), a.get(i)); score.merge(a.get(i).id(), 1f / (retrieval.rrfConstant() + i + 1), Float::sum); }
-    for (int i = 0; i < b.size(); i++) { all.putIfAbsent(b.get(i).id(), b.get(i)); score.merge(b.get(i).id(), 1f / (retrieval.rrfConstant() + i + 1), Float::sum); }
-    return all.values().stream()
-        .map(h -> new SearchHit(h.id(), h.documentId(), h.runId(), h.kind(), h.title(), h.sourceUri(), h.chunkOrdinal(), h.snippet(), score.get(h.id()),
-            scoreOf(a, h.id(), true), scoreOf(b, h.id(), false), null, h.content(), h.retrievalContent()))
-        .sorted(Comparator.comparing(SearchHit::score).reversed().thenComparing(h -> h.id().toString()))
-        .limit(limit).toList();
-  }
-
-  private static Float scoreOf(List<SearchHit> list, UUID id, boolean lexical) {
-    return list.stream().filter(h -> h.id().equals(id)).map(h -> lexical ? h.lexicalScore() : h.semanticScore()).findFirst().orElse(null);
+  private List<SearchHit> fuse(List<SearchHit> lexical, List<SearchHit> semantic, int limit) {
+    return HybridFusion.fuse(lexical, semantic, retrieval.rrfConstant(), limit);
   }
 
   // ---- helpers -------------------------------------------------------------------------------
@@ -337,14 +319,6 @@ public class QdrantSearchIndex implements SearchIndex {
   private static String nullable(String value) { return value == null ? "" : value; }
 
   private static String cap(String value) { return value.length() > MAX_DOCUMENT_TEXT ? value.substring(0, MAX_DOCUMENT_TEXT) : value; }
-
-  private static String snippet(String text, String query) {
-    if (text == null) return "";
-    if (text.length() <= 240) return text;
-    int m = text.toLowerCase(Locale.ROOT).indexOf(query.toLowerCase(Locale.ROOT));
-    int start = m < 0 ? 0 : Math.max(0, m - 100), end = Math.min(text.length(), start + 240);
-    return (start > 0 ? "..." : "") + text.substring(start, end) + (end < text.length() ? "..." : "");
-  }
 
   private static String detail(Exception error) {
     StringBuilder detail = new StringBuilder();
@@ -357,15 +331,7 @@ public class QdrantSearchIndex implements SearchIndex {
     return detail.isEmpty() ? error.getClass().getSimpleName() : detail.toString();
   }
 
-  private record Response(int status, String body) {}
-
-  private Response request(String method, String path, String body, Set<Integer> expected) throws IOException, InterruptedException {
-    var builder = HttpRequest.newBuilder(URI.create(endpoint + path)).header("Content-Type", "application/json");
-    if (apiKey != null) builder.header("api-key", apiKey);
-    builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
-    var response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
-    if (!expected.contains(response.statusCode()))
-      throw new IOException("Qdrant " + method + " " + path + " returned " + response.statusCode() + ": " + response.body());
-    return new Response(response.statusCode(), response.body());
+  private RestIndexClient.Response request(String method, String path, String body, Set<Integer> expected) throws IOException, InterruptedException {
+    return http.request(method, path, body, expected);
   }
 }

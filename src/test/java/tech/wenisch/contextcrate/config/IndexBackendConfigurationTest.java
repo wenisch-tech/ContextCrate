@@ -30,9 +30,48 @@ class IndexBackendConfigurationTest {
 
   @Test
   void theValidatorAcceptsLuceneOpenSearchAndQdrantOnly() {
-    for (String backend : new String[] {"lucene", "opensearch", "qdrant"})
+    for (String backend : new String[] {"lucene", "opensearch", "elasticsearch", "qdrant"})
       assertThatCode(() -> new BackendConfigurationValidator(properties(backend)).run(new DefaultApplicationArguments())).doesNotThrowAnyException();
     assertThatThrownBy(() -> new BackendConfigurationValidator(properties("pinecone")).run(new DefaultApplicationArguments()))
         .isInstanceOf(IllegalStateException.class).hasMessageContaining("Allowed");
+  }
+
+  private static ContextCrateProperties pgvector(String database, String endpoint, String prefix) {
+    return new ContextCrateProperties("standalone", "all", new ContextCrateProperties.Queue("local"), new ContextCrateProperties.Database(database), null,
+        new ContextCrateProperties.Index("pgvector", Path.of("data/index"), endpoint, prefix), null, null);
+  }
+
+  private static void validate(ContextCrateProperties properties) {
+    new BackendConfigurationValidator(properties).run(new DefaultApplicationArguments());
+  }
+
+  @Test
+  void elasticsearchDefaultsToTheUsualPort() {
+    assertThat(new ContextCrateProperties.Index("elasticsearch", null, null, null).endpoint()).isEqualTo("http://localhost:9200");
+  }
+
+  @Test
+  void pgvectorNeedsAJdbcUrlUnlessTheApplicationDatabaseIsPostgresql() {
+    assertThat(new ContextCrateProperties.Index("pgvector", null, null, null).endpoint()).isEmpty();
+    assertThatCode(() -> validate(pgvector("postgresql", "", "contextcrate"))).doesNotThrowAnyException();
+    assertThatCode(() -> validate(pgvector("h2", "jdbc:postgresql://db:5432/idx", "contextcrate"))).doesNotThrowAnyException();
+    assertThatThrownBy(() -> validate(pgvector("h2", "", "contextcrate"))).isInstanceOf(IllegalStateException.class).hasMessageContaining("jdbc:postgresql");
+    assertThatThrownBy(() -> validate(pgvector("postgresql", "http://localhost:9200", "contextcrate"))).isInstanceOf(IllegalStateException.class).hasMessageContaining("jdbc:postgresql");
+  }
+
+  @Test
+  void pgvectorPrefixMustBeAShortPlainIdentifier() {
+    for (String bad : new String[] {"Bad", "1abc", "has-dash", "x".repeat(21), "a b"})
+      assertThatThrownBy(() -> validate(pgvector("postgresql", "", bad))).isInstanceOf(IllegalStateException.class).hasMessageContaining("prefix");
+    assertThatCode(() -> validate(pgvector("postgresql", "", "my_idx1"))).doesNotThrowAnyException();
+  }
+
+  @Test
+  void credentialsAreTrimmedAndBlankMeansNone() {
+    var index = new ContextCrateProperties.Index("elasticsearch", null, null, null, " key ", " elastic ", "", true);
+    assertThat(index.apiKey()).isEqualTo("key");
+    assertThat(index.username()).isEqualTo("elastic");
+    assertThat(index.password()).isNull();
+    assertThat(index.trustAllCertificates()).isTrue();
   }
 }

@@ -62,6 +62,11 @@ contextcrate:
     endpoint: ${CONTEXTCRATE_INDEX_ENDPOINT:}
     # Optional Qdrant API key.
     api-key: ${CONTEXTCRATE_INDEX_API_KEY:}
+    # Elasticsearch (basic authentication) and pgvector (JDBC) credentials.
+    username: ${CONTEXTCRATE_INDEX_USERNAME:}
+    password: ${CONTEXTCRATE_INDEX_PASSWORD:}
+    # Accept any TLS certificate of the Elasticsearch/Qdrant endpoint. Development only.
+    trust-all-certificates: ${CONTEXTCRATE_INDEX_TRUST_ALL_CERTIFICATES:false}
     prefix: ${CONTEXTCRATE_INDEX_PREFIX:contextcrate}
   embeddings:
     enabled: ${CONTEXTCRATE_EMBEDDINGS_ENABLED:true}
@@ -162,6 +167,9 @@ contextcrate:
     backend: ${CONTEXTCRATE_INDEX_BACKEND:opensearch}
     endpoint: ${CONTEXTCRATE_INDEX_ENDPOINT:${OPENSEARCH_ENDPOINT:http://localhost:9200}}
     api-key: ${CONTEXTCRATE_INDEX_API_KEY:}
+    username: ${CONTEXTCRATE_INDEX_USERNAME:}
+    password: ${CONTEXTCRATE_INDEX_PASSWORD:}
+    trust-all-certificates: ${CONTEXTCRATE_INDEX_TRUST_ALL_CERTIFICATES:false}
     prefix: ${CONTEXTCRATE_INDEX_PREFIX:${OPENSEARCH_PREFIX:contextcrate}}
 management:
   health:

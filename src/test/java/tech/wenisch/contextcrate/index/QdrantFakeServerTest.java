@@ -24,7 +24,7 @@ class QdrantFakeServerTest extends QdrantSearchIndexContract {
   void everyRequestCarriesTheApiKeyAndWritesWaitForCompletion() throws Exception {
     var doc = document("Handbook", "body");
     var c = chunk(doc, 0, "Customers receive an invoice by email.");
-    index(new Topics(true), 1).upsert(doc, List.of(ChunkRetrievalRecord.standard(c)));
+    index(new Topics(true)).upsert(doc, List.of(ChunkRetrievalRecord.standard(c)));
 
     assertThat(server.apiKeys).isNotEmpty().allMatch("secret-key"::equals);
     assertThat(server.requests).anyMatch(r -> r.startsWith("PUT /collections/") && r.endsWith("/points"));
@@ -43,6 +43,6 @@ class QdrantFakeServerTest extends QdrantSearchIndexContract {
   void serverErrorsBecomeIOExceptionsWithStatusAndBody() throws Exception {
     var doc = document("Handbook", "body");
     server.failWith = 500;
-    assertThatThrownBy(() -> index(new Topics(true), 1).upsert(doc, List.of())).isInstanceOf(IOException.class).hasMessageContaining("500").hasMessageContaining("boom");
+    assertThatThrownBy(() -> index(new Topics(true)).upsert(doc, List.of())).isInstanceOf(IOException.class).hasMessageContaining("500").hasMessageContaining("boom");
   }
 }

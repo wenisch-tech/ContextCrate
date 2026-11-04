@@ -4,7 +4,7 @@ A **crate** is ContextCrate's mandatory isolation and collaboration boundary. It
 ingestion jobs and runs, artifacts, normalized documents, chunks, extraction rules and results,
 retrieval settings, provider credentials, and vector-index generations.
 
-The term *namespace* is reserved for the physical Lucene directory, OpenSearch index or Qdrant collection owned by a crate. It is never used as a synonym for a crate in the UI or API.
+The term *namespace* is reserved for the physical Lucene directory, OpenSearch or Elasticsearch index, Qdrant collection or pgvector table owned by a crate. It is never used as a synonym for a crate in the UI or API.
 
 ## Isolation guarantees
 
@@ -53,7 +53,7 @@ Archived crates remain readable, searchable, and exportable. Processing and conf
 
 ## Index generations
 
-Lucene namespaces use `data/index/crates/{crateId}/{generation}`. OpenSearch indices and Qdrant collections use `{prefix}-crate-{crateId}-{generation}`.
+Lucene namespaces use `data/index/crates/{crateId}/{generation}`. OpenSearch and Elasticsearch indices and Qdrant collections use `{prefix}-crate-{crateId}-{generation}`; pgvector tables use `{prefix}_c{crateId without dashes}_{generation}`.
 
 Changing the embedding configuration creates a background generation. The old generation remains active while documents are rebuilt. New document indexing is dual-written to every building generation. ContextCrate commits and activates the new generation only after the rebuild succeeds; failure leaves the previous generation searchable.
 

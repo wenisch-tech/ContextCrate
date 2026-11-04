@@ -28,7 +28,7 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 - **Choose your AI providers** with local ONNX models or OpenAI-compatible embedding, reranking, and answer endpoints configured per crate.
 - **Manage data safely** with document versions, background index rebuilds, archive/restore, checksummed crate export/import, and audit-aware access controls.
 - **Automate through the UI or API** using personal API keys and crate-specific Viewer or Editor service keys.
-- **Deploy from laptop to cluster** with standalone Docker or Compose for compact installs and Kubernetes with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch or Qdrant for production scale.
+- **Deploy from laptop to cluster** with standalone Docker or Compose for compact installs and Kubernetes with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch, Elasticsearch, Qdrant or pgvector for production scale.
 
 ## RAG toolbox
 
@@ -72,7 +72,7 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 
 ## Architecture
 
-The **control plane** exposes the crate-qualified UI and API, applies membership authorization, and owns configuration plus normalized documents in the relational database. **Workers** acquire website and Git sources, optionally render pages in a browser, normalize content, extract metadata, and build the search index. A crate-aware queue coordinates that work; raw source bodies live in artifact storage, while Lucene or OpenSearch serves lexical, semantic, and hybrid retrieval.
+The **control plane** exposes the crate-qualified UI and API, applies membership authorization, and owns configuration plus normalized documents in the relational database. **Workers** acquire website and Git sources, optionally render pages in a browser, normalize content, extract metadata, and build the search index. A crate-aware queue coordinates that work; raw source bodies live in artifact storage, while the search index (built-in Lucene, or OpenSearch, Elasticsearch, Qdrant or PostgreSQL with pgvector) serves lexical, semantic, and hybrid retrieval.
 
 ```mermaid
 flowchart LR
@@ -81,13 +81,13 @@ flowchart LR
   C --> Q[Crate-aware queue]
   Q --> W["Source, browser, parser,<br/>extractor, and indexer workers"]
   W --> A[(Artifact storage)]
-  W --> I[(Lucene, OpenSearch or Qdrant)]
+  W --> I[(Lucene, OpenSearch, Elasticsearch,<br/>Qdrant or pgvector)]
   C --> I
 ```
 
 **Standalone** runs the control plane, workers, queue, H2 database, filesystem artifacts, and Lucene in one JVM. It is designed for local use and compact single-instance deployments. 
 
-**Distributed** runs the control plane and worker roles separately, with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch or Qdrant; each workload can then scale independently. 
+**Distributed** runs the control plane and worker roles separately, with PostgreSQL, RabbitMQ, S3-compatible storage, and OpenSearch, Elasticsearch, Qdrant or pgvector; each workload can then scale independently. 
 
 Kubernetes is the intended production deployment. See the [architecture documentation](docs/architecture.md) and [Kubernetes installation guide](docs/installation/kubernetes.md) for the complete design.
 
@@ -106,7 +106,7 @@ flowchart LR
   I --> S[Search and cited answers]
 ```
 
-Raw artifacts remain separate from normalized documents so parsing and indexing can be rebuilt without re-crawling the original source. Every content row, queue message, artifact key, and search operation carries crate identity. Lucene uses `data/index/crates/{crateId}/{generation}`; OpenSearch uses `{prefix}-crate-{crateId}-{generation}`. See the [pipeline documentation](docs/pipeline.md) for work lifecycle, connector behavior, retries, and indexing details.
+Raw artifacts remain separate from normalized documents so parsing and indexing can be rebuilt without re-crawling the original source. Every content row, queue message, artifact key, and search operation carries crate identity. Lucene uses `data/index/crates/{crateId}/{generation}`; OpenSearch, Elasticsearch and Qdrant use `{prefix}-crate-{crateId}-{generation}`; pgvector uses one table per crate and generation. See the [pipeline documentation](docs/pipeline.md) for work lifecycle, connector behavior, retries, and indexing details.
 
 
 ## Quick start
@@ -145,7 +145,7 @@ The full documentation is available at **[contextcrate.eu/docs](https://contextc
 
 **Concepts and architecture**
 - [Architecture](https://contextcrate.eu/docs/architecture/) · [Crates and lifecycle](https://contextcrate.eu/docs/crates/) · [Pipeline](https://contextcrate.eu/docs/pipeline/) · [Authorization](https://contextcrate.eu/docs/authorization/)
-- [Search backends: Lucene, OpenSearch, Qdrant](https://contextcrate.eu/docs/search-backends/)
+- [Search backends: Lucene, OpenSearch, Elasticsearch, Qdrant, pgvector](https://contextcrate.eu/docs/search-backends/)
 
 **RAG features**
 - Chunking and indexing: [Parsing](https://contextcrate.eu/docs/features/parsing/) · [Chunking](https://contextcrate.eu/docs/features/chunking/) · [Semantic chunking](https://contextcrate.eu/docs/features/semantic-chunking/) · [Contextual headers](https://contextcrate.eu/docs/features/contextual-headers/) · [Document enrichment](https://contextcrate.eu/docs/features/document-enrichment/) · [Images](https://contextcrate.eu/docs/features/images/) · [Embeddings](https://contextcrate.eu/docs/embeddings/)

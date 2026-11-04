@@ -19,7 +19,7 @@ The standalone volume includes H2, filesystem artifacts, Lucene, and the local m
 
 ## Distributed Compose
 
-`compose.distributed.yml` starts ContextCrate roles with PostgreSQL, RabbitMQ, MinIO, and OpenSearch in one local Compose project (Qdrant can replace OpenSearch, see [Search backends](../search-backends.md)). It is an evaluation topology, not a production installation: its service credentials and disabled OpenSearch security are deliberately convenient for local use.
+`compose.distributed.yml` starts ContextCrate roles with PostgreSQL, RabbitMQ, MinIO, and OpenSearch in one local Compose project (Elasticsearch, Qdrant or pgvector can replace OpenSearch through Compose profiles, see [Search backends](../search-backends.md)). It is an evaluation topology, not a production installation: its service credentials and disabled OpenSearch security are deliberately convenient for local use.
 
 Build the JAR once before starting the stack if it is not already present in `target/`.
 

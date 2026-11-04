@@ -18,7 +18,8 @@ public class BackendConfigurationValidator implements ApplicationRunner {
     require("queue", properties.queue().backend(), Set.of("local", "rabbitmq"));
     require("database", properties.database().backend(), Set.of("h2", "postgresql"));
     require("artifacts", properties.artifacts().backend(), Set.of("filesystem", "s3"));
-    require("index", properties.index().backend(), Set.of("lucene", "opensearch", "qdrant"));
+    require("index", properties.index().backend(), Set.of("lucene", "opensearch", "elasticsearch", "qdrant", "pgvector"));
+    validatePgVector();
     require("embeddings provider", properties.embeddings().provider(), Set.of("local", "openai-compatible"));
     require("reranking provider", properties.reranking().provider(), Set.of("local", "cohere-compatible"));
     require("retrieval mode", properties.retrieval().defaultMode(), Set.of("lexical", "semantic", "hybrid"));
@@ -37,6 +38,20 @@ public class BackendConfigurationValidator implements ApplicationRunner {
       throw new IllegalStateException(
           "File-backed H2 requires a single process with contextcrate.role=all");
     }
+  }
+
+  /** pgvector creates tables named after the prefix, so the prefix must be a short, plain identifier. */
+  private void validatePgVector() {
+    var index = properties.index();
+    if (!"pgvector".equals(index.backend())) return;
+    if (!index.prefix().matches("[a-z][a-z0-9_]{0,19}"))
+      throw new IllegalStateException("contextcrate.index.prefix must match [a-z][a-z0-9_]{0,19} for the pgvector backend, but is '"
+          + index.prefix() + "'");
+    if (index.endpoint().isBlank() && !"postgresql".equals(properties.database().backend()))
+      throw new IllegalStateException("The pgvector backend needs contextcrate.index.endpoint (a jdbc:postgresql: URL) unless the "
+          + "application database is PostgreSQL");
+    if (!index.endpoint().isBlank() && !index.endpoint().startsWith("jdbc:postgresql:"))
+      throw new IllegalStateException("contextcrate.index.endpoint must be a jdbc:postgresql: URL for the pgvector backend");
   }
 
   private static void require(String name, String value, Set<String> allowed) {
