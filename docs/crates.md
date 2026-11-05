@@ -49,6 +49,15 @@ stateDiagram-v2
   PURGE_FAILED --> PURGING: retry
 ```
 
+## Duplicating a crate
+
+Global administrators can copy a crate under **Administration → Crates → Duplicate** (`POST /api/v1/crates/{crateId}/duplicate`), for example to compare settings in a second crate. The dialog asks for a new name and for the storage and search backend, like the create dialog (including the administrator policy for dedicated backends).
+
+Copied: sources, ingestion jobs (enabled state, schedule, Git tokens, crawler logins), extraction rules and the retrieval, answering, provider and evaluation settings including system prompt and API keys. The copy happens on the server; no secret is sent to the browser.
+Not copied: documents, runs, the search index, members and API keys. The new crate is owned by the administrator who made it and starts empty. Jobs stay enabled and scheduled as in the original, so the copy starts ingesting by itself; switch jobs off first if that is not wanted.
+
+An administrator could use this to place the credentials of any crate in a crate they own, so both crates get an audit entry (`CRATE_DUPLICATED`, `CRATE_CREATED_AS_COPY`).
+
 A crate can also be deleted directly, without archiving first: **Settings → Delete crate** for owners and **Administration → Crates → Delete** for global administrators, with the crate name typed as confirmation (`POST /api/v1/crates/{crateId}/delete`). It enters `PURGING` from any state.
 
 Archived crates remain readable, searchable, and exportable. Processing and configuration mutations are blocked. Purge requires the exact crate name and removes keys, elevations, queued work, artifacts, index generations, and relational content through an idempotent background operation.

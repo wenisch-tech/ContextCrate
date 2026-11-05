@@ -252,6 +252,7 @@
           <td class="small text-secondary" th:text="${card.updatedOn()}"></td>
           <td class="text-end" th:attr="x-data=|deleteCrate({ crateId: '${card.crate.id}', name: '${#strings.escapeJavaScript(card.crate.name)}', redirect: '/admin?crateDeleting#crates' })|">
             <button class="btn btn-sm btn-outline-warning" type="button" data-ui-toggle="modal" th:data-ui-target="'#elevate-' + ${card.crate.id}">Elevate</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" th:disabled="${card.crate.status.name() == 'PURGING'}" th:attr="data-crate-id=${card.crate.id},data-crate-name=${card.crate.name},data-crate-description=${card.crate.description}" @click="$dispatch('duplicate-crate', { id: $el.dataset.crateId, name: $el.dataset.crateName, description: $el.dataset.crateDescription })">Duplicate</button>
             <button class="btn btn-sm btn-outline-danger" type="button" @click="show()" th:text="${card.crate.status.name() == 'PURGE_FAILED'} ? 'Retry deletion' : 'Delete'" th:disabled="${card.crate.status.name() == 'PURGING'}">Delete</button>
             <div class="modal text-start" :class="{ show: open }" role="dialog" aria-modal="true" @keydown.escape.window="hide()" @click.self="hide()" x-cloak>
               <div class="modal-dialog"><form class="modal-content panel dialog" @submit.prevent="remove()" novalidate>
@@ -270,6 +271,29 @@
         </tr>
         <tr th:if="${cards.empty}"><td colspan="7" class="empty-state">No crates in this installation.</td></tr></tbody>
       </table></div>
+
+      <div class="modal" id="duplicate-crate" :class="{ show: shown }" role="dialog" aria-modal="true" aria-labelledby="duplicate-crate-title" @keydown.escape.window="close()" @duplicate-crate.window="openFor($event.detail)" x-cloak
+          th:attr="x-data=|duplicateCrate({ allowStorage: ${allowCustomStorage}, allowSearch: ${allowCustomSearchBackend}, allowUnsafe: ${allowUnsafeBackends}, globalTrust: ${globalTrustAll} })|">
+        <div class="modal-dialog modal-dialog-centered" :class="hasChoices &amp;&amp; 'modal-dialog--wide'">
+          <form class="modal-content panel dialog" @submit.prevent="create()" novalidate>
+            <div class="dialog-header"><div><h2 class="dialog-title" id="duplicate-crate-title">Duplicate crate</h2>
+              <p class="dialog-copy">Copies the sources, ingestion jobs, extraction rules and all settings of <strong x-text="sourceName"></strong> into a new crate, including passwords, tokens and API keys. Documents are not copied; the new crate starts empty. Enabled jobs keep running as in the original.</p></div>
+              <button type="button" class="btn-ghost btn-sm" @click="close()" aria-label="Close"><i data-lucide="x" class="size-4"></i></button></div>
+            <div class="dialog-body">
+              <p class="alert-error" x-show="formError" x-cloak x-text="formError" role="alert"></p>
+              <div class="dialog-grid">
+                <div class="field span-2"><label class="field-label" for="crate-name">Name of the copy</label>
+                  <input class="input" id="crate-name" x-model="name" x-ref="nameInput" required maxlength="200" autocomplete="off"></div>
+                <div class="field span-2"><label class="field-label" for="crate-description">Description <span class="font-normal text-ink-500">(optional)</span></label>
+                  <textarea class="input" id="crate-description" x-model="description" rows="2" maxlength="2000"></textarea></div>
+              </div>
+              <th:block th:replace="~{backend-fields :: fields}"></th:block>
+            </div>
+            <div class="dialog-footer"><button type="button" class="btn-secondary" @click="close()">Cancel</button>
+              <button type="submit" class="btn-primary" :disabled="!canCreate"><span x-text="creating ? 'Duplicating…' : 'Duplicate crate'">Duplicate crate</span></button></div>
+          </form>
+        </div>
+      </div>
 
       <div class="modal fade" th:each="card:${cards}" th:id="'elevate-' + ${card.crate.id}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered"><form class="modal-content panel" method="post" th:action="@{/admin/crates/{id}/elevations(id=${card.crate.id})}">

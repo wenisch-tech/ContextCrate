@@ -148,13 +148,15 @@ const SEARCH_BACKENDS = {
   pgvector: { label: 'PostgreSQL with pgvector', endpoint: 'jdbc:postgresql://db.example.com:5432/contextcrate', hint: 'JDBC URL of a database that has the pgvector extension.', auth: 'basic', prefixHint: 'Lowercase letters, digits and underscores, up to 20 characters.' }
 };
 
-Alpine.data('createCrate', (config = {}) => ({
+// The form of the create dialog; the administrator's "Duplicate crate" dialog is the same form with another target.
+const crateForm = (config = {}) => ({
   allowStorage: !!config.allowStorage, allowSearch: !!config.allowSearch, allowUnsafe: !!config.allowUnsafe, globalTrust: !!config.globalTrust, searchBackends: SEARCH_BACKENDS,
   name: '', description: '',
   storage: { mode: 'GLOBAL', endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '', pathStyle: true, trust: false },
   search: { mode: 'GLOBAL', backend: 'elasticsearch', endpoint: '', apiKey: '', username: '', password: '', prefix: '', trust: false },
   tests: { storage: null, searchBackend: null }, testing: { storage: false, searchBackend: false },
   failure: { storage: '', searchBackend: '' }, creating: false, formError: '',
+  endpoint() { return '/api/v1/crates'; },
   get hasChoices() { return this.allowStorage || this.allowSearch; },
   // Ignoring certificate errors is offered only when the administrator allows it and the installation does not ignore them anyway.
   get unsafeOffered() { return this.allowUnsafe && !this.globalTrust; },
@@ -214,7 +216,7 @@ Alpine.data('createCrate', (config = {}) => ({
     if (this.storage.mode === 'S3') body.storage = this.storagePayload();
     if (this.search.mode === 'CUSTOM') body.searchBackend = this.searchPayload();
     try {
-      const { ok, status, result } = await this.request('/api/v1/crates', body);
+      const { ok, status, result } = await this.request(this.endpoint(), body);
       if (ok) { window.location.assign(`/crates/${result.id}`); return; }
       if (status === 422 && result.field) {
         // The steps below name the failed check; the message above only has to say what happened to the crate.
@@ -229,7 +231,27 @@ Alpine.data('createCrate', (config = {}) => ({
     } catch { this.formError = 'The server could not be reached. Check your connection and try again.'; }
     this.creating = false;
   }
-}));
+});
+Alpine.data('createCrate', crateForm);
+
+// Duplicates a crate (administrators): one shared dialog on the admin page, opened per crate by a window event.
+Alpine.data('duplicateCrate', (config = {}) => {
+  const form = crateForm(config);
+  Object.assign(form, {
+    shown: false, crateId: null, sourceName: '',
+    endpoint() { return `/api/v1/crates/${this.crateId}/duplicate`; },
+    openFor(detail) {
+      Object.assign(this, { crateId: detail.id, sourceName: detail.name, name: `${detail.name} (copy)`, description: detail.description || '',
+        formError: '', creating: false, shown: true,
+        storage: { mode: 'GLOBAL', endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '', pathStyle: true, trust: false },
+        search: { mode: 'GLOBAL', backend: 'elasticsearch', endpoint: '', apiKey: '', username: '', password: '', prefix: '', trust: false },
+        tests: { storage: null, searchBackend: null }, failure: { storage: '', searchBackend: '' } });
+      this.$nextTick(() => this.$refs.nameInput?.select());
+    },
+    close() { if (!this.creating) this.shown = false; }
+  });
+  return form;
+});
 
 // Permanent deletion of a crate: the crate name has to be typed before the button works.
 Alpine.data('deleteCrate', (config = {}) => ({

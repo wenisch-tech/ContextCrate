@@ -99,6 +99,11 @@ Under **Policies → System prompts**, an administrator can write an installatio
 (off by default) or forbid crate owners to add their own. The built-in rules always come first, then the installation-wide prompt, then the crate's prompt; a later layer cannot
 override an earlier one. See [System prompts](../features/system-prompts.md).
 
+## Duplicating a crate
+
+**Administration → Crates → Duplicate** copies a crate's sources, ingestion jobs, extraction rules and settings (including tokens, passwords and API keys, server-side only)
+into a new, empty crate that you own, with a new name and backends chosen as in the create dialog. See [Crates](../crates.md#duplicating-a-crate).
+
 ## Deleting a crate
 
 Global administrators can delete any crate under **Administration → Crates → Delete** without an elevation, because deleting exposes no content.

@@ -16,6 +16,9 @@ Under `/api/v1/**` an unauthenticated request is answered with `401` and a `WWW-
 | POST | `/api/v1/crates/{crateId}/restore` | Owner |
 | POST | `/api/v1/crates/{crateId}/purge` | Owner (archived crate) |
 | POST | `/api/v1/crates/{crateId}/delete` | Owner or global administrator |
+| POST | `/api/v1/crates/{crateId}/duplicate` | Global administrator |
+
+Duplicate body: `{"name":"New name","description":"…","storage":{…},"searchBackend":{…}}` (the last two as when creating a crate, optional). Copies sources, jobs, rules and settings including secrets; returns the new crate (`201`).
 
 Purge and delete body: `{"confirmation":"Exact crate name"}`. `delete` works in any state (also for `PURGE_FAILED`), stops processing, and removes the crate, its documents, artifacts and search index in the background.
 

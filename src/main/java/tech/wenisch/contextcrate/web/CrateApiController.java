@@ -15,9 +15,14 @@ public class CrateApiController {
     this.crates=crates;this.lifecycle=lifecycle;
   }
   @org.springframework.beans.factory.annotation.Autowired(required=false) void setBackends(CrateBackendService backends){this.backends=backends;}
+  private CrateDuplicationService duplication;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) void setDuplication(CrateDuplicationService duplication){this.duplication=duplication;}
   @GetMapping public List<Crate> list(){return crates.accessible();}
   @PostMapping @ResponseStatus(HttpStatus.CREATED)
   public Crate create(@RequestBody CrateRequest request){return crates.create(request.name(),request.description(),new tech.wenisch.contextcrate.backend.BackendChoice(request.storage(),request.searchBackend()));}
+  /** Copies the configuration (sources, jobs, settings and their secrets) of a crate into a new, empty crate. Global administrators only. */
+  @PostMapping("/{crateId}/duplicate") @ResponseStatus(HttpStatus.CREATED)
+  public Crate duplicate(@PathVariable UUID crateId,@RequestBody CrateRequest request){return duplication.duplicate(crateId,request.name(),request.description(),new tech.wenisch.contextcrate.backend.BackendChoice(request.storage(),request.searchBackend()));}
   /** "Test connection" of the create dialog for a dedicated S3 storage. Needs the creation right and the matching administrator policy. */
   @PostMapping("/test-storage") public tech.wenisch.contextcrate.backend.ConnectionTest testStorage(@RequestBody tech.wenisch.contextcrate.backend.BackendChoice.StorageChoice request){return crates.testStorage(request);}
   /** "Test connection" for a dedicated search backend. */

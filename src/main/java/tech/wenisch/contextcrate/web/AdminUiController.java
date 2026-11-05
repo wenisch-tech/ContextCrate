@@ -60,6 +60,7 @@ public class AdminUiController {
     model.addAttribute("users", administration.users());
     model.addAttribute("cards", overview.all());
     model.addAttribute("systemSetting", administration.systemSetting());
+    BackendDialogModel.add(model, administration.systemSetting(), properties);
     model.addAttribute("creationModes", SystemSetting.CrateCreationMode.values());
     model.addAttribute("onboardingPolicies", SystemSetting.OnboardingPolicy.values());
     model.addAttribute("timeZones", List.of("UTC", "Europe/London", "Europe/Berlin", "Europe/Paris",
