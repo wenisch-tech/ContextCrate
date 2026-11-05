@@ -25,7 +25,7 @@ class AdminUiControllerTest {
   private final AdminElevationService elevations = mock(AdminElevationService.class);
   private final AdminElevationRepository elevationRecords = mock(AdminElevationRepository.class);
   private final PipelineQueue queue = mock(PipelineQueue.class);
-  private final ContextCrateProperties properties = mock(ContextCrateProperties.class);
+  private final ContextCrateProperties properties = mock(ContextCrateProperties.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
   private final SharedModelService sharedModels = mock(SharedModelService.class);
   private final AdminUiController controller = new AdminUiController(
       administration, overview, access, elevations, elevationRecords, queue, properties,
@@ -42,6 +42,8 @@ class AdminUiControllerTest {
   @Test
   void thePanelExposesEverythingTheTemplateRenders() {
     AppUser admin = new AppUser(UUID.randomUUID(), "admin@example.com", "hash", "ADMIN", false);
+    when(properties.artifacts().backend()).thenReturn("local");
+    when(properties.index().backend()).thenReturn("lucene");
     when(access.currentUser()).thenReturn(admin);
     when(administration.users()).thenReturn(List.of(admin));
     when(administration.systemSetting()).thenReturn(mock(SystemSetting.class));
@@ -54,7 +56,7 @@ class AdminUiControllerTest {
     assertThat(controller.panel(model)).isEqualTo("admin");
     assertThat(model.asMap())
         .containsKeys("users", "cards", "systemSetting", "creationModes", "properties",
-            "onboardingPolicies", "sharedModelRows", "queueDepth", "deadLetters", "currentUserId", "elevations");
+            "onboardingPolicies", "sharedModelRows", "allowCustomStorage", "allowCustomSearchBackend", "allowUnsafeBackends", "globalTrustAll", "globalStorage", "globalSearch", "queueDepth", "deadLetters", "currentUserId", "elevations");
     assertThat(model.getAttribute("currentUserId")).isEqualTo(admin.getId());
   }
 
