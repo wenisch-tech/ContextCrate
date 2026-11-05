@@ -51,7 +51,7 @@
   </div>
 
   <div th:if="${canCreateCrate or onboardingCrateCreationRequired}" class="modal fade" id="create-crate" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="create-crate-title" th:attr="data-onboarding-required=${onboardingCrateCreationRequired}">
-    <div class="modal-dialog modal-dialog-centered" :class="hasChoices &amp;&amp; 'modal-dialog--wide'" th:attr="x-data=|createCrate({ allowStorage: ${allowCustomStorage}, allowSearch: ${allowCustomSearchBackend} })|">
+    <div class="modal-dialog modal-dialog-centered" :class="hasChoices &amp;&amp; 'modal-dialog--wide'" th:attr="x-data=|createCrate({ allowStorage: ${allowCustomStorage}, allowSearch: ${allowCustomSearchBackend}, allowUnsafe: ${allowUnsafeBackends}, globalTrust: ${globalTrustAll} })|">
       <form class="modal-content panel dialog" method="post" action="/crates" @submit.prevent="create()" novalidate>
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <div class="dialog-header">
@@ -77,15 +77,15 @@
             </div>
           </div>
 
-          <p class="dialog-copy" x-show="hasChoices" x-cloak>Crates use the installation's storage and search backend unless you choose your own. You cannot change this after the crate is created.</p>
+          <p class="dialog-copy" x-text="hasChoices ? 'Crates use the installation\'s storage and search backend unless you choose your own. You cannot change this after the crate is created.' : 'This crate uses the installation\'s storage and search backend. You cannot change this after the crate is created.'">Crates use the installation's storage and search backend.</p>
 
-          <fieldset class="dialog-section" x-show="allowStorage" x-cloak>
+          <fieldset class="dialog-section">
             <legend>Document storage</legend>
             <div class="choice-group">
               <label class="choice"><input type="radio" name="storage-mode" value="GLOBAL" x-model="storage.mode" @change="stale('storage')"><span>Global storage provider</span></label>
-              <label class="choice"><input type="radio" name="storage-mode" value="S3" x-model="storage.mode" @change="stale('storage')"><span>Custom S3 storage</span></label>
+              <label class="choice"><input type="radio" name="storage-mode" value="S3" x-model="storage.mode" @change="stale('storage')" :disabled="!allowStorage"><span>Custom S3 storage</span></label>
             </div>
-            <p class="field-help" x-show="storage.mode === 'GLOBAL'">Downloaded pages and files are kept in the installation's <span th:text="${globalStorage}">storage</span>.</p>
+            <p class="field-help" x-show="storage.mode === 'GLOBAL'">Downloaded pages and files are kept in the installation's <span th:text="${globalStorage}">storage</span>.<span x-show="!allowStorage" x-cloak> Your administrator has not enabled a dedicated storage per crate.</span></p>
 
             <div class="space-y-4" x-show="storage.mode === 'S3'" x-cloak>
               <div class="dialog-grid">
@@ -115,6 +115,11 @@
                   <label class="field-label" for="s3-prefix">Folder in the bucket <span class="font-normal text-ink-500">(optional)</span></label>
                   <input class="input" id="s3-prefix" x-model="storage.prefix" @input="stale('storage')" placeholder="contextcrate" autocomplete="off" spellcheck="false">
                 </div>
+                <label class="switch-labelled span-2" for="s3-trust" x-show="unsafeOffered &amp;&amp; storage.endpoint.trim().toLowerCase().startsWith('https')" x-cloak>
+                  <span class="switch"><input type="checkbox" id="s3-trust" x-model="storage.trust" @change="stale('storage')"><span></span></span>
+                  <span>Ignore TLS certificate errors <span class="text-ink-500">(for self-signed certificates; the server is not verified)</span></span>
+                </label>
+                <p class="field-help span-2" x-show="globalTrust &amp;&amp; storage.endpoint.trim().toLowerCase().startsWith('https')" x-cloak>The administrator has turned off certificate validation for the whole installation, so this endpoint is accepted with any certificate.</p>
                 <label class="switch-labelled span-2" for="s3-path-style">
                   <span class="switch"><input type="checkbox" id="s3-path-style" x-model="storage.pathStyle" @change="stale('storage')"><span></span></span>
                   <span>Use path-style addresses <span class="text-ink-500">(MinIO and most S3-compatible services need this)</span></span>
@@ -140,13 +145,13 @@
             </div>
           </fieldset>
 
-          <fieldset class="dialog-section" x-show="allowSearch" x-cloak>
+          <fieldset class="dialog-section">
             <legend>Search backend</legend>
             <div class="choice-group">
               <label class="choice"><input type="radio" name="search-mode" value="GLOBAL" x-model="search.mode" @change="stale('searchBackend')"><span>Global search backend</span></label>
-              <label class="choice"><input type="radio" name="search-mode" value="CUSTOM" x-model="search.mode" @change="stale('searchBackend')"><span>Custom search backend</span></label>
+              <label class="choice"><input type="radio" name="search-mode" value="CUSTOM" x-model="search.mode" @change="stale('searchBackend')" :disabled="!allowSearch"><span>Custom search backend</span></label>
             </div>
-            <p class="field-help" x-show="search.mode === 'GLOBAL'">Searches use the installation's <span th:text="${globalSearch}">search index</span>.</p>
+            <p class="field-help" x-show="search.mode === 'GLOBAL'">Searches use the installation's <span th:text="${globalSearch}">search index</span>.<span x-show="!allowSearch" x-cloak> Your administrator has not enabled a dedicated search backend per crate.</span></p>
 
             <div class="space-y-4" x-show="search.mode === 'CUSTOM'" x-cloak>
               <div class="dialog-grid">
@@ -178,9 +183,10 @@
                   <input class="input" id="search-prefix" x-model="search.prefix" @input="stale('searchBackend')" placeholder="contextcrate" autocomplete="off" spellcheck="false" :aria-invalid="!prefixValid" aria-describedby="search-prefix-help">
                   <p class="field-help" id="search-prefix-help" :class="!prefixValid &amp;&amp; 'text-bad-500'" x-text="backend.prefixHint"></p>
                 </div>
-                <label class="switch-labelled span-2" for="search-trust" x-show="search.backend !== 'pgvector' &amp;&amp; search.endpoint.trim().startsWith('https')">
+                <p class="field-help span-2" x-show="globalTrust &amp;&amp; search.backend !== 'pgvector'" x-cloak>The administrator has turned off certificate validation for the whole installation, so this endpoint is accepted with any certificate.</p>
+                <label class="switch-labelled span-2" for="search-trust" x-show="unsafeOffered &amp;&amp; search.backend !== 'pgvector' &amp;&amp; search.endpoint.trim().toLowerCase().startsWith('https')" x-cloak>
                   <span class="switch"><input type="checkbox" id="search-trust" x-model="search.trust" @change="stale('searchBackend')"><span></span></span>
-                  <span>Accept a self-signed certificate <span class="text-ink-500">(for testing only; the certificate is not verified)</span></span>
+                  <span>Ignore TLS certificate errors <span class="text-ink-500">(for self-signed certificates; the server is not verified)</span></span>
                 </label>
               </div>
               <div class="test-bar">

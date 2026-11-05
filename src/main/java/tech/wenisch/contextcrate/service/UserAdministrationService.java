@@ -131,10 +131,10 @@ public class UserAdministrationService {
   }
 
   @Transactional
-  public SystemSetting backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend) {
+  public SystemSetting backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend, boolean allowUnsafeBackends) {
     requireAdmin();
     SystemSetting setting = settings.findById(1).orElseThrow();
-    setting.backendPolicy(allowCustomStorage, allowCustomSearchBackend);
+    setting.backendPolicy(allowCustomStorage, allowCustomSearchBackend, allowUnsafeBackends);
     return settings.save(setting);
   }
 

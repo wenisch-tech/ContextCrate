@@ -49,6 +49,11 @@ public class Crate {
       throw new IllegalStateException("Archive the crate before purging");
     status = Status.PURGING; updatedAt = Instant.now();
   }
+  /** Permanent deletion starts from any state except a purge that is already running. */
+  public void deleting() {
+    if (status == Status.PURGING) throw new IllegalStateException("This crate is already being deleted");
+    status = Status.PURGING; updatedAt = Instant.now();
+  }
   public void purgeFailed() { status = Status.PURGE_FAILED; updatedAt = Instant.now(); }
   public void activateGeneration(int generation) {
     if (generation < 1) throw new IllegalArgumentException("generation must be positive");

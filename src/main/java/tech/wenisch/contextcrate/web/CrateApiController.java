@@ -34,6 +34,9 @@ public class CrateApiController {
   public void remove(@PathVariable UUID crateId,@PathVariable UUID userId){crates.removeMember(crateId,userId);}
   @PostMapping("/{crateId}/archive") public Crate archive(@PathVariable UUID crateId){return lifecycle.archive(crateId);}
   @PostMapping("/{crateId}/restore") public Crate restore(@PathVariable UUID crateId){return lifecycle.restore(crateId);}
+  /** Permanently deletes the crate with its documents, artifacts and search index (owners and global administrators). */
+  @PostMapping("/{crateId}/delete") @ResponseStatus(HttpStatus.ACCEPTED)
+  public void delete(@PathVariable UUID crateId,@RequestBody PurgeRequest request){lifecycle.delete(crateId,request.confirmation());}
   @PostMapping("/{crateId}/purge") @ResponseStatus(HttpStatus.ACCEPTED)
   public void purge(@PathVariable UUID crateId,@RequestBody PurgeRequest request){lifecycle.purge(crateId,request.confirmation());}
   public record CrateRequest(String name,String description,tech.wenisch.contextcrate.backend.BackendChoice.StorageChoice storage,tech.wenisch.contextcrate.backend.BackendChoice.SearchChoice searchBackend){

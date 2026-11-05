@@ -106,7 +106,7 @@ public class SearchBackendTester {
   /** A first, cheap call that separates "cannot connect" and "wrong credentials" from later failures. */
   private String serverCheck(IndexConfig config) throws Exception {
     if ("pgvector".equals(config.backend())) {
-      try (var connection = DriverManager.getConnection(config.endpoint(), config.username(), config.password() == null ? "" : config.password());
+      try (var connection = DriverManager.getConnection(config.trustAllCertificates() || tech.wenisch.contextcrate.util.InsecureSsl.globalTrustAll() ? tech.wenisch.contextcrate.util.InsecureSsl.relaxPostgresUrl(config.endpoint()) : config.endpoint(), config.username(), config.password() == null ? "" : config.password());
           var statement = connection.createStatement()) {
         String version;
         try (var rs = statement.executeQuery("select current_setting('server_version')")) { rs.next(); version = rs.getString(1); }

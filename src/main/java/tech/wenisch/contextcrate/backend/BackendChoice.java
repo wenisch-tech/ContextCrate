@@ -14,13 +14,22 @@ public record BackendChoice(StorageChoice storage, SearchChoice searchBackend) {
   public boolean customStorage() { return storage != null && storage.custom(); }
   public boolean customSearch() { return searchBackend != null && searchBackend.custom(); }
 
+  /** True when the creator asked to skip TLS validation for a part that is actually dedicated. */
+  public boolean asksToSkipTls() {
+    return (customStorage() && Boolean.TRUE.equals(storage.trustAllCertificates())) || (customSearch() && Boolean.TRUE.equals(searchBackend.trustAllCertificates()));
+  }
+
   /** @param mode {@code GLOBAL} or {@code S3} */
-  public record StorageChoice(String mode, String endpoint, String region, String bucket, String prefix, String accessKey, String secretKey, Boolean pathStyle) {
+  public record StorageChoice(String mode, String endpoint, String region, String bucket, String prefix, String accessKey, String secretKey, Boolean pathStyle, Boolean trustAllCertificates) {
+    public StorageChoice(String mode, String endpoint, String region, String bucket, String prefix, String accessKey, String secretKey, Boolean pathStyle) {
+      this(mode, endpoint, region, bucket, prefix, accessKey, secretKey, pathStyle, null);
+    }
+
     public boolean custom() { return "S3".equalsIgnoreCase(mode); }
 
     public S3Config toConfig() {
       return new S3Config(blankToNull(endpoint), blankToNull(region) == null ? "us-east-1" : region.strip(), trim(bucket), blankToNull(prefix),
-          trim(accessKey), secretKey == null || secretKey.isBlank() ? null : secretKey, pathStyle == null || pathStyle);
+          trim(accessKey), secretKey == null || secretKey.isBlank() ? null : secretKey, pathStyle == null || pathStyle, trustAllCertificates != null && trustAllCertificates);
     }
 
     @Override public String toString() { return "StorageChoice[mode=" + mode + ", endpoint=" + endpoint + ", bucket=" + bucket + "]"; }

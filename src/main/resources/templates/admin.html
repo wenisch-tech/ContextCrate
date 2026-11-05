@@ -16,6 +16,7 @@
   <div class="alert alert-success" th:if="${param.timeZoneSaved != null}">Time zone saved.</div>
   <div class="alert alert-success" th:if="${param.modelPolicySaved != null}">Model policy saved.</div>
   <div class="alert alert-success" th:if="${param.systemPromptsSaved != null}">System prompt settings saved.</div>
+  <div class="alert alert-info" th:if="${param.crateDeleting != null}">The crate is being deleted. Its data is removed in the background; the list shows PURGE_FAILED if that does not succeed, and the deletion can be retried.</div>
   <div class="alert alert-success" th:if="${param.backendPolicySaved != null}">Storage and search policy saved.</div>
   <div class="alert alert-success" th:if="${param.modelSaved != null}">Shared model saved.</div>
   <div class="alert alert-success" th:if="${param.modelDeleted != null}">Shared model deleted.</div>
@@ -138,6 +139,8 @@
         <p class="text-secondary small">By default every crate uses the storage provider and the search backend of the installation. Allow crate creators to choose their own when they create a crate. The choice is fixed afterwards. Endpoints must not point into private networks unless the crawler allows it.</p>
         <div class="form-check"><input class="form-check-input" type="checkbox" id="allow-custom-storage" name="allowCustomStorage" value="true" th:checked="${systemSetting.allowCustomStorage}"><label class="form-check-label" for="allow-custom-storage">Crates may use their own S3-compatible storage for documents</label></div>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-custom-search" name="allowCustomSearchBackend" value="true" th:checked="${systemSetting.allowCustomSearchBackend}"><label class="form-check-label" for="allow-custom-search">Crates may use their own search backend (OpenSearch, Elasticsearch, Qdrant or pgvector)</label></div>
+        <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="allow-unsafe-backends" name="allowUnsafeBackends" value="true" th:checked="${systemSetting.allowUnsafeBackends}"><label class="form-check-label" for="allow-unsafe-backends">Users may ignore unsafe backends (accept self-signed or otherwise untrusted TLS certificates of their own S3 or search backend)</label></div>
+        <p class="text-secondary small mt-1 mb-0">Without this, a backend with an untrusted certificate is refused. The installation-wide <code>contextcrate.tls.trust-all-certificates</code> setting applies to these backends as well, regardless of this option.</p>
         <button class="btn btn-primary mt-4">Save storage and search policy</button>
       </form>
       <form class="card panel p-4" method="post" action="/admin/settings/crate-creation">
@@ -228,7 +231,7 @@
     <section class="tab-pane fade" id="crates">
       <div class="card panel p-4 mb-4">
         <h2 class="h5">Active elevations</h2>
-        <p class="text-secondary small mb-3">A global administrator has no access to crate content by default. An elevation grants owner-equivalent access to one crate for 30 minutes and audits every action. Archive, restore, and purge are performed inside the crate once an elevation is active.</p>
+        <p class="text-secondary small mb-3">A global administrator has no access to crate content by default. An elevation grants owner-equivalent access to one crate for 30 minutes and audits every action. Archive, restore, and purge are performed inside the crate once an elevation is active. Deleting a crate needs no elevation: it removes data and exposes none.</p>
         <div class="backend-row" th:each="elevation:${elevations}">
           <span><strong th:text="${elevation.crateId}"></strong><span class="d-block text-secondary small" th:text="${elevation.reason}"></span></span>
           <span class="d-flex align-items-center gap-3"><span class="small text-secondary">expires <span th:text="${#strings.substring(elevation.expiresAt, 0, 19)}"></span></span>
@@ -247,7 +250,23 @@
           <td><span class="badge" th:classappend="${card.crate.status.name() == 'ACTIVE'} ? 'text-bg-success' : (${card.crate.status.name() == 'PURGE_FAILED'} ? 'text-bg-danger' : (${card.crate.status.name() == 'ARCHIVED'} ? 'text-bg-secondary' : 'text-bg-warning'))" th:text="${card.crate.status}"></span></td>
           <td th:text="${card.documents}"></td><td th:text="${card.sources}"></td><td th:text="${card.members}"></td>
           <td class="small text-secondary" th:text="${card.updatedOn()}"></td>
-          <td class="text-end"><button class="btn btn-sm btn-outline-warning" type="button" data-ui-toggle="modal" th:data-ui-target="'#elevate-' + ${card.crate.id}">Elevate</button></td>
+          <td class="text-end" th:attr="x-data=|deleteCrate({ crateId: '${card.crate.id}', name: '${#strings.escapeJavaScript(card.crate.name)}', redirect: '/admin?crateDeleting#crates' })|">
+            <button class="btn btn-sm btn-outline-warning" type="button" data-ui-toggle="modal" th:data-ui-target="'#elevate-' + ${card.crate.id}">Elevate</button>
+            <button class="btn btn-sm btn-outline-danger" type="button" @click="show()" th:text="${card.crate.status.name() == 'PURGE_FAILED'} ? 'Retry deletion' : 'Delete'" th:disabled="${card.crate.status.name() == 'PURGING'}">Delete</button>
+            <div class="modal text-start" :class="{ show: open }" role="dialog" aria-modal="true" @keydown.escape.window="hide()" @click.self="hide()" x-cloak>
+              <div class="modal-dialog"><form class="modal-content panel dialog" @submit.prevent="remove()" novalidate>
+                <div class="dialog-header"><div><h2 class="dialog-title">Delete this crate permanently?</h2>
+                  <p class="dialog-copy">This removes <strong th:text="${card.crate.name}"></strong> with all its documents, files, search index entries, members and settings. This cannot be undone.</p></div></div>
+                <div class="dialog-body">
+                  <p class="alert-error" x-show="error" x-cloak x-text="error" role="alert"></p>
+                  <div class="field"><label class="field-label" th:for="'confirm-' + ${card.crate.id}">Type <strong th:text="${card.crate.name}"></strong> to confirm</label>
+                    <input class="input" th:id="'confirm-' + ${card.crate.id}" x-model="typed" x-ref="confirm" autocomplete="off" spellcheck="false"></div>
+                </div>
+                <div class="dialog-footer"><button type="button" class="btn-secondary" @click="hide()" :disabled="busy">Cancel</button>
+                  <button type="submit" class="btn-danger" :disabled="!confirmed || busy"><span x-text="busy ? 'Deleting…' : 'Delete crate permanently'">Delete crate permanently</span></button></div>
+              </form></div>
+            </div>
+          </td>
         </tr>
         <tr th:if="${cards.empty}"><td colspan="7" class="empty-state">No crates in this installation.</td></tr></tbody>
       </table></div>

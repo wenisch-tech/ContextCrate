@@ -42,6 +42,8 @@ public class HomeUiController {
     var policy=systemSettings==null?null:systemSettings.current();
     model.addAttribute("allowCustomStorage",policy!=null&&policy.isAllowCustomStorage());
     model.addAttribute("allowCustomSearchBackend",policy!=null&&policy.isAllowCustomSearchBackend());
+    model.addAttribute("allowUnsafeBackends",policy!=null&&policy.isAllowUnsafeBackends());
+    model.addAttribute("globalTrustAll",tech.wenisch.contextcrate.util.InsecureSsl.globalTrustAll());
     model.addAttribute("globalStorage",properties==null||!"s3".equals(properties.artifacts().backend())?"local file storage":"S3 storage");
     model.addAttribute("globalSearch",properties==null?"search index":switch(properties.index().backend()){
       case "opensearch"->"OpenSearch cluster";case "elasticsearch"->"Elasticsearch cluster";case "qdrant"->"Qdrant server";case "pgvector"->"PostgreSQL pgvector index";default->"built-in Lucene index";});

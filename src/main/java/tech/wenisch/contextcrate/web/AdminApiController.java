@@ -27,7 +27,7 @@ public class AdminApiController {
   @PutMapping("/users/{id}/role") public AppUser role(@PathVariable UUID id,@RequestBody RoleRequest r){return administration.role(id,r.role());}
   @PostMapping("/users/{id}/password-reset") public AppUser resetPassword(@PathVariable UUID id,@RequestBody PasswordReset r){return administration.resetPassword(id,r.temporaryPassword());}
   @PutMapping("/settings/crate-creation") public SystemSetting creation(@RequestBody CreationMode r){return administration.crateCreationMode(r.mode());}
-  @PutMapping("/settings/backend-policy") public SystemSetting backendPolicy(@RequestBody BackendPolicyRequest r){return administration.backendPolicy(r.allowCustomStorage(),r.allowCustomSearchBackend());}
+  @PutMapping("/settings/backend-policy") public SystemSetting backendPolicy(@RequestBody BackendPolicyRequest r){return administration.backendPolicy(r.allowCustomStorage(),r.allowCustomSearchBackend(),r.allowUnsafeBackends());}
   @PutMapping("/settings/system-prompts") public SystemSetting systemPrompts(@RequestBody SystemPromptsRequest r){return administration.systemPromptPolicy(r.allowCrateSystemPrompts(),r.globalSystemPrompt());}
   @PutMapping("/settings/time-zone") public SystemSetting timeZone(@RequestBody TimeZoneRequest r){return administration.timeZone(r.timeZone());}
   @PutMapping("/settings/onboarding-policy") public SystemSetting onboardingPolicy(@RequestBody OnboardingPolicyRequest r){return administration.onboardingPolicy(r.policy(),r.crateId());}
@@ -40,7 +40,7 @@ public class AdminApiController {
   @PostMapping("/crates/{crateId}/elevations") public AdminElevation elevate(@PathVariable UUID crateId,@RequestBody Elevation r){return elevations.start(crateId,r.reason());}
   @DeleteMapping("/elevations/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void end(@PathVariable UUID id){elevations.end(id);}
   public record SystemPromptsRequest(boolean allowCrateSystemPrompts,String globalSystemPrompt){}
-  public record BackendPolicyRequest(boolean allowCustomStorage,boolean allowCustomSearchBackend){}
+  public record BackendPolicyRequest(boolean allowCustomStorage,boolean allowCustomSearchBackend,boolean allowUnsafeBackends){}
   public record UserRequest(String email,String temporaryPassword){}
   public record Entitlement(boolean allowed){}
   public record Enabled(boolean enabled){}

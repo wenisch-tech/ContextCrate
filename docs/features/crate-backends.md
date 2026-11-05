@@ -19,9 +19,19 @@ Both options are **off by default**. Turn them on in **Administration → Polici
 |---|---|
 | Crates may use their own S3-compatible storage | The create dialog offers "Custom S3 storage" |
 | Crates may use their own search backend | The create dialog offers "Custom search backend" |
+| Users may ignore unsafe backends | The create dialog offers "Ignore TLS certificate errors" for a dedicated backend with an `https://` endpoint, e.g. one with a self-signed certificate |
 
-The REST equivalent is `PUT /api/v1/admin/settings/backend-policy` with `{"allowCustomStorage": true, "allowCustomSearchBackend": true}`.
-Turning a policy off does not affect crates that already have a dedicated backend; it only hides the choice for new crates.
+The REST equivalent is `PUT /api/v1/admin/settings/backend-policy` with `{"allowCustomStorage": true, "allowCustomSearchBackend": true, "allowUnsafeBackends": false}`.
+Turning a policy off does not affect crates that already have a dedicated backend; it only takes the choice away for new crates.
+While a policy is off, the create dialog still shows the option, greyed out, with the installation's provider selected.
+
+### Certificates
+
+A dedicated backend with a certificate the server does not trust (self-signed, private CA) fails the connection test with a TLS error. There are three ways out:
+
+* Add the CA to the server's trust store (the safe way).
+* Turn on **Users may ignore unsafe backends** and let the crate creator tick **Ignore TLS certificate errors**. The server is then not verified, so use it for test setups only. Without the policy the server refuses the setting, even if the request is sent directly to the API.
+* Set `contextcrate.tls.trust-all-certificates=true` for the whole installation. It applies to dedicated S3 storage and dedicated search backends as well, independent of the policy above, and is logged as a warning at startup.
 
 ## Choosing it (crate creators)
 
@@ -70,7 +80,7 @@ and a **Test connections** button to check that it still works. If the settings 
 * **Only people who may create crates can test.** The test endpoints need the creation right and the matching policy, so they cannot be used to probe the network.
 * **Secrets** (S3 secret key, API keys, passwords) are stored with the crate like the keys of custom model endpoints, are write-only in the UI and the API, and are never returned or logged. Use credentials that can only reach what the crate needs: a key limited to one bucket, a database user that owns only the index schema.
 * **Credentials are not exported.** A crate export contains its content, not its dedicated backend settings. An import creates a crate on the installation's global providers.
-* **Deleting a crate** removes its objects under `crates/{crateId}/` from its own bucket and its index from its own backend, like for the global providers.
+* **Deleting a crate** (Settings → Delete crate, or Administration → Crates) removes its objects under `crates/{crateId}/` from its own bucket and its index from its own backend, like for the global providers.
 
 ## Layout in the bucket
 

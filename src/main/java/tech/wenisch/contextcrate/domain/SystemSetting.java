@@ -28,10 +28,13 @@ public class SystemSetting {
   private boolean allowCustomStorage;
   @Column(name = "allow_custom_search_backend", nullable = false)
   private boolean allowCustomSearchBackend;
+  @Column(name = "allow_unsafe_backends", nullable = false)
+  private boolean allowUnsafeBackends;
+  public boolean isAllowUnsafeBackends() { return allowUnsafeBackends; }
   public boolean isAllowCustomStorage() { return allowCustomStorage; }
   public boolean isAllowCustomSearchBackend() { return allowCustomSearchBackend; }
-  public void backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend) {
-    this.allowCustomStorage = allowCustomStorage; this.allowCustomSearchBackend = allowCustomSearchBackend;
+  public void backendPolicy(boolean allowCustomStorage, boolean allowCustomSearchBackend, boolean allowUnsafeBackends) {
+    this.allowCustomStorage = allowCustomStorage; this.allowCustomSearchBackend = allowCustomSearchBackend; this.allowUnsafeBackends = allowUnsafeBackends;
   }
   @Column(name = "allow_crate_system_prompts", nullable = false)
   private boolean allowCrateSystemPrompts;

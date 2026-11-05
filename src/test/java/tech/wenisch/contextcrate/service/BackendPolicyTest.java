@@ -23,15 +23,17 @@ class BackendPolicyTest {
     var setting = mock(SystemSetting.class, CALLS_REAL_METHODS);
     assertThat(setting.isAllowCustomStorage()).isFalse();
     assertThat(setting.isAllowCustomSearchBackend()).isFalse();
+    assertThat(setting.isAllowUnsafeBackends()).isFalse();
 
     when(access.isAdmin()).thenReturn(true);
     when(settings.findById(1)).thenReturn(Optional.of(setting));
     when(settings.save(any())).thenAnswer(i -> i.getArgument(0));
-    administration.backendPolicy(true, false);
+    administration.backendPolicy(true, false, true);
     assertThat(setting.isAllowCustomStorage()).isTrue();
     assertThat(setting.isAllowCustomSearchBackend()).isFalse();
+    assertThat(setting.isAllowUnsafeBackends()).isTrue();
 
     when(access.isAdmin()).thenReturn(false);
-    assertThatThrownBy(() -> administration.backendPolicy(true, true)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> administration.backendPolicy(true, true, true)).isInstanceOf(AccessDeniedException.class);
   }
 }

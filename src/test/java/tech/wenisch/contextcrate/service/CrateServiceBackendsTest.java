@@ -80,6 +80,28 @@ class CrateServiceBackendsTest {
   }
 
   @Test
+  void ignoringTlsErrorsNeedsTheAdministratorPolicy() {
+    when(policy.isAllowCustomStorage()).thenReturn(true);
+    when(policy.isAllowCustomSearchBackend()).thenReturn(true);
+    when(policy.isAllowUnsafeBackends()).thenReturn(false);
+    var unsafeS3 = new StorageChoice("S3", "https://s3.example.test", "r", "b", null, "AKIA", "secret", true, true);
+    var unsafeEs = new SearchChoice("CUSTOM", "elasticsearch", "https://es.example.test:9200", "key", null, null, null, true);
+    assertThatThrownBy(() -> service.create("A", "d", new BackendChoice(unsafeS3, null))).isInstanceOf(BackendValidationException.class).hasMessageContaining("TLS");
+    assertThatThrownBy(() -> service.create("A", "d", new BackendChoice(null, unsafeEs))).isInstanceOf(BackendValidationException.class).hasMessageContaining("TLS");
+    assertThatThrownBy(() -> service.testStorage(unsafeS3)).isInstanceOf(BackendValidationException.class);
+    assertThatThrownBy(() -> service.testSearchBackend(unsafeEs)).isInstanceOf(BackendValidationException.class);
+    verify(crates, never()).saveAndFlush(any());
+    verifyNoInteractions(storageTester, searchTester);
+
+    when(policy.isAllowUnsafeBackends()).thenReturn(true);
+    when(storageTester.test(any())).thenReturn(OK);
+    service.create("B", "d", new BackendChoice(unsafeS3, null));
+    var saved = ArgumentCaptor.forClass(CrateBackendSettings.class);
+    verify(backends).save(saved.capture());
+    assertThat(saved.getValue().s3Config().trustAllCertificates()).isTrue();
+  }
+
+  @Test
   void aFailedConnectionTestStopsCreationAndReportsTheSteps() {
     when(policy.isAllowCustomStorage()).thenReturn(true);
     when(storageTester.test(any())).thenReturn(FAILED);

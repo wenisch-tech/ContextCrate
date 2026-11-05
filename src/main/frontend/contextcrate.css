@@ -157,6 +157,9 @@
   .choice > input { @apply absolute inset-0 z-10 m-0 size-full cursor-pointer opacity-0; }
   .choice > span { @apply flex min-h-9 items-center justify-center rounded-md px-3 py-1.5 text-center text-sm font-medium text-ink-300 transition-colors; }
   .choice:hover > input:not(:checked) + span { @apply bg-ink-800/70 text-white; }
+  .choice > input:disabled { @apply cursor-not-allowed; }
+  .choice > input:disabled + span { @apply cursor-not-allowed opacity-50; }
+  .choice:hover > input:disabled + span { @apply bg-transparent text-ink-300; }
   .choice > input:checked + span { @apply bg-brand-500/12 text-brand-400 ring-1 ring-inset ring-brand-500/25; }
   .choice > input:focus-visible + span { @apply outline-2 outline-offset-2 outline-brand-400; }
   .test-bar { @apply flex flex-wrap items-center gap-3; }

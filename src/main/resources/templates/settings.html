@@ -14,6 +14,7 @@
       <p class="settings-nav__group">Crate</p>
       <a href="#general" :class="{'active':active==='general'}">General</a>
       <a href="#backends" :class="{'active':active==='backends'}" th:if="${backends != null}">Storage &amp; search</a>
+      <a href="#delete" :class="{'active':active==='delete'}">Delete crate</a>
       <p class="settings-nav__group">Retrieval &amp; answers</p>
       <a href="#retrieval" :class="{'active':active==='retrieval'}">Retrieval</a>
       <a href="#context-header" :class="{'active':active==='context-header'}">Chunk headers</a>
@@ -79,6 +80,28 @@
         </div>
       </section>
 
+
+      <!-- Delete -->
+      <section id="delete" class="panel scroll-mt-24" th:attr="x-data=|deleteCrate({ crateId: '${crate.id}', name: '${#strings.escapeJavaScript(crate.name)}', redirect: '/crates' })|">
+        <div class="panel-header"><div><h2 class="settings-title">Delete crate</h2><p class="settings-hint">Permanently removes this crate with all documents, files, search index entries, members and settings.</p></div></div>
+        <div class="panel-body flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm text-ink-300">This cannot be undone. Exports and backups you made stay untouched.</p>
+          <button type="button" class="btn-danger" @click="show()">Delete this crate…</button>
+        </div>
+        <div class="modal" :class="{ show: open }" role="dialog" aria-modal="true" aria-labelledby="delete-crate-title" @keydown.escape.window="hide()" @click.self="hide()" x-cloak>
+          <div class="modal-dialog"><form class="modal-content panel dialog" @submit.prevent="remove()" novalidate>
+            <div class="dialog-header"><div><h2 class="dialog-title" id="delete-crate-title">Delete this crate permanently?</h2>
+              <p class="dialog-copy">All documents, files and search index entries of <strong th:text="${crate.name}"></strong> are removed, as are its members, API keys and settings. This cannot be undone.</p></div></div>
+            <div class="dialog-body">
+              <p class="alert-error" x-show="error" x-cloak x-text="error" role="alert"></p>
+              <div class="field"><label class="field-label" for="delete-confirm">Type <strong th:text="${crate.name}"></strong> to confirm</label>
+                <input class="input" id="delete-confirm" x-model="typed" x-ref="confirm" autocomplete="off" spellcheck="false"></div>
+            </div>
+            <div class="dialog-footer"><button type="button" class="btn-secondary" @click="hide()" :disabled="busy">Cancel</button>
+              <button type="submit" class="btn-danger" :disabled="!confirmed || busy"><span x-text="busy ? 'Deleting…' : 'Delete crate permanently'">Delete crate permanently</span></button></div>
+          </form></div>
+        </div>
+      </section>
 
       <!-- Retrieval & answers -->
       <form method="post" class="space-y-4" th:action="@{/crates/{id}/settings/rag(id=${crate.id})}" x-data="{dirty:false,qt:false}" x-init="qt=$el.querySelector('#query-transformation-enabled').checked" @input="dirty=true" @change="dirty=true; if($event.target.id==='query-transformation-enabled') qt=$event.target.checked; if($event.target.name==='queryTransformationStrategies' && $event.target.checked){ $el.querySelectorAll('[name=queryTransformationStrategies]').forEach(c=>{ if(c!==$event.target && ($event.target.value==='auto' || c.value==='auto')) c.checked=false }) }">

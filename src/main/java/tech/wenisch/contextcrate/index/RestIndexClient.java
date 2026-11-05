@@ -30,7 +30,7 @@ final class RestIndexClient {
     this.service = service;
     this.endpoint = index.endpoint().replaceAll("/+$", "");
     HttpClient.Builder builder = HttpClient.newBuilder();
-    if (index.trustAllCertificates()) builder.sslContext(trustAll());
+    if (index.trustAllCertificates() || tech.wenisch.contextcrate.util.InsecureSsl.globalTrustAll()) builder.sslContext(trustAll());
     this.client = builder.build();
     if (index.apiKey() != null) {
       headers.put(apiKeyHeader.equals("Authorization") ? "Authorization" : apiKeyHeader,

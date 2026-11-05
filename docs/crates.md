@@ -49,6 +49,8 @@ stateDiagram-v2
   PURGE_FAILED --> PURGING: retry
 ```
 
+A crate can also be deleted directly, without archiving first: **Settings → Delete crate** for owners and **Administration → Crates → Delete** for global administrators, with the crate name typed as confirmation (`POST /api/v1/crates/{crateId}/delete`). It enters `PURGING` from any state.
+
 Archived crates remain readable, searchable, and exportable. Processing and configuration mutations are blocked. Purge requires the exact crate name and removes keys, elevations, queued work, artifacts, index generations, and relational content through an idempotent background operation.
 
 ## Index generations

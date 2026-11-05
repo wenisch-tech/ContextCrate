@@ -85,6 +85,8 @@ public class PgVectorSearchIndex implements SearchIndex {
       if (user == null) user = environment.getProperty("spring.datasource.username");
       if (password == null) password = environment.getProperty("spring.datasource.password");
     }
+    if (index.trustAllCertificates() || tech.wenisch.contextcrate.util.InsecureSsl.globalTrustAll())
+      url = tech.wenisch.contextcrate.util.InsecureSsl.relaxPostgresUrl(url);
     HikariConfig config = new HikariConfig();
     config.setJdbcUrl(url);
     config.setUsername(user);

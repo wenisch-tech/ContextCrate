@@ -58,6 +58,16 @@ public final class InsecureSsl {
     };
   }
 
+  /**
+   * A PostgreSQL JDBC URL whose server certificate is not validated: {@code verify-ca} and {@code verify-full}
+   * become {@code require} and the non-validating socket factory is added. Other URLs are returned unchanged.
+   */
+  public static String relaxPostgresUrl(String url) {
+    if (url == null || !url.startsWith("jdbc:postgresql:") || url.contains("sslfactory=")) return url;
+    String relaxed = url.replaceAll("sslmode=(verify-ca|verify-full)", "sslmode=require");
+    return relaxed + (relaxed.indexOf('?') >= 0 ? "&" : "?") + "sslfactory=org.postgresql.ssl.NonValidatingFactory";
+  }
+
   /** True when the operator asked for process-wide TLS validation bypass. */
   public static boolean globalTrustAll() {
     return globalTrustAll;

@@ -99,13 +99,20 @@ Under **Policies → System prompts**, an administrator can write an installatio
 (off by default) or forbid crate owners to add their own. The built-in rules always come first, then the installation-wide prompt, then the crate's prompt; a later layer cannot
 override an earlier one. See [System prompts](../features/system-prompts.md).
 
+## Deleting a crate
+
+Global administrators can delete any crate under **Administration → Crates → Delete** without an elevation, because deleting exposes no content.
+Crate owners do the same under **Settings → Delete crate**. In both places the crate name has to be typed to confirm. The crate, its documents,
+files, search index entries (also in a dedicated backend), members and API keys are removed in the background. If a store cannot be reached the crate
+shows `PURGE_FAILED` and **Retry deletion** starts it again.
+
 ## Dedicated storage and search policy
 
 Under **Policies → Dedicated storage and search**, two switches (both **off** by default) decide whether crate creators may
 create a crate with its own S3-compatible storage and/or its own search backend (OpenSearch, Elasticsearch, Qdrant, pgvector)
 instead of the installation's providers. The choice is made in the **Create a crate** dialog, is tested before the crate is
 created, and is fixed afterwards. Endpoints in private networks are refused unless `contextcrate.crawler.allow-private-networks`
-is on. Turning a switch off does not affect existing crates. See
+is on. A third switch, **Users may ignore unsafe backends** (off by default), lets creators skip TLS certificate validation for their own backend, for example with a self-signed certificate. `contextcrate.tls.trust-all-certificates` covers these backends too. Turning a switch off does not affect existing crates. See
 [Dedicated storage and search per crate](../features/crate-backends.md).
 
 ## Models

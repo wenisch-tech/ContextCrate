@@ -149,13 +149,15 @@ const SEARCH_BACKENDS = {
 };
 
 Alpine.data('createCrate', (config = {}) => ({
-  allowStorage: !!config.allowStorage, allowSearch: !!config.allowSearch, searchBackends: SEARCH_BACKENDS,
+  allowStorage: !!config.allowStorage, allowSearch: !!config.allowSearch, allowUnsafe: !!config.allowUnsafe, globalTrust: !!config.globalTrust, searchBackends: SEARCH_BACKENDS,
   name: '', description: '',
-  storage: { mode: 'GLOBAL', endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '', pathStyle: true },
+  storage: { mode: 'GLOBAL', endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '', pathStyle: true, trust: false },
   search: { mode: 'GLOBAL', backend: 'elasticsearch', endpoint: '', apiKey: '', username: '', password: '', prefix: '', trust: false },
   tests: { storage: null, searchBackend: null }, testing: { storage: false, searchBackend: false },
   failure: { storage: '', searchBackend: '' }, creating: false, formError: '',
   get hasChoices() { return this.allowStorage || this.allowSearch; },
+  // Ignoring certificate errors is offered only when the administrator allows it and the installation does not ignore them anyway.
+  get unsafeOffered() { return this.allowUnsafe && !this.globalTrust; },
   get backend() { return this.searchBackends[this.search.backend]; },
   get storageReady() { const s = this.storage; return !!(s.bucket.trim() && s.accessKey.trim() && s.secretKey); },
   get searchReady() {
@@ -179,11 +181,11 @@ Alpine.data('createCrate', (config = {}) => ({
   stale(kind) { this.tests[kind] = null; this.failure[kind] = ''; },
   storagePayload() {
     const s = this.storage;
-    return { mode: s.mode, endpoint: s.endpoint, region: s.region, bucket: s.bucket, prefix: s.prefix, accessKey: s.accessKey, secretKey: s.secretKey, pathStyle: s.pathStyle };
+    return { mode: s.mode, endpoint: s.endpoint, region: s.region, bucket: s.bucket, prefix: s.prefix, accessKey: s.accessKey, secretKey: s.secretKey, pathStyle: s.pathStyle, trustAllCertificates: this.unsafeOffered && s.trust };
   },
   searchPayload() {
     const s = this.search;
-    return { mode: s.mode, backend: s.backend, endpoint: s.endpoint, apiKey: s.apiKey, username: s.username, password: s.password, prefix: s.prefix, trustAllCertificates: s.trust };
+    return { mode: s.mode, backend: s.backend, endpoint: s.endpoint, apiKey: s.apiKey, username: s.username, password: s.password, prefix: s.prefix, trustAllCertificates: this.unsafeOffered && s.trust };
   },
   async request(url, body) {
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
@@ -226,6 +228,27 @@ Alpine.data('createCrate', (config = {}) => ({
       }
     } catch { this.formError = 'The server could not be reached. Check your connection and try again.'; }
     this.creating = false;
+  }
+}));
+
+// Permanent deletion of a crate: the crate name has to be typed before the button works.
+Alpine.data('deleteCrate', (config = {}) => ({
+  crateId: config.crateId, name: config.name || '', redirect: config.redirect || '/crates',
+  open: false, typed: '', busy: false, error: '',
+  get confirmed() { return this.typed.trim() === this.name; },
+  show() { this.open = true; this.typed = ''; this.error = ''; this.$nextTick(() => this.$refs.confirm?.focus()); },
+  hide() { if (!this.busy) this.open = false; },
+  async remove() {
+    if (!this.confirmed || this.busy) return;
+    this.busy = true; this.error = '';
+    try {
+      const response = await fetch(`/api/v1/crates/${this.crateId}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ confirmation: this.typed.trim() }) });
+      if (response.ok) { window.location.assign(this.redirect); return; }
+      let result = {};
+      try { result = await response.json(); } catch { /* an empty or non-JSON answer */ }
+      this.error = response.status === 403 ? 'You are not allowed to delete this crate.' : (result.error || 'The crate could not be deleted.');
+    } catch { this.error = 'The server could not be reached. Check your connection and try again.'; }
+    this.busy = false;
   }
 }));
 

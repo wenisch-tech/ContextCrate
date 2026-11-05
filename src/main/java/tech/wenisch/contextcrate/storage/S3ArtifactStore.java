@@ -9,7 +9,12 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.*;
 import tech.wenisch.contextcrate.config.ContextCrateProperties;
+import software.amazon.awssdk.http.SdkHttpClient;
+import software.amazon.awssdk.http.SdkHttpConfigurationOption;
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
+import software.amazon.awssdk.utils.AttributeMap;
 import tech.wenisch.contextcrate.domain.CrateBackendSettings;
+import tech.wenisch.contextcrate.util.InsecureSsl;
 
 @Component
 @ConditionalOnProperty(name = "contextcrate.artifacts.backend", havingValue = "s3")
@@ -60,7 +65,19 @@ public class S3ArtifactStore implements ArtifactStore {
             .overrideConfiguration(o -> o.apiCallTimeout(java.time.Duration.ofSeconds(timeoutSeconds))
                 .apiCallAttemptTimeout(java.time.Duration.ofSeconds(timeoutSeconds)));
     if (c.endpoint() != null && !c.endpoint().isBlank()) builder.endpointOverride(URI.create(c.endpoint().strip()));
+    // The crate's own setting or the installation-wide contextcrate.tls.trust-all-certificates switch.
+    // The SDK's HTTP client keeps its own TLS settings, so the JVM-wide default does not reach it.
+    if (c.trustAllCertificates() || InsecureSsl.globalTrustAll()) builder.httpClientBuilder(new TrustAllHttpClientBuilder());
     return builder.build();
+  }
+
+  /** Builds the SDK's HTTP client with certificate and host name validation switched off; the SDK closes the client it builds. */
+  static final class TrustAllHttpClientBuilder implements SdkHttpClient.Builder<TrustAllHttpClientBuilder> {
+    @Override
+    public SdkHttpClient buildWithDefaults(AttributeMap serviceDefaults) {
+      AttributeMap trustAll = AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, true).build();
+      return UrlConnectionHttpClient.builder().buildWithDefaults(trustAll.merge(serviceDefaults));
+    }
   }
 
   public void close() { client.close(); }

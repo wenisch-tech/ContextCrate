@@ -38,6 +38,7 @@ public class CrateBackendService {
       storage.put("prefix", c.prefix());
       storage.put("accessKey", c.accessKey());
       storage.put("pathStyle", c.pathStyle());
+      storage.put("trustAllCertificates", c.trustAllCertificates());
       storage.put("secretKeyConfigured", c.secretKey() != null);
     } else {
       storage.put("mode", "GLOBAL");

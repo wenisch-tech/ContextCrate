@@ -96,11 +96,13 @@ public class CrateService {
   /** Tests a storage configuration before the crate exists (the dialog's "Test connection"). */
   public tech.wenisch.contextcrate.backend.ConnectionTest testStorage(tech.wenisch.contextcrate.backend.BackendChoice.StorageChoice choice) {
     requireBackendPolicy(true, false);
+    requireUnsafeAllowed(Boolean.TRUE.equals(choice.trustAllCertificates()), "storage");
     return storageTester.test(choice.toConfig());
   }
 
   public tech.wenisch.contextcrate.backend.ConnectionTest testSearchBackend(tech.wenisch.contextcrate.backend.BackendChoice.SearchChoice choice) {
     requireBackendPolicy(false, true);
+    requireUnsafeAllowed(Boolean.TRUE.equals(choice.trustAllCertificates()), "searchBackend");
     return searchTester.test(choice.toConfig());
   }
 
@@ -114,11 +116,20 @@ public class CrateService {
       throw new tech.wenisch.contextcrate.backend.BackendValidationException("searchBackend", "A dedicated search backend is not enabled by the administrator", null);
   }
 
+  /** Skipping TLS validation for a crate's own backend is an administrator decision. */
+  private void requireUnsafeAllowed(boolean requested, String field) {
+    if (requested && !settings.findById(1).orElseThrow().isAllowUnsafeBackends())
+      throw new tech.wenisch.contextcrate.backend.BackendValidationException(field,
+          "Ignoring TLS certificate errors is not enabled by the administrator. Use a certificate your server trusts.", null);
+  }
+
   /** Checks the choice against the policy and the connection tests; returns the settings to store, or {@code null} for the global providers. */
   private CrateBackendSettings validatedBackends(tech.wenisch.contextcrate.backend.BackendChoice choice, UUID crateId) {
     if (choice == null || !(choice.customStorage() || choice.customSearch())) return null;
     if (backendSettings == null) throw new IllegalStateException("Dedicated backends are not available");
     requireBackendPolicy(choice.customStorage(), choice.customSearch());
+    if (choice.customStorage()) requireUnsafeAllowed(Boolean.TRUE.equals(choice.storage().trustAllCertificates()), "storage");
+    if (choice.customSearch()) requireUnsafeAllowed(Boolean.TRUE.equals(choice.searchBackend().trustAllCertificates()), "searchBackend");
     CrateBackendSettings row = new CrateBackendSettings(crateId);
     if (choice.customStorage()) {
       var config = choice.storage().toConfig();

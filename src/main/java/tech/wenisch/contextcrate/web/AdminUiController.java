@@ -132,8 +132,9 @@ public class AdminUiController {
 
   @PostMapping("/settings/backend-policy")
   String backendPolicy(@RequestParam(defaultValue = "false") boolean allowCustomStorage,
-      @RequestParam(defaultValue = "false") boolean allowCustomSearchBackend) {
-    administration.backendPolicy(allowCustomStorage, allowCustomSearchBackend);
+      @RequestParam(defaultValue = "false") boolean allowCustomSearchBackend,
+      @RequestParam(defaultValue = "false") boolean allowUnsafeBackends) {
+    administration.backendPolicy(allowCustomStorage, allowCustomSearchBackend, allowUnsafeBackends);
     return "redirect:/admin?backendPolicySaved#policies";
   }
 
