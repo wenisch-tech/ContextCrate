@@ -180,6 +180,10 @@ it is designed to hold them as briefly as possible:
   model) and assigns up to 5 tags. These are kept **independently of Log every question**, until the
   retention period ends, so the report can show what users ask about without raw questions. If even a
   rewritten topic is too sensitive for a crate, leave both options off.
+- With **Track unanswered questions** the judge also receives the question and the answer once more (to
+  classify them), and for every question that was **not** or only **partly answered** a neutral topic and
+  tags are stored, **even when "Store request topic" and "Store tags" are off**. The raw question is still
+  removed unless "Log every question" is on.
 - Building the report sends the stored topic wordings to the crate's embedding model, or to the judge model if there are none. The summary sends aggregated scores, topics and tags to the judge model.
 - The judge model **receives the question, the retrieved chunks and the answer**. Use a provider you
   trust with the content of the crate, with TLS.
@@ -214,6 +218,7 @@ or in the [REST API](../api.md).
 | Dimensions | all on | Context relevance, faithfulness, answer relevance, completeness |
 | Log every question | off | Keep text and judge reasoning per case |
 | Keep cases | 30 days | Retention of cases (1 to 365) |
+| Track unanswered questions | off | Classify every question as answered, partly or not answered; keep a topic for the ones that were not |
 | Store request topic | off | The judge rewrites each live question into a neutral topic; only the rewrite is kept |
 | Store tags | off | The judge assigns up to 5 category tags (for example `development`, `python`) |
 | Judge model | – | Shared judge model or own endpoint, model and key; nothing is evaluated without one |
@@ -237,6 +242,27 @@ using the crate's **embedding model** (topics with a cosine similarity of at lea
 without embeddings, the **judge model**, and finally the exact text (ignoring case and trailing
 punctuation). The report says which method was used and lists the other wordings under each topic.
 Tags are merged only when spelled the same.
+
+### Questions the knowledge base could not answer
+
+With **Track unanswered questions** on, the report has its own section for the gaps in the knowledge base.
+Every live question is classified:
+
+- **Not answered, nothing found** - retrieval returned no passage at all. This includes questions that strict
+  grounding refused to answer ("No answer was found in the knowledge base."), which are always recorded, even
+  with a low sampling rate, and cost no scoring calls.
+- **Not answered, not in the documents** - passages were found, but the answer says the information is missing or
+  only talks about something else.
+- **Partly answered** - some parts of the question were covered, others were not.
+
+The section shows the counts and the share of assessed questions, the **topics without a good answer** (merged
+by meaning like the other topics, with how often they were asked, why they failed, their tags and when they were
+last asked), and the **latest unanswered questions** (the neutral topic, and the raw question while it is still
+stored). **Analyze gaps** asks the judge model for an analysis: which themes are missing, likely causes, and what
+to write or add next. It receives only the clustered topics with counts and reasons, no questions or answers, and
+is cached for an hour like the summary. The printable view includes it when it was generated
+(`&gaps=true` on the JSON endpoint). The classification is a judgement of the judge model, not proof that the
+documents lack the content: check the listed topics before writing new documentation.
 
 **Generate summary** asks the judge model to read the figures of the report and write what people
 searched for, which topics were answered well, which were not, and what to improve. The judge

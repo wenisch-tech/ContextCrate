@@ -52,11 +52,35 @@ public class EvaluationAdminService {
   /** The reporting page: everything for one crate and one time frame. {@code truncated} when more than MAX_REPORT_CASES matched. */
   public record Report(Instant from, Instant to, long questions, long failed, boolean truncated, Averages live, Averages golden,
       List<Day> trend, List<Ranked> topTopics, List<Ranked> topTags, List<CaseView> latest, long withTopic,
-      String groupingMethod, ReportSummary summary) {
+      String groupingMethod, ReportSummary summary, GapReport gaps) {
     public Report withSummary(ReportSummary value) {
-      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, value);
+      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, value, gaps);
+    }
+    public Report withGapSummary(GapSummary value) {
+      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, summary, gaps.withSummary(value));
     }
   }
+
+  /** A topic (grouped by meaning) that users asked about and the knowledge base could not answer, or only in part. */
+  public record GapTopic(String label, long count, long noSources, long notInSources, long partial, List<String> variants, List<String> tags, Instant lastAsked) {}
+
+  /** One question that was not answered; {@code question} only while its text is still stored and the viewer may see it. */
+  public record GapQuestion(Instant createdAt, String status, String reason, String topic, List<String> tags, String question) {}
+
+  /**
+   * Questions the knowledge base could not answer. {@code tracked} is the number of live answers that were assessed
+   * (zero when "track unanswered questions" is off or nothing was asked yet).
+   */
+  public record GapReport(long tracked, long unanswered, long partial, long noSources, long notInSources,
+      List<GapTopic> topics, List<GapQuestion> latest, GapSummary summary) {
+    GapReport withSummary(GapSummary value) { return new GapReport(tracked, unanswered, partial, noSources, notInSources, topics, latest, value); }
+    public long gaps() { return unanswered + partial; }
+    /** Share of assessed questions that were unanswered or partly answered, 0..1. */
+    public double share() { return tracked == 0 ? 0 : (double) (unanswered + partial) / tracked; }
+  }
+
+  /** Judge-written reading of the unanswered questions. */
+  public record GapSummary(String overview, List<String> themes, List<String> causes, List<String> actions, String model, Instant generatedAt) {}
 
   /** Only present while the case still carries its text (per-question logging) and the viewer may see it. */
   public record TextView(String question, String answer, Map<String, Object> snapshot, Map<String, Object> details, String detailsText) {}
@@ -130,8 +154,35 @@ public class EvaluationAdminService {
           cluster.stream().skip(1).limit(5).toList());
     }).sorted(Comparator.comparingLong(Ranked::count).reversed().thenComparing(Ranked::label)).limit(TOP_TOPICS).toList();
     List<CaseView> latest = live.stream().limit(MAX_REPORT_ROWS).map(c -> view(c, includeText)).toList();
+    GapReport gaps = gaps(live, grouping.clusters(), byWording, includeText);
     return new Report(from, to, live.size(), cases.countByCrateIdAndStatus(crateId, EvaluationCase.Status.FAILED), truncated,
-        averages(live), averages(goldenCases), trend, topics, ranked(tags), latest, withTopic, grouping.method(), null);
+        averages(live), averages(goldenCases), trend, topics, ranked(tags), latest, withTopic, grouping.method(), null, gaps);
+  }
+
+  /** Counts and clusters the live cases that were not (fully) answered, reusing the meaning clusters of the topics. */
+  private static GapReport gaps(List<EvaluationCase> live, List<List<String>> clusters, Map<String, List<EvaluationCase>> byWording, boolean includeText) {
+    long tracked = live.stream().filter(c -> c.getAnswerStatus() != null).count();
+    List<EvaluationCase> gapCases = live.stream().filter(EvaluationCase::isGap).toList();
+    long unanswered = gapCases.stream().filter(c -> "UNANSWERED".equals(c.getAnswerStatus())).count();
+    long noSources = gapCases.stream().filter(c -> "no-sources".equals(c.getGapReason())).count();
+    long notInSources = gapCases.stream().filter(c -> "not-in-sources".equals(c.getGapReason())).count();
+    List<GapTopic> topics = new ArrayList<>();
+    for (List<String> cluster : clusters) {
+      List<EvaluationCase> members = cluster.stream().flatMap(w -> byWording.get(w).stream()).filter(EvaluationCase::isGap).toList();
+      if (members.isEmpty()) continue;
+      Map<String, Long> tagCounts = new HashMap<>();
+      members.forEach(c -> readTags(c.getTags()).forEach(t -> tagCounts.merge(t, 1L, Long::sum)));
+      List<String> tags = tagCounts.entrySet().stream().sorted(Map.Entry.<String, Long>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+          .limit(5).map(Map.Entry::getKey).toList();
+      topics.add(new GapTopic(cluster.get(0), members.size(), members.stream().filter(c -> "no-sources".equals(c.getGapReason())).count(),
+          members.stream().filter(c -> "not-in-sources".equals(c.getGapReason())).count(), members.stream().filter(c -> "partial".equals(c.getGapReason())).count(),
+          cluster.stream().skip(1).limit(5).toList(), tags, members.stream().map(EvaluationCase::getCreatedAt).max(Comparator.naturalOrder()).orElse(null)));
+    }
+    topics.sort(Comparator.comparingLong(GapTopic::count).reversed().thenComparing(GapTopic::label));
+    List<GapQuestion> latest = gapCases.stream().limit(MAX_REPORT_ROWS)
+        .map(c -> new GapQuestion(c.getCreatedAt(), c.getAnswerStatus(), c.getGapReason(), c.getTopic(), readTags(c.getTags()), includeText ? c.getQuestion() : null)).toList();
+    return new GapReport(tracked, unanswered, gapCases.size() - unanswered, noSources, notInSources,
+        topics.stream().limit(TOP_TOPICS).toList(), latest, null);
   }
 
   private static List<Ranked> ranked(Map<String, List<EvaluationCase>> groups) {
@@ -170,6 +221,48 @@ public class EvaluationAdminService {
     if (summaries.size() >= SUMMARY_CACHE_SIZE) summaries.clear();
     summaries.put(key, new Cached(summary, now));
     return summary;
+  }
+
+  private record CachedGap(GapSummary summary, Instant at) {}
+  private final Map<String, CachedGap> gapSummaries = new java.util.concurrent.ConcurrentHashMap<>();
+
+  /**
+   * Asks the judge model what the unanswered questions say about missing content. It receives only the clustered topics
+   * with counts and reasons, never questions or answers. Cached for an hour like {@link #summarize}.
+   */
+  public GapSummary summarizeGaps(UUID crateId, Report report) throws Exception {
+    if (!judge.available(crateId)) throw new IllegalStateException("Configure a judge model to analyze the unanswered questions");
+    GapReport gaps = report.gaps();
+    if (gaps == null || gaps.gaps() == 0) throw new IllegalStateException("There are no unanswered questions in this timeframe to analyze");
+    String input = gapInput(report);
+    String key = crateId + "|gaps|" + report.from() + "|" + report.to() + "|" + input.hashCode();
+    Instant now = Instant.now();
+    CachedGap cached = gapSummaries.get(key);
+    if (cached != null && cached.at().plusSeconds(SUMMARY_TTL_SECONDS).isAfter(now)) return cached.summary();
+    JsonNode node = JudgeProtocol.askJson(judge, crateId, JudgeProtocol.GAP_SUMMARY, JudgeProtocol.textInput("DATA", input));
+    var summary = new GapSummary(text(node.path("overview").asText("")), items(node.path("themes")), items(node.path("causes")),
+        items(node.path("actions")), judge.model(crateId), now);
+    if (summary.overview().isEmpty() && summary.themes().isEmpty() && summary.causes().isEmpty() && summary.actions().isEmpty())
+      throw new IllegalStateException("The judge returned an empty analysis");
+    if (gapSummaries.size() >= SUMMARY_CACHE_SIZE) gapSummaries.clear();
+    gapSummaries.put(key, new CachedGap(summary, now));
+    return summary;
+  }
+
+  static String gapInput(Report r) {
+    GapReport g = r.gaps();
+    StringBuilder b = new StringBuilder();
+    b.append("Period: ").append(r.from()).append(" to ").append(r.to()).append(" (UTC)\n");
+    b.append("Questions assessed: ").append(g.tracked()).append(", not answered: ").append(g.unanswered()).append(", answered in part: ").append(g.partial()).append('\n');
+    b.append("Reasons: no-sources ").append(g.noSources()).append(", not-in-sources ").append(g.notInSources()).append(", partial ").append(g.partial()).append('\n');
+    b.append("Topics that were not (fully) answered, most asked first:\n");
+    for (GapTopic t : g.topics()) {
+      b.append("- \"").append(t.label()).append("\" asked ").append(t.count()).append("x (no-sources ").append(t.noSources()).append(", not-in-sources ")
+          .append(t.notInSources()).append(", partial ").append(t.partial()).append(')');
+      if (!t.tags().isEmpty()) b.append(", tags: ").append(String.join(", ", t.tags()));
+      b.append('\n');
+    }
+    return b.toString();
   }
 
   private static String text(String value) {

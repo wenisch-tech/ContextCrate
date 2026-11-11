@@ -135,4 +135,22 @@ class EvaluationCollectorTest {
     assertThat(millis).isLessThan(1_000); // the slow store happens off the calling thread
     release.countDown();
   }
+
+  @Test
+  void questionsThatFoundNothingAreKeptDespiteSamplingWhenUnansweredQuestionsAreTracked() throws Exception {
+    config.update(true, 0.01, 5, 20, true, true, true, true, false, 30);
+    var empty = new AnswerService.Prepared(crateId, "q", List.of(), "hybrid", List.of(), "alice", true, true, true, false, "revise-once");
+    var collector = collector(direct());
+
+    for (int i = 0; i < 20; i++) collector.offer(empty, AnswerService.NO_ANSWER);
+    verifyNoInteractions(cases); // tracking is off: the 1% sampling applies as before
+
+    config.updateTracking(true);
+    for (int i = 0; i < 20; i++) collector.offer(empty, AnswerService.NO_ANSWER);
+    verify(cases, times(20)).save(any(EvaluationCase.class));
+    // answers that did find sources are still sampled
+    clearInvocations(cases);
+    for (int i = 0; i < 20; i++) collector.offer(prepared(), "an answer");
+    verify(cases, atMost(10)).save(any(EvaluationCase.class));
+  }
 }

@@ -71,4 +71,13 @@ class AnswerServiceEvaluationHookTest {
     service.setEvaluation(null);
     assertThat(service.generate(prepared(false)).text()).isEqualTo("Generated answer.");
   }
+
+  @Test
+  void aDeclinedQuestionIsHandedOverWithTheNoAnswerText() {
+    var prepared = prepared(false);
+
+    service.declined(prepared);
+
+    verify(collector).offer(prepared, AnswerService.NO_ANSWER);
+  }
 }

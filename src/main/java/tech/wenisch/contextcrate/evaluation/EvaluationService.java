@@ -81,6 +81,20 @@ public class EvaluationService {
       Map<String, Object> details = new LinkedHashMap<>();
       List<String> errors = new ArrayList<>();
       int succeeded = 0, attempted = 0;
+      boolean live = evaluation.getSource() == EvaluationCase.Source.LIVE && evaluation.getQuestion() != null;
+      boolean tracking = config.isTrackUnanswered() && live;
+
+      // Nothing was retrieved: the knowledge base had no answer. Scores would say nothing here, so only note the gap and its topic.
+      if (tracking && snapshot.chunks().isEmpty()) {
+        evaluation.answerStatus("UNANSWERED", "no-sources");
+        details.put("gap", "no-sources");
+        runDimension("topic", crateId, errors, () -> topic(evaluation, true, true));
+        if (!errors.isEmpty()) details.put("errors", errors);
+        evaluation.done(judge.model(crateId), MAPPER.writeValueAsString(details), errors.isEmpty() ? null : String.join("; ", errors));
+        emit(evaluation, crateId, source);
+        finish(evaluation, config);
+        return;
+      }
 
       if (config.isContextEnabled()) { attempted++; if (runDimension("context", crateId, errors, () -> context(evaluation, config, snapshot, item, details))) succeeded++; }
       if (config.isFaithfulnessEnabled()) { attempted++; if (runDimension("faithfulness", crateId, errors, () -> faithfulness(evaluation, snapshot, details))) succeeded++; }
@@ -90,10 +104,11 @@ public class EvaluationService {
         attempted++;
         if (runDimension("reference_recall", crateId, errors, () -> referenceRecall(evaluation, item, details))) succeeded++;
       }
-      // Topic and tags describe the question; they do not count as a scored dimension.
-      if (evaluation.getSource() == EvaluationCase.Source.LIVE && (config.isStoreTopic() || config.isStoreTags())
-          && evaluation.getQuestion() != null)
-        runDimension("topic", crateId, errors, () -> topic(evaluation, config));
+      // Answer status, topic and tags describe the question; they do not count as scored dimensions.
+      if (tracking) runDimension("answer_status", crateId, errors, () -> answerStatus(evaluation, details));
+      // A question that was not answered always gets a topic, even if topics are not stored in general.
+      final boolean wantTopic = config.isStoreTopic() || evaluation.isGap(), wantTags = config.isStoreTags() || evaluation.isGap();
+      if (live && (wantTopic || wantTags)) runDimension("topic", crateId, errors, () -> topic(evaluation, wantTopic, wantTags));
       if (errors.size() > 0) details.put("errors", errors);
       String detailsJson = MAPPER.writeValueAsString(details);
       if (attempted > 0 && succeeded == 0) {
@@ -127,8 +142,20 @@ public class EvaluationService {
     }
   }
 
-  private void topic(EvaluationCase evaluation, EvaluationSettings config) throws Exception {
-    var result = JudgeProtocol.askTopicTags(judge, evaluation.getCrateId(), evaluation.getQuestion(), config.isStoreTopic(), config.isStoreTags());
+  /** Asks whether the answer gave the requested information; only question and answer are sent. */
+  private void answerStatus(EvaluationCase evaluation, Map<String, Object> details) throws Exception {
+    var verdict = JudgeProtocol.askVerdict(judge, evaluation.getCrateId(), JudgeProtocol.ANSWER_STATUS,
+        JudgeProtocol.coverageInput("QUESTION", evaluation.getQuestion(), evaluation.getAnswer()), 0, 2);
+    switch (verdict.score()) {
+      case 2 -> evaluation.answerStatus("ANSWERED", null);
+      case 1 -> evaluation.answerStatus("PARTIAL", "partial");
+      default -> evaluation.answerStatus("UNANSWERED", "not-in-sources");
+    }
+    details.put("answer_status", Map.of("score", verdict.score(), "reasoning", verdict.reasoning()));
+  }
+
+  private void topic(EvaluationCase evaluation, boolean wantTopic, boolean wantTags) throws Exception {
+    var result = JudgeProtocol.askTopicTags(judge, evaluation.getCrateId(), evaluation.getQuestion(), wantTopic, wantTags);
     evaluation.topic(result.topic(), result.tags().isEmpty() ? null : MAPPER.writeValueAsString(result.tags()));
   }
 

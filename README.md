@@ -69,7 +69,7 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 
 | Option | What it does |
 |---|---|
-| [RAG evaluation](docs/features/evaluation.md) | An LLM judge scores context relevance (Precision/Recall@K, MRR, MAP, NDCG), faithfulness, answer relevance and completeness, asynchronously and per crate, with an optional golden question set. Optionally stores a neutral rewrite and tags of each question and offers a printable report that groups topics by meaning and can include an LLM-written summary. Visible to crate owners. |
+| [RAG evaluation](docs/features/evaluation.md) | An LLM judge scores context relevance (Precision/Recall@K, MRR, MAP, NDCG), faithfulness, answer relevance and completeness, asynchronously and per crate, with an optional golden question set. Optionally stores a neutral rewrite and tags of each question, tracks questions the knowledge base could not answer and offers a printable report that groups topics by meaning and can include an LLM-written summary. Visible to crate owners. |
 | [Prometheus and Grafana](docs/operations.md) | Metrics for every stage and a ready-made [dashboard](docs/grafana/README.md) with a crate selector. |
 
 ## Architecture

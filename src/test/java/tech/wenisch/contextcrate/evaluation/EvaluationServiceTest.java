@@ -347,4 +347,82 @@ class EvaluationServiceTest {
     service().evaluate(crateId, stored.getId());
     assertThat(calls.stream().map(c -> c[0])).noneMatch(s -> s.startsWith("You summarise"));
   }
+
+  // ---- unanswered questions
+
+  private static String statusScore(int value) { return "{\"reasoning\":\"r\",\"score\":" + value + "}"; }
+
+  private static final String TOPIC = "{\"topic\":\"Rotating API keys\",\"tags\":[\"security\"]}";
+
+  @Test
+  void aQuestionThatFoundNothingIsRecordedAsAGapWithATopicAndWithoutScores() throws Exception {
+    only(true, true, true, true, false);
+    settings.updateTracking(true); // topics are NOT enabled, yet a gap always gets one
+    script = (system, user) -> system.startsWith("You summarise") ? TOPIC : "unexpected";
+    var evaluation = caseOf("how do i rotate my key?", "No answer was found in the knowledge base.");
+
+    service().evaluate(crateId, evaluation.getId());
+
+    assertThat(evaluation.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+    assertThat(evaluation.getAnswerStatus()).isEqualTo("UNANSWERED");
+    assertThat(evaluation.getGapReason()).isEqualTo("no-sources");
+    assertThat(evaluation.getTopic()).isEqualTo("Rotating API keys");
+    assertThat(evaluation.getTags()).isEqualTo("[\"security\"]");
+    assertThat(evaluation.getFaithfulness()).isNull();
+    assertThat(evaluation.getPrecisionAtK()).isNull();
+    assertThat(calls).hasSize(1); // only the topic call; no scoring of an empty context
+    assertThat(evaluation.getQuestion()).isNull(); // raw text is still removed
+  }
+
+  @Test
+  void theJudgeClassifiesAnswersAndGapsGetATopic() throws Exception {
+    only(true, false, false, false, false);
+    settings.updateTracking(true);
+    for (int[] row : new int[][] {{0}, {1}}) {
+      script = (system, user) -> system.equals(JudgeProtocol.ANSWER_STATUS) ? statusScore(row[0]) : system.startsWith("You summarise") ? TOPIC : score(3);
+      var evaluation = caseOf("how do i rotate my key?", "I could not find that.", "alpha");
+      service().evaluate(crateId, evaluation.getId());
+      assertThat(evaluation.getAnswerStatus()).isEqualTo(row[0] == 0 ? "UNANSWERED" : "PARTIAL");
+      assertThat(evaluation.getGapReason()).isEqualTo(row[0] == 0 ? "not-in-sources" : "partial");
+      assertThat(evaluation.getTopic()).isEqualTo("Rotating API keys");
+      assertThat(evaluation.getPrecisionAtK()).isEqualTo(1.0); // scored as usual
+    }
+    // the question and the answer are sent, the retrieved chunks are not
+    assertThat(calls.stream().filter(c -> c[0].equals(JudgeProtocol.ANSWER_STATUS)).map(c -> c[1]))
+        .allSatisfy(user -> assertThat(user).contains("QUESTION:", "ANSWER:").doesNotContain("alpha"));
+  }
+
+  @Test
+  void anAnsweredQuestionGetsNoTopicUnlessTopicsAreEnabled() throws Exception {
+    only(true, false, false, false, false);
+    settings.updateTracking(true);
+    script = (system, user) -> system.equals(JudgeProtocol.ANSWER_STATUS) ? statusScore(2) : score(3);
+    var evaluation = caseOf("q", "a detailed answer", "alpha");
+
+    service().evaluate(crateId, evaluation.getId());
+
+    assertThat(evaluation.getAnswerStatus()).isEqualTo("ANSWERED");
+    assertThat(evaluation.getGapReason()).isNull();
+    assertThat(evaluation.isGap()).isFalse();
+    assertThat(evaluation.getTopic()).isNull();
+    assertThat(calls.stream().map(c -> c[0])).noneMatch(s -> s.startsWith("You summarise"));
+  }
+
+  @Test
+  void withoutTrackingNothingIsClassifiedAndAFailedClassificationDoesNotFailTheCase() throws Exception {
+    only(true, false, false, false, false);
+    script = (system, user) -> score(3);
+    var plain = caseOf("q", "a", "alpha");
+    service().evaluate(crateId, plain.getId());
+    assertThat(plain.getAnswerStatus()).isNull();
+    assertThat(calls.stream().map(c -> c[0])).doesNotContain(JudgeProtocol.ANSWER_STATUS);
+
+    settings.updateTracking(true);
+    script = (system, user) -> system.equals(JudgeProtocol.ANSWER_STATUS) ? "not json" : score(3);
+    var failing = caseOf("q", "a", "alpha");
+    service().evaluate(crateId, failing.getId());
+    assertThat(failing.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+    assertThat(failing.getAnswerStatus()).isNull();
+    assertThat(failing.getError()).contains("answer_status");
+  }
 }

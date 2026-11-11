@@ -22,13 +22,13 @@ public class EvaluationSettingsService {
   public record View(boolean enabled, double samplingRate, int topK, int poolSize, boolean context, boolean faithfulness,
       boolean answerRelevance, boolean completeness, boolean logQuestions, int retentionDays, UUID judgeSharedModelId,
       String judgeSharedModelName, String judgeBaseUrl, String judgeModel, boolean judgeApiKeySet, int judgeTimeoutSeconds,
-      boolean judgeConfigured, boolean storeTopic, boolean storeTags) {}
+      boolean judgeConfigured, boolean storeTopic, boolean storeTags, boolean trackUnanswered) {}
 
   /** Every field is optional; a missing field keeps the stored value. */
   public record Request(Boolean enabled, Double samplingRate, Integer topK, Integer poolSize, Boolean context,
       Boolean faithfulness, Boolean answerRelevance, Boolean completeness, Boolean logQuestions, Integer retentionDays,
       UUID judgeSharedModelId, String judgeBaseUrl, String judgeModel, String judgeApiKey, Integer judgeTimeoutSeconds,
-      Boolean storeTopic, Boolean storeTags) {}
+      Boolean storeTopic, Boolean storeTags, Boolean trackUnanswered) {}
 
   private final EvaluationSettingsRepository settings;
   private final SharedModelRepository sharedModels;
@@ -98,7 +98,7 @@ public class EvaluationSettingsService {
     return new View(v.isEnabled(), v.getSamplingRate(), v.getTopK(), v.getPoolSize(), v.isContextEnabled(), v.isFaithfulnessEnabled(),
         v.isAnswerRelevanceEnabled(), v.isCompletenessEnabled(), v.isLogQuestions(), v.getRetentionDays(), v.getJudgeSharedModelId(),
         sharedJudgeName(v.getJudgeSharedModelId()), v.getJudgeBaseUrl(), v.getJudgeModel(), v.hasJudgeApiKey(), v.getJudgeTimeoutSeconds(),
-        judge(crateId) != null, v.isStoreTopic(), v.isStoreTags());
+        judge(crateId) != null, v.isStoreTopic(), v.isStoreTags(), v.isTrackUnanswered());
   }
 
   /** Validates and stores a (partial) update; a judge shared model replaces an own endpoint and the other way round. */
@@ -109,9 +109,10 @@ public class EvaluationSettingsService {
         pick(r.poolSize(), c.getPoolSize()), pick(r.context(), c.isContextEnabled()), pick(r.faithfulness(), c.isFaithfulnessEnabled()),
         pick(r.answerRelevance(), c.isAnswerRelevanceEnabled()), pick(r.completeness(), c.isCompletenessEnabled()),
         pick(r.logQuestions(), c.isLogQuestions()), pick(r.retentionDays(), c.getRetentionDays()));
-    if (r.storeTopic() != null || r.storeTags() != null) {
+    if (r.storeTopic() != null || r.storeTags() != null || r.trackUnanswered() != null) {
       var topics = current(crateId);
       topics.updateTopics(pick(r.storeTopic(), topics.isStoreTopic()), pick(r.storeTags(), topics.isStoreTags()));
+      topics.updateTracking(pick(r.trackUnanswered(), topics.isTrackUnanswered()));
       settings.save(topics);
     }
     if (r.judgeSharedModelId() != null || r.judgeBaseUrl() != null || r.judgeModel() != null || r.judgeApiKey() != null || r.judgeTimeoutSeconds() != null) {

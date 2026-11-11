@@ -48,7 +48,7 @@ import tech.wenisch.contextcrate.service.CrateAccessService;
 @RequestMapping("/api/v1/crates/{crateId}/v1")
 public class OpenAiChatCompletionsController {
   /** Mirrors the strict-grounding short-circuit in {@link AnswerApiController}. */
-  private static final String NO_ANSWER = "No answer was found in the knowledge base.";
+  private static final String NO_ANSWER = AnswerService.NO_ANSWER;
 
   /**
    * Matches an inline citation marker, capturing any horizontal whitespace in front of it so a
@@ -141,7 +141,7 @@ public class OpenAiChatCompletionsController {
    * rather than token by token. This is the same shape the native answers API already delivers.
    */
   private String generate(AnswerService.Prepared prepared) throws Exception {
-    if (prepared.strictGrounding() && prepared.sources().isEmpty()) return NO_ANSWER;
+    if (prepared.strictGrounding() && prepared.sources().isEmpty()) { answers.declined(prepared); return NO_ANSWER; }
     return answers.generate(prepared).text();
   }
 

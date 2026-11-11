@@ -166,6 +166,10 @@ public class AnswerService {
     }
     return accepted;
   }
+  /** Shown instead of an answer when strict grounding finds no source. */
+  public static final String NO_ANSWER="No answer was found in the knowledge base.";
+  /** Called by the API layers when strict grounding finds no source and no answer is generated: the gap is still evaluated. */
+  public void declined(Prepared prepared){if(evaluation!=null){try{evaluation.offer(prepared,NO_ANSWER);}catch(RuntimeException evaluationFailure){}}}
   public Result generate(Prepared prepared) throws Exception {
     Instant started=Instant.now();long totalStarted=System.nanoTime();boolean success=false;String verification="disabled";String transformed=prepared.transformations().isEmpty()?"false":"true";
     try (var ignored=tech.wenisch.contextcrate.config.CrateContext.use(prepared.crateId())) {
@@ -191,7 +195,7 @@ public class AnswerService {
       if("yes".equals(decision))return new Result(answer,"verified");
       if(!"no".equals(decision))return unavailable(prepared,answer,"Answer verification returned an ambiguous result");
       return switch(prepared.answerVerificationFailureAction()) {
-        case "block-answer" -> new Result("No answer was found in the knowledge base.","blocked");
+        case "block-answer" -> new Result(NO_ANSWER,"blocked");
         case "return-warning" -> new Result(unsupportedWarning(answer),"unsupported");
         case "revise-once" -> revise(prepared,answer);
         default -> unavailable(prepared,answer,"Answer verification action was invalid");

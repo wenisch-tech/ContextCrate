@@ -296,7 +296,7 @@ class EvaluationAdminTest {
     when(settingsRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
     var view = settings.apply(crateId, new EvaluationSettingsService.Request(null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, true, false));
+        null, null, null, null, null, true, false, null));
 
     assertThat(view.storeTopic()).isTrue();
     assertThat(view.storeTags()).isFalse();
@@ -313,9 +313,9 @@ class EvaluationAdminTest {
 
     assertThatThrownBy(() -> api.settings(crateId)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.summary(crateId, 7)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> api.report(crateId, 7, false)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.report(crateId, 7, false, false)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.cases(crateId, 10)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> api.update(crateId, new EvaluationSettingsService.Request(true, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null))).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.update(crateId, new EvaluationSettingsService.Request(true, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null))).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.run(crateId)).isInstanceOf(AccessDeniedException.class);
     verifyNoInteractions(cases, golden, settingsRepository);
   }
@@ -341,5 +341,87 @@ class EvaluationAdminTest {
     // The web layer uses a different Jackson version than the internals; a tree node would be serialised as a bean.
     assertThat(json).doesNotContain("nodeType").doesNotContain("containerNode");
     assertThat(json).contains("\"details\":{\"x\":1}").contains("secret question");
+  }
+
+  // ---- unanswered questions in the report
+
+  private EvaluationCase gap(String topic, String tagsJson, String status, String reason, java.time.Instant at) throws Exception {
+    var c = withTopic(topic, tagsJson, 0.5, at);
+    c.answerStatus(status, reason);
+    return c;
+  }
+
+  @Test
+  void theReportCountsAndClustersQuestionsTheKnowledgeBaseCouldNotAnswer() throws Exception {
+    var now = java.time.Instant.now();
+    when(embeddings.available()).thenReturn(true);
+    when(embeddings.embedQueries(any())).thenAnswer(i -> ((List<String>) i.getArgument(0)).stream()
+        .map(t -> t.toLowerCase().contains("key") ? new float[] {1f, 0f} : new float[] {0f, 1f}).toList());
+    var answered = withTopic("Reset a password", "[]", 0.9, now);
+    answered.answerStatus("ANSWERED", null);
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
+        .thenReturn(List.of(
+            gap("Rotate an API key", "[\"security\"]", "UNANSWERED", "no-sources", now),
+            gap("API key rotation steps", "[\"security\",\"api\"]", "UNANSWERED", "not-in-sources", now.minusSeconds(60)),
+            gap("API key rotation steps", "[\"api\"]", "PARTIAL", "partial", now.minusSeconds(120)),
+            gap("Export billing data", "[]", "UNANSWERED", "no-sources", now.minusSeconds(180)),
+            answered));
+
+    var gaps = admin.report(crateId, now.minusSeconds(3600), now.plusSeconds(3600), false).gaps();
+
+    assertThat(gaps.tracked()).isEqualTo(5);
+    assertThat(gaps.unanswered()).isEqualTo(3);
+    assertThat(gaps.partial()).isEqualTo(1);
+    assertThat(gaps.noSources()).isEqualTo(2);
+    assertThat(gaps.notInSources()).isEqualTo(1);
+    assertThat(gaps.gaps()).isEqualTo(4);
+    assertThat(gaps.share()).isEqualTo(0.8);
+    assertThat(gaps.topics()).hasSize(2); // the answered topic is not a gap
+    assertThat(gaps.topics().get(0).count()).isEqualTo(3);
+    assertThat(gaps.topics().get(0).label()).isEqualTo("API key rotation steps");
+    assertThat(gaps.topics().get(0).variants()).containsExactly("Rotate an API key");
+    assertThat(gaps.topics().get(0).noSources()).isEqualTo(1);
+    assertThat(gaps.topics().get(0).notInSources()).isEqualTo(1);
+    assertThat(gaps.topics().get(0).partial()).isEqualTo(1);
+    assertThat(gaps.topics().get(0).tags()).containsExactly("api", "security");
+    assertThat(gaps.latest()).hasSize(4);
+    assertThat(gaps.latest().get(0).topic()).isEqualTo("Rotate an API key");
+    assertThat(gaps.latest().get(0).question()).isNull(); // raw text was scrubbed
+  }
+
+  @Test
+  void aReportWithoutTrackedAnswersHasNoGaps() throws Exception {
+    var now = java.time.Instant.now();
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(withTopic("T", "[]", 1.0, now)));
+
+    var gaps = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), false).gaps();
+
+    assertThat(gaps.tracked()).isZero();
+    assertThat(gaps.gaps()).isZero();
+    assertThat(gaps.share()).isZero();
+    assertThat(gaps.topics()).isEmpty();
+  }
+
+  @Test
+  void theGapAnalysisIsWrittenFromClusteredTopicsOnlyAndNeedsGaps() throws Exception {
+    var now = java.time.Instant.now();
+    var question = gap("Rotate an API key", "[\"security\"]", "UNANSWERED", "no-sources", now);
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(question));
+    var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
+    judgeAvailable = true;
+    judgeReply = "{\"overview\":\"One topic is missing.\",\"themes\":[\"API keys: 1\"],\"causes\":[\"No page\"],\"actions\":[\"Write a rotation guide\"]}";
+
+    var analysis = admin.summarizeGaps(crateId, report);
+    admin.summarizeGaps(crateId, report);
+
+    assertThat(analysis.overview()).isEqualTo("One topic is missing.");
+    assertThat(analysis.actions()).containsExactly("Write a rotation guide");
+    assertThat(judgeCalls).hasSize(1); // cached
+    assertThat(judgeCalls.get(0)).contains("Rotate an API key", "no-sources 1", "security").doesNotContain("secret question");
+    assertThat(report.withGapSummary(analysis).gaps().summary()).isEqualTo(analysis);
+
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of());
+    var none = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
+    assertThatThrownBy(() -> admin.summarizeGaps(crateId, none)).hasMessageContaining("no unanswered questions");
   }
 }

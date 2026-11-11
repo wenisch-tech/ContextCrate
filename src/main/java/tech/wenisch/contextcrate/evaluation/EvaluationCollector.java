@@ -82,7 +82,9 @@ public class EvaluationCollector implements AutoCloseable {
     try {
       var config = settings.current(crateId);
       if (!config.isEnabled() || !settings.judgeAvailable(crateId)) return;
-      if (config.getSamplingRate() < 1.0 && ThreadLocalRandom.current().nextDouble() >= config.getSamplingRate()) {
+      // Questions that found nothing are always kept when unanswered questions are tracked: they cost no judge scoring and are the gaps to close.
+      boolean gap = config.isTrackUnanswered() && prepared.sources().isEmpty();
+      if (!gap && config.getSamplingRate() < 1.0 && ThreadLocalRandom.current().nextDouble() >= config.getSamplingRate()) {
         metrics.count("evaluation.cases", crateId, "outcome", "skipped", "source", "live");
         return;
       }

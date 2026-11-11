@@ -43,6 +43,10 @@ public class EvaluationCase {
   @Column(columnDefinition = "text") private String error;
   /** Neutral rewrite of the question; kept after {@link #scrub()}. */
   @Column(columnDefinition = "text") private String topic;
+  /** ANSWERED, PARTIAL or UNANSWERED, or null when not assessed; kept after {@link #scrub()}. */
+  @Column(name = "answer_status", length = 12) private String answerStatus;
+  /** Why a question was not (fully) answered: no-sources, not-in-sources or partial. */
+  @Column(name = "gap_reason", length = 16) private String gapReason;
   /** JSON array of up to 5 category tags; kept after {@link #scrub()}. */
   @Column(columnDefinition = "text") private String tags;
 
@@ -81,6 +85,11 @@ public class EvaluationCase {
   public String getError() { return error; }
   public String getTopic() { return topic; }
   public String getTags() { return tags; }
+  public String getAnswerStatus() { return answerStatus; }
+  public String getGapReason() { return gapReason; }
+  public boolean isGap() { return "UNANSWERED".equals(answerStatus) || "PARTIAL".equals(answerStatus); }
+
+  public void answerStatus(String status, String reason) { this.answerStatus = status; this.gapReason = reason; }
 
   public void topic(String topic, String tagsJson) { this.topic = topic; this.tags = tagsJson; }
 

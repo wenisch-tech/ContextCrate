@@ -68,7 +68,8 @@ public class EvaluationUiController {
   @GetMapping("/report")
   String report(@PathVariable UUID crateId, @RequestParam(defaultValue = "7d") String range,
       @RequestParam(required = false) String from, @RequestParam(required = false) String to,
-      @RequestParam(defaultValue = "false") boolean print, @RequestParam(defaultValue = "false") boolean summary, Model model) {
+      @RequestParam(defaultValue = "false") boolean print, @RequestParam(defaultValue = "false") boolean summary,
+      @RequestParam(defaultValue = "false") boolean gaps, Model model) {
     java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
     java.time.LocalDate start, end = today;
     String selected = range;
@@ -100,6 +101,15 @@ public class EvaluationUiController {
         model.addAttribute("summaryError", "The summary could not be generated. Check the judge model and try again.");
       }
     }
+    if (gaps) {
+      try {
+        report = report.withGapSummary(admin.summarizeGaps(crateId, report));
+      } catch (IllegalStateException e) {
+        model.addAttribute("gapError", e.getMessage());
+      } catch (Exception e) {
+        model.addAttribute("gapError", "The analysis could not be generated. Check the judge model and try again.");
+      }
+    }
     model.addAttribute("report", report);
     model.addAttribute("summaryRequested", summary);
     model.addAttribute("range", selected);
@@ -118,6 +128,7 @@ public class EvaluationUiController {
       @RequestParam(defaultValue = "false") boolean answerRelevance, @RequestParam(defaultValue = "false") boolean completeness,
       @RequestParam(defaultValue = "false") boolean logQuestions, @RequestParam(defaultValue = "30") int retentionDays,
       @RequestParam(defaultValue = "false") boolean storeTopic, @RequestParam(defaultValue = "false") boolean storeTags,
+      @RequestParam(defaultValue = "false") boolean trackUnanswered,
       @RequestParam(defaultValue = "") String judgeSharedModelId, @RequestParam(defaultValue = "") String judgeBaseUrl,
       @RequestParam(defaultValue = "") String judgeModel, @RequestParam(defaultValue = "") String judgeApiKey,
       @RequestParam(defaultValue = "120") int judgeTimeoutSeconds) {
@@ -125,10 +136,10 @@ public class EvaluationUiController {
       UUID shared = judgeSharedModelId.isBlank() ? null : UUID.fromString(judgeSharedModelId);
       var view = settings.apply(crateId, new EvaluationSettingsService.Request(enabled, samplingRate, topK, poolSize, context,
           faithfulness, answerRelevance, completeness, logQuestions, retentionDays, shared, shared == null ? judgeBaseUrl : null,
-          shared == null ? judgeModel : null, judgeApiKey, judgeTimeoutSeconds, storeTopic, storeTags));
+          shared == null ? judgeModel : null, judgeApiKey, judgeTimeoutSeconds, storeTopic, storeTags, trackUnanswered));
       audits.save(new AuditLog(crateId, actor(), "EVALUATION_SETTINGS_CHANGED", "evaluation",
           "enabled=" + view.enabled() + ", sampling=" + view.samplingRate() + ", logQuestions=" + view.logQuestions()
-              + ", storeTopic=" + view.storeTopic() + ", storeTags=" + view.storeTags()));
+              + ", storeTopic=" + view.storeTopic() + ", storeTags=" + view.storeTags() + ", trackUnanswered=" + view.trackUnanswered()));
     });
   }
 

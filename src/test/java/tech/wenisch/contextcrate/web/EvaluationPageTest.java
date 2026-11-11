@@ -54,7 +54,7 @@ class EvaluationPageTest {
     when(access.activeElevation(crateId)).thenReturn(java.util.Optional.empty());
     when(crateService.require(crateId, tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER)).thenReturn(new Crate(crateId, "Handbook", null, null));
     when(settings.view(crateId)).thenReturn(new EvaluationSettingsService.View(true, 0.5, 5, 20, true, true, true, true, true, 30,
-        null, null, "https://judge.example/v1", "judge-1", true, 120, true, true, true));
+        null, null, "https://judge.example/v1", "judge-1", true, 120, true, true, true, true));
     when(admin.summary(crateId, 7)).thenReturn(new EvaluationAdminService.Summary(7, 1, 0, averages(12, 0.8), averages(0, null),
         List.of(new EvaluationAdminService.Day(LocalDate.of(2026, 11, 1), averages(12, 0.8)))));
     var text = new EvaluationAdminService.TextView("Who is on call?", "The secondary.", new ObjectMapper().readValue("{\"chunks\":[{\"uri\":\"u1\",\"content\":\"alpha\"}]}", java.util.Map.class), new ObjectMapper().readValue("{\"errors\":[]}", java.util.Map.class), "{ \"errors\" : [ ] }");
@@ -114,21 +114,27 @@ class EvaluationPageTest {
     when(access.activeElevation(crateId)).thenReturn(java.util.Optional.empty());
     when(crateService.require(crateId, tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER)).thenReturn(new Crate(crateId, "Handbook", null, null));
     when(settings.view(crateId)).thenReturn(new EvaluationSettingsService.View(true, 0.5, 5, 20, true, true, true, true, false, 30,
-        null, null, "https://judge.example/v1", "judge-1", true, 120, true, true, true));
+        null, null, "https://judge.example/v1", "judge-1", true, 120, true, true, true, true));
     var now = Instant.now();
     var row = new EvaluationAdminService.CaseView(UUID.randomUUID(), now, "LIVE", "DONE", 5, 0.6, 0.5, 1.0, 0.7, 0.9, 0.75, 4, 3,
         0.8, 0.6, null, "judge-1", null, "Deploying with Docker", List.of("development", "docker"), null);
+    var gaps = new EvaluationAdminService.GapReport(10, 2, 1, 2, 1,
+        List.of(new EvaluationAdminService.GapTopic("Rotating API keys", 3, 2, 0, 1, List.of("Key rotation steps"), List.of("security"), now)),
+        List.of(new EvaluationAdminService.GapQuestion(now, "UNANSWERED", "no-sources", "Rotating API keys", List.of("security"), "How do I rotate my key?")), null);
     when(admin.report(eq(crateId), any(), any(), eq(true))).thenReturn(new EvaluationAdminService.Report(now.minusSeconds(86400), now, 12, 0, false,
         averages(12, 0.8), averages(0, null), List.of(new EvaluationAdminService.Day(LocalDate.of(2026, 11, 1), averages(12, 0.8))),
         List.of(new EvaluationAdminService.Ranked("Deploying with Docker", 7, 0.8, 0.7, 0.6, List.of("Docker deployment steps"))),
-        List.of(new EvaluationAdminService.Ranked("docker", 7, 0.8, 0.7, 0.6, List.of())), List.of(row), 12, "embedding", null));
+        List.of(new EvaluationAdminService.Ranked("docker", 7, 0.8, 0.7, 0.6, List.of())), List.of(row), 12, "embedding", null, gaps));
 
     var normal = new ConcurrentModel();
     controller.crate(crateId, normal);
-    assertThat(controller.report(crateId, "30d", null, null, false, false, normal)).isEqualTo("evaluation-report");
+    assertThat(controller.report(crateId, "30d", null, null, false, false, false, normal)).isEqualTo("evaluation-report");
     String html = render("evaluation-report", normal);
     assertThat(html).contains("Evaluation report", "Handbook", "Deploying with Docker", "development", "Most requested topics",
         "What the metrics mean", "Faithfulness", "Printable view", "Last 30 days", "sidebar", "also asked as:", "Docker deployment steps", "matched with embeddings", "Generate summary");
+    // The dedicated section for questions that could not be answered.
+    assertThat(html).contains("Questions the knowledge base could not answer", "Not answered", "Partly answered", "Topics without a good answer",
+        "Rotating API keys", "Key rotation steps", "nothing relevant found", "How do I rotate my key?", "Analyze gaps", "30 %");
     assertThat(html).doesNotContain("Print / Save as PDF");
 
     var print = new ConcurrentModel();
@@ -136,9 +142,11 @@ class EvaluationPageTest {
     var summary = new EvaluationAdminService.ReportSummary("People mostly ask about Docker.", List.of("Docker: 7x, faithfulness 0.80"), List.of("Passwords: 2x, faithfulness 0.30"),
         List.of("Document password resets"), "judge-1", Instant.now());
     when(admin.summarize(eq(crateId), any())).thenReturn(summary);
-    controller.report(crateId, "custom", "2026-11-01", "2026-11-07", true, true, print);
+    when(admin.summarizeGaps(eq(crateId), any())).thenReturn(new EvaluationAdminService.GapSummary("Key management is undocumented.",
+        List.of("API keys: 3 questions"), List.of("No page on rotation"), List.of("Write a key rotation guide"), "judge-1", Instant.now()));
+    controller.report(crateId, "custom", "2026-11-01", "2026-11-07", true, true, true, print);
     String printable = render("evaluation-report", print);
     assertThat(printable).contains("Print / Save as PDF", "2026-11-01", "2026-11-07", "report-print", "What the metrics mean");
-    assertThat(printable).doesNotContain("class=\"sidebar").contains("People mostly ask about Docker.", "Needs attention", "Document password resets").doesNotContain("Generate summary");
+    assertThat(printable).doesNotContain("class=\"sidebar").contains("People mostly ask about Docker.", "Needs attention", "Document password resets", "Key management is undocumented.", "Write a key rotation guide", "Likely causes").doesNotContain("Generate summary").doesNotContain("Analyze gaps");
   }
 }

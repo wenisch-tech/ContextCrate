@@ -26,8 +26,8 @@
     <label class="small text-secondary" for="to">To</label><input class="form-control form-control-sm" style="width:auto" type="date" id="to" name="to" th:value="${to}">
     <button class="btn btn-primary btn-sm" type="submit">Show</button>
     <span class="ms-auto d-flex gap-2">
-      <a class="btn btn-outline-primary btn-sm" th:unless="${report.summary != null}" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=true)}" title="Asks the judge model to read the numbers below">Generate summary</a>
-      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true,summary=${report.summary != null})}" target="_blank" rel="noopener">Printable view</a>
+      <a class="btn btn-outline-primary btn-sm" th:unless="${report.summary != null}" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=true,gaps=${report.gaps.summary != null})}" title="Asks the judge model to read the numbers below">Generate summary</a>
+      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true,summary=${report.summary != null},gaps=${report.gaps.summary != null})}" target="_blank" rel="noopener">Printable view</a>
       <a class="btn btn-outline-secondary btn-sm" th:href="@{/crates/{id}/evaluation(id=${crate.id})}">Back to evaluation</a>
     </span>
   </form>
@@ -48,6 +48,59 @@
       <div th:if="${!report.summary.suggestions.empty}"><strong>Suggestions</strong><ul class="mb-0"><li th:each="i:${report.summary.suggestions}" th:text="${i}"></li></ul></div>
       <p class="text-secondary mt-2 mb-0">Written by <span th:text="${report.summary.model}"></span> on <span th:text="${#strings.substring(report.summary.generatedAt.toString(), 0, 16).replace('T', ' ')}"></span> UTC from the figures in this report. Check it against the tables.</p>
     </div>
+  </section>
+
+  <div class="alert alert-danger" th:if="${gapError != null}" th:text="${gapError}"></div>
+  <section class="mb-5 report-gaps" id="gaps">
+    <div class="d-flex justify-content-between align-items-center mb-2" style="flex-wrap:wrap;gap:.5rem">
+      <h2 class="h5 mb-0">Questions the knowledge base could not answer</h2>
+      <a class="btn btn-outline-primary btn-sm no-print" th:if="${report.gaps.summary == null and report.gaps.gaps > 0}"
+         th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=${report.summary != null},gaps=true)}"
+         title="Asks the judge model what these questions say about missing content">Analyze gaps</a>
+    </div>
+    <p class="text-secondary small">A question counts as <strong>not answered</strong> when nothing relevant was found or the answer says the information is not available, and as <strong>partly answered</strong> when only some parts were covered. These are the places where documentation or sources are missing.</p>
+    <div class="alert alert-info no-print" th:unless="${settings.trackUnanswered}">Unanswered questions are not being tracked. Switch on “Track unanswered questions” in the <a th:href="@{/crates/{id}/evaluation(id=${crate.id})}">evaluation settings</a>. Until then, only answers assessed earlier appear here.</div>
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="metric-card"><span>Not answered</span><strong th:text="${report.gaps.unanswered}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card"><span>Partly answered</span><strong th:text="${report.gaps.partial}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card" title="Share of assessed questions that were not or only partly answered"><span>Share of questions</span><strong th:text="${report.gaps.tracked == 0 ? '–' : #numbers.formatDecimal(report.gaps.share * 100, 1, 0) + ' %'}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card" title="Nothing relevant found / found documents did not contain the answer"><span>Nothing found / not in documents</span><strong th:text="|${report.gaps.noSources} / ${report.gaps.notInSources}|"></strong></div></div>
+    </div>
+    <p class="small text-secondary" th:if="${report.gaps.tracked > 0}">Based on <span th:text="${report.gaps.tracked}"></span> assessed questions in this timeframe.</p>
+
+    <div class="card panel p-3 small mb-3" th:if="${report.gaps.summary != null}">
+      <h3 class="h6">Analysis</h3>
+      <p th:text="${report.gaps.summary.overview}"></p>
+      <div th:if="${!report.gaps.summary.themes.empty}"><strong>Missing themes</strong><ul><li th:each="i:${report.gaps.summary.themes}" th:text="${i}"></li></ul></div>
+      <div th:if="${!report.gaps.summary.causes.empty}"><strong>Likely causes</strong><ul><li th:each="i:${report.gaps.summary.causes}" th:text="${i}"></li></ul></div>
+      <div th:if="${!report.gaps.summary.actions.empty}"><strong>What to do</strong><ul class="mb-0"><li th:each="i:${report.gaps.summary.actions}" th:text="${i}"></li></ul></div>
+      <p class="text-secondary mt-2 mb-0">Written by <span th:text="${report.gaps.summary.model}"></span> on <span th:text="${#strings.substring(report.gaps.summary.generatedAt.toString(), 0, 16).replace('T', ' ')}"></span> UTC from the topics below. Check it against the tables.</p>
+    </div>
+
+    <h3 class="h6" th:if="${!report.gaps.topics.empty}">Topics without a good answer</h3>
+    <div class="card panel table-responsive mb-3" th:if="${!report.gaps.topics.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Nothing found</th><th>Not in documents</th><th>Partly</th><th>Tags</th><th>Last asked (UTC)</th></tr></thead>
+      <tbody><tr th:each="t:${report.gaps.topics}">
+        <td><span th:text="${t.label}"></span><div class="small text-secondary" th:if="${!t.variants.empty}">also asked as: <span th:text="${#strings.listJoin(t.variants, '; ')}"></span></div></td>
+        <td th:text="${t.count}"></td>
+        <td style="width:14%"><div class="report-bar" th:style="|width:${t.count * 100 / report.gaps.topics[0].count}%|"></div></td>
+        <td th:text="${t.noSources}"></td><td th:text="${t.notInSources}"></td><td th:text="${t.partial}"></td>
+        <td><span class="badge text-bg-secondary me-1" th:each="g:${t.tags}" th:text="${g}"></span></td>
+        <td class="small" th:text="${#strings.substring(t.lastAsked.toString(), 0, 16).replace('T', ' ')}"></td>
+      </tr></tbody></table></div>
+
+    <h3 class="h6" th:if="${!report.gaps.latest.empty}">Latest unanswered questions</h3>
+    <div class="card panel table-responsive" th:if="${!report.gaps.latest.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Time (UTC)</th><th>Result</th><th>Topic / question</th><th>Tags</th></tr></thead>
+      <tbody><tr th:each="q:${report.gaps.latest}">
+        <td class="small" th:text="${#strings.substring(q.createdAt.toString(), 0, 16).replace('T', ' ')}"></td>
+        <td><span class="badge" th:classappend="${q.status == 'UNANSWERED'} ? 'text-bg-danger' : 'text-bg-warning'" th:text="${q.status == 'UNANSWERED' ? 'Not answered' : 'Partly answered'}"></span>
+          <div class="small text-secondary" th:text="${q.reason == 'no-sources' ? 'nothing relevant found' : (q.reason == 'not-in-sources' ? 'documents did not contain the answer' : 'some parts missing')}"></div></td>
+        <td class="small"><div th:if="${q.topic != null}" th:text="${q.topic}"></div><div class="text-secondary" th:if="${q.question != null}" th:text="${#strings.abbreviate(q.question, 160)}"></div>
+          <span class="text-secondary" th:if="${q.topic == null and q.question == null}">–</span></td>
+        <td><span class="badge text-bg-secondary me-1" th:each="g:${q.tags}" th:text="${g}"></span></td>
+      </tr></tbody></table></div>
+    <p class="text-secondary small" th:if="${report.gaps.tracked > 0 and report.gaps.gaps == 0}">Every assessed question in this timeframe was answered.</p>
   </section>
 
   <section class="mb-5">
@@ -146,6 +199,7 @@
       <dt>MAP (mean average precision)</dt><dd>Rewards ranking relevant passages above irrelevant ones across the whole top K.</dd>
       <dt>NDCG</dt><dd>Like MAP but uses graded relevance (0–3): highly relevant passages should appear before marginal ones.</dd>
       <dt>Reference recall</dt><dd>Golden set only: the share of statements in your reference answer that the produced answer contains.</dd>
+      <dt>Not answered / partly answered</dt><dd>Every assessed question is classified: answered, partly answered, or not answered. “Nothing found” means retrieval returned no passage at all (for example because strict grounding refused to answer); “not in documents” means passages were found but the answer says the information is missing. Partly answered means some parts of the question were covered and others were not.</dd>
       <dt>Topic and tags</dt><dd>The judge rewrites each question into a neutral topic and assigns up to 5 category tags, so you can see what users ask about without storing the raw questions. When building the report, topics that mean the same are merged (by embeddings, or by the judge model if there are no embeddings). Tags are only merged when they are spelled the same.</dd>
     </dl>
   </section>

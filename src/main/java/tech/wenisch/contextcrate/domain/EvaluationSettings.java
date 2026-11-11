@@ -26,6 +26,8 @@ public class EvaluationSettings {
   @Column(name = "store_topic", nullable = false) private boolean storeTopic;
   /** When true the judge derives up to 5 category tags per live question. */
   @Column(name = "store_tags", nullable = false) private boolean storeTags;
+  /** When true each live question is classified as answered, partly or not answered, and a topic is stored for the ones that were not. */
+  @Column(name = "track_unanswered", nullable = false) private boolean trackUnanswered;
   @Column(name = "retention_days", nullable = false) private int retentionDays = 30;
   @Column(name = "judge_shared_model_id") private UUID judgeSharedModelId;
   @Column(name = "judge_base_url", length = 2000) private String judgeBaseUrl;
@@ -48,6 +50,7 @@ public class EvaluationSettings {
   public boolean isLogQuestions() { return logQuestions; }
   public boolean isStoreTopic() { return storeTopic; }
   public boolean isStoreTags() { return storeTags; }
+  public boolean isTrackUnanswered() { return trackUnanswered; }
   public int getRetentionDays() { return retentionDays; }
   public UUID getJudgeSharedModelId() { return judgeSharedModelId; }
   public String getJudgeBaseUrl() { return judgeBaseUrl; }
@@ -66,6 +69,7 @@ public class EvaluationSettings {
   }
 
   public void updateTopics(boolean storeTopic, boolean storeTags) { this.storeTopic = storeTopic; this.storeTags = storeTags; }
+  public void updateTracking(boolean trackUnanswered) { this.trackUnanswered = trackUnanswered; }
 
   /** A blank API key keeps the stored key. A shared model replaces the own endpoint. */
   public void updateJudge(UUID sharedModelId, String baseUrl, String model, String apiKey, int timeoutSeconds) {
