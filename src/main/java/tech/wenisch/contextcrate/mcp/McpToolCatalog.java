@@ -50,7 +50,7 @@ public class McpToolCatalog {
         "How many passages to return. Default " + McpTools.SEARCH_DEFAULT_LIMIT
             + ", maximum " + McpTools.SEARCH_MAX_LIMIT + "."));
     properties.put("mode", property("string",
-        "Retrieval mode: lexical, semantic, or hybrid. Defaults to the crate's configured mode."));
+        "Retrieval mode: lexical, semantic, hybrid (rank fusion), or fusion (normalized score fusion). Defaults to the crate's configured mode."));
     addCrate(properties);
     return tool(
         "search_crate",

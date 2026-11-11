@@ -81,6 +81,26 @@ abstract class SearchIndexContract {
   }
 
   @Test
+  void fusionNormalizesBothLegsAndRanksByTheWeightedScore() throws Exception {
+    var embeddings = new Topics(true);
+    var doc = document("Handbook", "body");
+    var rotation = chunk(doc, 0, "Engineers swap the beeper every Monday for the on-call rotation.");
+    var billing = chunk(doc, 1, "Customers receive an invoice by email at the end of the month.");
+    var index = index(embeddings);
+    index.upsert(doc, List.of(ChunkRetrievalRecord.standard(rotation), ChunkRetrievalRecord.standard(billing)));
+
+    var fusion = index.search(new SearchIndex.SearchRequest(crateId, "on-call monday", 10, null, "chunk", "fusion"));
+
+    assertThat(fusion.mode()).isEqualTo("fusion");
+    assertThat(fusion.hits().getFirst().id()).isEqualTo(rotation.getId());
+    assertThat(fusion.hits().getFirst().lexicalScore()).isNotNull();
+    assertThat(fusion.hits().getFirst().semanticScore()).isNotNull();
+    assertThat(fusion.hits()).allSatisfy(h -> assertThat(h.score()).isBetween(0f, 1f));
+    var vectorOnly = index.search(new SearchIndex.SearchRequest(crateId, "on-call monday", 10, null, "chunk", "fusion").withVectorWeight(1.0));
+    assertThat(vectorOnly.hits().getFirst().id()).isEqualTo(rotation.getId());
+  }
+
+  @Test
   void aGeneratedQuestionFindsItsParentChunkOnceAndIsEmbeddedLikeAQuery() throws Exception {
     var embeddings = new Topics(true);
     var doc = document("Handbook", "body");

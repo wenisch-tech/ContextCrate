@@ -107,9 +107,11 @@ public class LuceneSearchIndex implements SearchIndex {
   }
   private SearchResults searchScoped(SearchRequest request)throws IOException{
     var writer=writer(request.crateId(),generation(request.crateId())); if(request.query().isBlank())return new SearchResults(request.query(),mode(request),List.of()); writer.commit();
-    String mode=mode(request); try(var reader=DirectoryReader.open(writer)) { var searcher=new IndexSearcher(reader); List<SearchHit> lexical=mode.equals("semantic")?List.of():lexical(searcher,request); List<SearchHit> semantic=mode.equals("lexical")?List.of():semantic(searcher,request);
+    String mode=mode(request); try(var reader=DirectoryReader.open(writer)) { var searcher=new IndexSearcher(reader); List<SearchHit> lexical,semantic;
+      if(mode.equals("fusion")){var legs=ParallelLegs.run(request.crateId(),()->lexical(searcher,request),()->semantic(searcher,request));lexical=legs.lexical();semantic=legs.semantic();}
+      else{lexical=mode.equals("semantic")?List.of():lexical(searcher,request);semantic=mode.equals("lexical")?List.of():semantic(searcher,request);}
       int candidates=RerankingSearchSupport.candidateLimit(request,reranking,retrieval.candidateLimit());
-      List<SearchHit> found=mode.equals("hybrid") ? fuse(lexical,semantic,candidates) : limit(mode.equals("lexical")?lexical:semantic,candidates);
+      List<SearchHit> found=mode.equals("fusion") ? HybridFusion.fuseNormalized(lexical,semantic,request.vectorWeight(),candidates) : mode.equals("hybrid") ? fuse(lexical,semantic,candidates) : limit(mode.equals("lexical")?lexical:semantic,candidates);
       return new SearchResults(request.query(),mode,RerankingSearchSupport.apply(request,found,reranking,metrics));
     } catch(Exception e) { if(e instanceof IOException io)throw io; throw new IOException("Search failed",e); }
   }

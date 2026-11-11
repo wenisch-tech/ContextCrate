@@ -108,6 +108,7 @@ public class AnswerService {
     else if(useHyde&&!available(request.crateId())){hyde.skipped(request.crateId(),"answer-model-unavailable");useHyde=false;}
     for(String query:queries) {
       var search=new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode);
+      if("fusion".equals(mode)) search=search.withVectorWeight(policy.getFusionVectorWeight());
       if(useHyde) { long hydeStarted=System.nanoTime();String hypothetical=hyde.generate(request.crateId(),query);hydeNanos+=System.nanoTime()-hydeStarted;if(hypothetical!=null){search=search.withVectorQuery(hypothetical);hydeQueries++;} }
       lists.add(index.search(search));
     }

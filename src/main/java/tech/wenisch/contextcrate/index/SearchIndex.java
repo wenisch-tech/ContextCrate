@@ -34,9 +34,13 @@ public interface SearchIndex extends AutoCloseable {
    * @param query the user's text; used for keyword search, reranking and snippets
    * @param vectorQuery optional text embedded <em>instead of</em> {@code query} for the vector leg
    *     (HyDE: a hypothetical answer). Blank or null means the query itself is embedded.
+   * @param vectorWeight weight of the vector leg (0 to 1) in {@code fusion} mode; null means the default of 0.5
    */
   record SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode,
-      String vectorQuery) {
+      String vectorQuery, Double vectorWeight) {
+    public SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode, String vectorQuery) {
+      this(crateId, query, limit, runId, kind, mode, vectorQuery, null);
+    }
     public SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind) {
       this(crateId, query, limit, runId, kind, null, null);
     }
@@ -49,14 +53,21 @@ public interface SearchIndex extends AutoCloseable {
       limit = Math.max(1, Math.min(limit, 100));
       kind = kind == null || kind.isBlank() ? null : kind.trim().toLowerCase(java.util.Locale.ROOT);
       mode = mode == null || mode.isBlank() ? null : mode.trim().toLowerCase(java.util.Locale.ROOT);
-      if (mode != null && !java.util.Set.of("lexical", "semantic", "hybrid").contains(mode))
-        throw new IllegalArgumentException("mode must be lexical, semantic, or hybrid");
+      if (mode != null && !java.util.Set.of("lexical", "semantic", "hybrid", "fusion").contains(mode))
+        throw new IllegalArgumentException("mode must be lexical, semantic, hybrid, or fusion");
+      if (vectorWeight != null && (vectorWeight.isNaN() || vectorWeight < 0 || vectorWeight > 1))
+        throw new IllegalArgumentException("vector weight must be between 0 and 1");
       vectorQuery = vectorQuery == null || vectorQuery.isBlank() ? null : vectorQuery.trim();
     }
 
     /** Same request, but the vector leg embeds the given text (a hypothetical document). */
     public SearchRequest withVectorQuery(String text) {
-      return new SearchRequest(crateId, query, limit, runId, kind, mode, text);
+      return new SearchRequest(crateId, query, limit, runId, kind, mode, text, vectorWeight);
+    }
+
+    /** Same request, with the weight of the vector leg for {@code fusion} mode. */
+    public SearchRequest withVectorWeight(double weight) {
+      return new SearchRequest(crateId, query, limit, runId, kind, mode, vectorQuery, weight);
     }
 
     /** The text to embed as a vector query, and whether it is document-like (HyDE). */

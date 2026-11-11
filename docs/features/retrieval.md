@@ -26,6 +26,47 @@ Proposition retrieval requires enabled, configured embedding and answer provider
 > [HyDE](hyde.md) changes what is **searched with** at question time and needs no rebuild. They can
 > be combined, except that propositions are not given a header because they already stand alone.
 
+## Retrieval modes
+
+| Mode | What it does |
+|---|---|
+| `lexical` | Keyword search only (BM25; see [search backends](../search-backends.md) for what each backend uses). |
+| `semantic` | Vector search only. |
+| `hybrid` | Both searches, merged by **rank** with reciprocal-rank fusion. The raw scores are ignored. |
+| `fusion` | Both searches, merged by **score** after normalization, with a weight. See below. |
+
+## Fusion retrieval
+
+Fusion retrieval builds on the indexes that already exist: every chunk is embedded into the vector index and
+tokenized into the keyword index (BM25 or the backend's equivalent). At question time:
+
+1. The keyword search and the vector search are started **in parallel**, so the search takes as long as the slower one.
+2. Each returns its top candidates (the candidate limit, 100 by default): the vector search with similarity
+   scores, the keyword search with keyword scores.
+3. The scores of each list are **min-max normalized** to 0-1: the best hit of a list becomes 1, the worst 0
+   (`(score - min) / (max - min)`; if all scores of a list are equal they all become 1). This is needed
+   because the two score types are on different scales (BM25 values can be 10 or more, cosine similarities lie between 0 and 1).
+4. The final score is `w * vector + (1 - w) * keyword`, where `w` is the **vector weight** of the crate. A chunk that
+   only one search found scores 0 in the other.
+5. Chunks are ranked by the final score. Optional [reranking](../reranking.md), grading, the
+   [context window](context-window.md) and compression then run as usual, and the top chunks go to the answer model.
+
+Choose fusion in **Settings → Retrieval → Default retrieval mode** and set **Fusion: weight of the vector search**
+(default 0.5; 0 = keyword only, 1 = vector only), or with the API:
+
+```json
+{ "retrievalMode": "fusion", "fusionVectorWeight": 0.6 }
+```
+
+The `lexicalScore` and `semanticScore` of a search hit keep the raw scores of the two searches; `score` is the
+final value between 0 and 1. A search request can also pass `mode=fusion` (REST, MCP).
+
+**When to use it instead of hybrid:** rank fusion treats a rank-1 hit like any other rank-1 hit; score fusion keeps
+how much better a hit is than the next one, and lets you favour exact terms (lower weight) or meaning (higher weight).
+Because min-max depends on the other hits in the list, scores are only comparable within one search. Fusion needs
+embeddings; without them it fails like `hybrid` and `semantic` do. PgVector's keyword scores come from
+PostgreSQL full-text ranking without IDF, so rare terms count less there than with the BM25 backends.
+
 ## Generation and grading
 
 ContextCrate makes two independent LLM calls for each chunk. The first asks for JSON propositions. Every proposition must state one fact, work without additional context, replace pronouns and ambiguous references with full names, preserve dates, data, names, and qualifications, and contain a clear subject, verb, and object.

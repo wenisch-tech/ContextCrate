@@ -37,7 +37,7 @@ Purge and delete body: `{"confirmation":"Exact crate name"}`. `delete` works in 
 | Index health/rebuild | `/api/v1/crates/{crateId}/index` |
 | Audit | `/api/v1/crates/{crateId}/audit` |
 
-Search modes are `lexical`, `semantic`, and `hybrid`. Answers accept JSON and return server-sent events named `sources`, `delta`, `complete`, or `error`.
+Search modes are `lexical`, `semantic`, `hybrid` (rank fusion), and `fusion` (normalized score fusion, see [Retrieval](features/retrieval.md#fusion-retrieval)). Answers accept JSON and return server-sent events named `sources`, `delta`, `complete`, or `error`.
 
 Each crate is additionally reachable as an OpenAI chat model: point an OpenAI client's base URL at `/api/v1/crates/{crateId}/v1` with an API key as the bearer token. The crate's configured answer model is authoritative and the request's `model` field is ignored. See [OpenAI-compatible API](integrations/openai.md) for the mapping, streaming behaviour, and client setup.
 

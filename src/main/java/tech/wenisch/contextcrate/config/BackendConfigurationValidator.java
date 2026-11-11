@@ -22,9 +22,9 @@ public class BackendConfigurationValidator implements ApplicationRunner {
     validatePgVector();
     require("embeddings provider", properties.embeddings().provider(), Set.of("local", "openai-compatible"));
     require("reranking provider", properties.reranking().provider(), Set.of("local", "cohere-compatible"));
-    require("retrieval mode", properties.retrieval().defaultMode(), Set.of("lexical", "semantic", "hybrid"));
+    require("retrieval mode", properties.retrieval().defaultMode(), Set.of("lexical", "semantic", "hybrid", "fusion"));
     require("answering provider", properties.answering().provider(), Set.of("openai-compatible"));
-    require("answering retrieval mode", properties.answering().retrievalMode(), Set.of("lexical", "semantic", "hybrid"));
+    require("answering retrieval mode", properties.answering().retrievalMode(), Set.of("lexical", "semantic", "hybrid", "fusion"));
     require(
         "role",
         properties.role(),

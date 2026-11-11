@@ -12,6 +12,7 @@ keyword index and the vectors live.
 | Keyword search | BM25 | BM25 | BM25 | BM25-style (sparse vectors with IDF) | PostgreSQL full-text search (no IDF) |
 | Vector search | HNSW (cosine) | HNSW (cosine) | HNSW (cosine) | HNSW (cosine) | HNSW (cosine), up to 2,000 dimensions |
 | Hybrid search | Reciprocal-rank fusion | Reciprocal-rank fusion | Reciprocal-rank fusion | Reciprocal-rank fusion | Reciprocal-rank fusion |
+| Fusion search | Normalized score fusion | Normalized score fusion | Normalized score fusion | Normalized score fusion | Normalized score fusion |
 | Several ContextCrate processes | One indexer process (`role=all`) | Yes | Yes | Yes | Yes |
 | Authentication | Not applicable | Not configured (secure the network) | API key or user and password | Optional API key | PostgreSQL user and password |
 | Requires | Nothing | OpenSearch 2 or 3 | Elasticsearch 8 or 9 | Qdrant 1.10 or newer | PostgreSQL 13 or newer with the `vector` extension (pgvector 0.5 or newer) |

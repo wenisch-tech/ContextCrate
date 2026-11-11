@@ -35,6 +35,8 @@ public class RagSettings {
   /** Instructions of the crate owner for the answer model; applied only while the administrator allows crate system prompts. */
   @Column(name="system_prompt",columnDefinition="text") private String systemPrompt;
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
+  /** Retrieval mode "fusion": weight of the vector leg (0 to 1); the keyword leg gets the rest. */
+  @Column(name="fusion_vector_weight",nullable=false) private double fusionVectorWeight=0.5;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
   @Column(name="image_description_enabled",nullable=false) private boolean imageDescriptionEnabled;
   @Column(name="image_vision_model_id") private java.util.UUID imageVisionModelId;
@@ -61,6 +63,7 @@ public class RagSettings {
   public boolean isEnrichmentEnabled(){return enrichmentEnabled;} public int getEnrichmentQuestions(){return enrichmentQuestions;} public void updateEnrichment(boolean enabled,int questions){this.enrichmentEnabled=enabled;this.enrichmentQuestions=questions;}
   public boolean isContextCompressionEnabled(){return contextCompressionEnabled;} public void updateContextCompression(boolean enabled){this.contextCompressionEnabled=enabled;}
   public int getContextWindow(){return contextWindow;} public void updateContextWindow(int radius){this.contextWindow=radius;}
+  public double getFusionVectorWeight(){return fusionVectorWeight;} public void updateFusionVectorWeight(double weight){this.fusionVectorWeight=weight;}
   public boolean isHydeEnabled(){return hydeEnabled;} public void updateHyde(boolean enabled){this.hydeEnabled=enabled;}
   public void updateQueryTransformation(boolean enabled,String strategies){this.queryTransformationEnabled=enabled;this.queryTransformationStrategies=strategies;}
   public boolean isStrictGrounding(){return strictGrounding;} public boolean isAllowClientHistory(){return allowClientHistory;} public boolean isInlineCitations(){return inlineCitations;} public boolean isStructuredSources(){return structuredSources;} public boolean isGradingEnabled(){return gradingEnabled;} public boolean isAnswerVerificationEnabled(){return answerVerificationEnabled;} public String getAnswerVerificationFailureAction(){return answerVerificationFailureAction;} public String getRetrievalMode(){return retrievalMode;} public String getRetrievalStrategy(){return retrievalStrategy;} public String getPropositionFailurePolicy(){return propositionFailurePolicy;} public int getSourceLimit(){return sourceLimit;}

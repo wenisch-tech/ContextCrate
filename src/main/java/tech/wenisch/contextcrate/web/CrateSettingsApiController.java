@@ -36,6 +36,7 @@ public class CrateSettingsApiController {
       boolean enabled=r.queryTransformationEnabled()==null?current.isQueryTransformationEnabled():r.queryTransformationEnabled();
       updated=rag.updateQueryTransformation(crateId,enabled,r.queryTransformationStrategies()==null?java.util.List.of(current.getQueryTransformationStrategies()):r.queryTransformationStrategies());
     }
+    if(r.fusionVectorWeight()!=null)updated=rag.updateFusion(crateId,r.fusionVectorWeight());
     if(r.hydeEnabled()!=null)updated=rag.updateHyde(crateId,r.hydeEnabled());
     boolean enrichmentChanged=false;
     if(r.enrichmentEnabled()!=null||r.enrichmentQuestions()!=null){
@@ -80,7 +81,7 @@ public class CrateSettingsApiController {
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
       boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Boolean enrichmentEnabled,Integer enrichmentQuestions,Integer contextWindow,Boolean contextCompression,String contextHeaderVariant,Integer contextHeaderWords,
-      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns){}
+      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

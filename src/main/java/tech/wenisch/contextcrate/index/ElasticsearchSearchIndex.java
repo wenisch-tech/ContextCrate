@@ -252,10 +252,17 @@ public class ElasticsearchSearchIndex implements SearchIndex {
       String mode = mode(r);
       if (r.query().isBlank()) return new SearchResults(r.query(), mode, List.of());
       try {
-        List<SearchHit> lexical = mode.equals("semantic") ? List.of() : search(name, r, false);
-        List<SearchHit> semantic = mode.equals("lexical") ? List.of() : search(name, r, true);
+        List<SearchHit> lexical, semantic;
+        if (mode.equals("fusion")) {
+          var legs = ParallelLegs.run(r.crateId(), () -> search(name, r, false), () -> search(name, r, true));
+          lexical = legs.lexical(); semantic = legs.semantic();
+        } else {
+          lexical = mode.equals("semantic") ? List.of() : search(name, r, false);
+          semantic = mode.equals("lexical") ? List.of() : search(name, r, true);
+        }
         int candidates = RerankingSearchSupport.candidateLimit(r, reranking, retrieval.candidateLimit());
-        List<SearchHit> found = mode.equals("hybrid") ? HybridFusion.fuse(lexical, semantic, retrieval.rrfConstant(), candidates)
+        List<SearchHit> found = mode.equals("fusion") ? HybridFusion.fuseNormalized(lexical, semantic, r.vectorWeight(), candidates)
+            : mode.equals("hybrid") ? HybridFusion.fuse(lexical, semantic, retrieval.rrfConstant(), candidates)
             : (mode.equals("lexical") ? lexical : semantic).stream().limit(candidates).toList();
         return new SearchResults(r.query(), mode, RerankingSearchSupport.apply(r, found, reranking, metrics));
       } catch (IOException | InterruptedException | IllegalStateException e) {

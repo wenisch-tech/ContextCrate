@@ -38,7 +38,7 @@ The features are listed in the order content flows through the system.
 | **Contextual headers** | Puts the document title, summary and section path in front of every chunk before it is embedded. | [Contextual headers](features/contextual-headers.md) |
 | **Images** | Makes meaningful images searchable and optionally describes them with a vision model. | [Images](features/images.md) |
 | **Embeddings** | Local or remote models that create the vectors for semantic search. | [Embeddings](embeddings.md) |
-| **Retrieval** | Standard and proposition retrieval, lexical, semantic or hybrid. | [Retrieval](features/retrieval.md) |
+| **Retrieval** | Standard and proposition retrieval, lexical, semantic, hybrid or fusion. | [Retrieval](features/retrieval.md) |
 | **Semantic chunking** | Optional per ingestion job: cuts text where the topic changes, based on sentence embeddings, instead of by size. | [Semantic chunking](features/semantic-chunking.md) |
 | **Document enrichment** | The model writes questions each chunk answers; they are indexed and lead back to the chunk, so user questions match questions instead of passages. | [Document enrichment](features/document-enrichment.md) |
 | **System prompts** | An installation-wide prompt and an optional prompt per crate adjust tone, language and focus of answers; the built-in rules always come first. | [System prompts](features/system-prompts.md) |

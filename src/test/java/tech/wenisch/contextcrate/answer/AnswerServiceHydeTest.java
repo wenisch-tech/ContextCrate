@@ -140,4 +140,24 @@ class AnswerServiceHydeTest {
     assertThat(searches.getAllValues()).extracting(SearchIndex.SearchRequest::vectorQuery).containsExactly("answer one", null);
     assertThat(prepared.hydeQueries()).isEqualTo(1);
   }
+
+  @Test
+  void fusionSearchesCarryTheCratesVectorWeightAndOtherModesDoNot() throws Exception {
+    var value = new RagSettings(crateId, false, true, true, true, false, false, "revise-once", "fusion", 8);
+    value.updateFusionVectorWeight(0.8);
+    when(settings.current(crateId)).thenReturn(value);
+
+    service().prepare(request());
+
+    var searches = ArgumentCaptor.forClass(SearchIndex.SearchRequest.class);
+    verify(index).search(searches.capture());
+    assertThat(searches.getValue().mode()).isEqualTo("fusion");
+    assertThat(searches.getValue().vectorWeight()).isEqualTo(0.8);
+
+    clearInvocations(index);
+    settings(false, "hybrid");
+    service().prepare(request());
+    verify(index).search(searches.capture());
+    assertThat(searches.getValue().vectorWeight()).isNull();
+  }
 }

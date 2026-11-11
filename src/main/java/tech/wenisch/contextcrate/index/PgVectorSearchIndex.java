@@ -287,10 +287,17 @@ public class PgVectorSearchIndex implements SearchIndex {
       String mode = mode(r);
       if (r.query().isBlank()) return new SearchResults(r.query(), mode, List.of());
       try {
-        List<SearchHit> lexical = mode.equals("semantic") ? List.of() : lexical(name, r);
-        List<SearchHit> semantic = mode.equals("lexical") ? List.of() : semantic(name, r);
+        List<SearchHit> lexical, semantic;
+        if (mode.equals("fusion")) {
+          var legs = ParallelLegs.run(r.crateId(), () -> lexical(name, r), () -> semantic(name, r));
+          lexical = legs.lexical(); semantic = legs.semantic();
+        } else {
+          lexical = mode.equals("semantic") ? List.of() : lexical(name, r);
+          semantic = mode.equals("lexical") ? List.of() : semantic(name, r);
+        }
         int candidates = RerankingSearchSupport.candidateLimit(r, reranking, retrieval.candidateLimit());
-        List<SearchHit> found = mode.equals("hybrid") ? HybridFusion.fuse(lexical, semantic, retrieval.rrfConstant(), candidates)
+        List<SearchHit> found = mode.equals("fusion") ? HybridFusion.fuseNormalized(lexical, semantic, r.vectorWeight(), candidates)
+            : mode.equals("hybrid") ? HybridFusion.fuse(lexical, semantic, retrieval.rrfConstant(), candidates)
             : (mode.equals("lexical") ? lexical : semantic).stream().limit(candidates).toList();
         return new SearchResults(r.query(), mode, RerankingSearchSupport.apply(r, found, reranking, metrics));
       } catch (IllegalStateException e) {
