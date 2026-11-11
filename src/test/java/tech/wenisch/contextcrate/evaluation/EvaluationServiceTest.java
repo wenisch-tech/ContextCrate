@@ -292,4 +292,59 @@ class EvaluationServiceTest {
     assertThat(EvaluationService.readUris("[\"a\",\" b \",\"\"]")).containsExactly("a", "b");
     assertThat(EvaluationService.readUris("not json")).isEmpty();
   }
+
+  // ---- topic and tags
+
+  @Test
+  void topicAndTagsAreStoredAndSurviveTheScrubbing() throws Exception {
+    only(true, false, false, false, false);
+    settings.updateTopics(true, true);
+    script = (system, user) -> system.startsWith("You summarise") ? "{\"topic\":\"  Deploying   a service with Docker \",\"tags\":[\"Development\",\"docker\",\"DOCKER\",\"a b\",\"x\",\"y\",\"z\"]}" : score(3);
+    var evaluation = caseOf("how do i deploy my thing with docker, my email is a@b.c", "answer", "alpha");
+
+    service().evaluate(crateId, evaluation.getId());
+
+    assertThat(evaluation.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+    assertThat(evaluation.getTopic()).isEqualTo("Deploying a service with Docker");
+    assertThat(MAPPER.readValue(evaluation.getTags(), List.class)).containsExactly("development", "docker", "a b", "x", "y"); // lowercase, unique, at most 5
+    assertThat(evaluation.getQuestion()).isNull(); // the raw question is still removed
+    assertThat(evaluation.getPrecisionAtK()).isEqualTo(1.0);
+  }
+
+  @Test
+  void onlyTheRequestedPartIsKeptAndNothingIsAskedWhenBothAreOff() throws Exception {
+    only(true, false, false, false, false);
+    script = (system, user) -> system.startsWith("You summarise") ? "{\"topic\":\"T\",\"tags\":[\"t\"]}" : score(3);
+    var plain = caseOf("q", "a", "alpha");
+    service().evaluate(crateId, plain.getId());
+    assertThat(calls.stream().map(c -> c[0])).noneMatch(s -> s.startsWith("You summarise"));
+    assertThat(plain.getTopic()).isNull();
+
+    settings.updateTopics(false, true);
+    var tagsOnly = caseOf("q", "a", "alpha");
+    service().evaluate(crateId, tagsOnly.getId());
+    assertThat(tagsOnly.getTopic()).isNull();
+    assertThat(tagsOnly.getTags()).isEqualTo("[\"t\"]");
+  }
+
+  @Test
+  void aFailingTopicStepDoesNotFailTheCaseAndGoldenCasesAreSkipped() throws Exception {
+    only(true, false, false, false, false);
+    settings.updateTopics(true, true);
+    script = (system, user) -> system.startsWith("You summarise") ? "not json" : score(3);
+    var evaluation = caseOf("q", "a", "alpha");
+
+    service().evaluate(crateId, evaluation.getId());
+
+    assertThat(evaluation.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+    assertThat(evaluation.getTopic()).isNull();
+    assertThat(evaluation.getError()).contains("topic");
+
+    calls.clear();
+    stored = new EvaluationCase(UUID.randomUUID(), crateId, EvaluationCase.Source.GOLDEN, null, "gq", "ga",
+        MAPPER.writeValueAsString(new EvaluationSnapshot("hybrid", List.of("gq"), 0, List.of())));
+    when(golden.findById(any())).thenReturn(Optional.empty());
+    service().evaluate(crateId, stored.getId());
+    assertThat(calls.stream().map(c -> c[0])).noneMatch(s -> s.startsWith("You summarise"));
+  }
 }

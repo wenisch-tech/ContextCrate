@@ -41,6 +41,10 @@ public class EvaluationCase {
   @Column(name = "reference_recall") private Double referenceRecall;
   @Column(name = "judge_model", length = 500) private String judgeModel;
   @Column(columnDefinition = "text") private String error;
+  /** Neutral rewrite of the question; kept after {@link #scrub()}. */
+  @Column(columnDefinition = "text") private String topic;
+  /** JSON array of up to 5 category tags; kept after {@link #scrub()}. */
+  @Column(columnDefinition = "text") private String tags;
 
   protected EvaluationCase() {}
 
@@ -75,6 +79,10 @@ public class EvaluationCase {
   public Double getReferenceRecall() { return referenceRecall; }
   public String getJudgeModel() { return judgeModel; }
   public String getError() { return error; }
+  public String getTopic() { return topic; }
+  public String getTags() { return tags; }
+
+  public void topic(String topic, String tagsJson) { this.topic = topic; this.tags = tagsJson; }
 
   /** Replaces the question and answer of a golden case once the worker has produced the answer. */
   public void answered(String answer, String snapshotJson) { this.answer = answer; this.snapshotJson = snapshotJson; }
@@ -94,7 +102,7 @@ public class EvaluationCase {
   }
   public void failed(String error) { this.status = Status.FAILED; this.evaluatedAt = Instant.now(); this.error = error; }
 
-  /** Removes everything that came from users or documents; the numeric scores stay. */
+  /** Removes everything that came from users or documents; the numeric scores, topic and tags stay. */
   public void scrub() { this.question = null; this.answer = null; this.snapshotJson = null; this.detailsJson = null; }
   public boolean hasText() { return question != null || answer != null || snapshotJson != null || detailsJson != null; }
 }

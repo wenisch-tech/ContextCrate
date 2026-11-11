@@ -90,6 +90,10 @@ public class EvaluationService {
         attempted++;
         if (runDimension("reference_recall", crateId, errors, () -> referenceRecall(evaluation, item, details))) succeeded++;
       }
+      // Topic and tags describe the question; they do not count as a scored dimension.
+      if (evaluation.getSource() == EvaluationCase.Source.LIVE && (config.isStoreTopic() || config.isStoreTags())
+          && evaluation.getQuestion() != null)
+        runDimension("topic", crateId, errors, () -> topic(evaluation, config));
       if (errors.size() > 0) details.put("errors", errors);
       String detailsJson = MAPPER.writeValueAsString(details);
       if (attempted > 0 && succeeded == 0) {
@@ -121,6 +125,11 @@ public class EvaluationService {
       errors.add(name + ": " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
       return false;
     }
+  }
+
+  private void topic(EvaluationCase evaluation, EvaluationSettings config) throws Exception {
+    var result = JudgeProtocol.askTopicTags(judge, evaluation.getCrateId(), evaluation.getQuestion(), config.isStoreTopic(), config.isStoreTags());
+    evaluation.topic(result.topic(), result.tags().isEmpty() ? null : MAPPER.writeValueAsString(result.tags()));
   }
 
   private void context(EvaluationCase evaluation, EvaluationSettings config, EvaluationSnapshot snapshot,

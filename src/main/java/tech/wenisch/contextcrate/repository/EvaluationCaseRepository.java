@@ -14,6 +14,7 @@ public interface EvaluationCaseRepository extends JpaRepository<EvaluationCase, 
   List<EvaluationCase> findByCrateIdAndStatusOrderByCreatedAtDesc(UUID crateId, EvaluationCase.Status status, Pageable page);
   List<EvaluationCase> findByCrateIdOrderByCreatedAtDesc(UUID crateId, Pageable page);
   List<EvaluationCase> findByCrateIdAndStatusAndCreatedAtAfter(UUID crateId, EvaluationCase.Status status, Instant after);
+  List<EvaluationCase> findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(UUID crateId, EvaluationCase.Status status, Instant from, Instant to, Pageable page);
   List<EvaluationCase> findByStatusAndCreatedAtBefore(EvaluationCase.Status status, Instant before);
   List<EvaluationCase> findByQuestionIsNotNullAndStatusNot(EvaluationCase.Status status);
   long countByCrateIdAndStatus(UUID crateId, EvaluationCase.Status status);

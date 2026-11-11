@@ -172,6 +172,70 @@ class EvaluationAdminTest {
     verify(collector, times(2)).publish(eq(crateId), any());
   }
 
+  // ---- topics, tags and the report
+
+  private EvaluationCase withTopic(String topic, String tagsJson, double faithfulness, java.time.Instant at) throws Exception {
+    var c = done(EvaluationCase.Source.LIVE, faithfulness, 0.5);
+    c.topic(topic, tagsJson);
+    c.scrub(); // raw text is gone, topic and tags stay
+    var field = EvaluationCase.class.getDeclaredField("createdAt");
+    field.setAccessible(true);
+    field.set(c, at);
+    return c;
+  }
+
+  @Test
+  void theReportGroupsTopicsAndTagsAndKeepsRawTextOut() throws Exception {
+    var now = java.time.Instant.now();
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
+        .thenReturn(List.of(
+            withTopic("How to deploy with Docker", "[\"development\",\"docker\"]", 1.0, now),
+            withTopic("how to deploy with docker.", "[\"docker\"]", 0.5, now),
+            withTopic("Reset a password", "[\"security\"]", 0.8, now),
+            done(EvaluationCase.Source.GOLDEN, 0.9, 0.5)));
+
+    var report = admin.report(crateId, now.minusSeconds(3600), now.plusSeconds(3600), false);
+
+    assertThat(report.questions()).isEqualTo(3);
+    assertThat(report.withTopic()).isEqualTo(3);
+    assertThat(report.golden().cases()).isEqualTo(1);
+    assertThat(report.topTopics().get(0).label()).isEqualTo("How to deploy with Docker");
+    assertThat(report.topTopics().get(0).count()).isEqualTo(2);
+    assertThat(report.topTopics().get(0).faithfulness()).isEqualTo(0.75);
+    assertThat(report.topTags().get(0).label()).isEqualTo("docker");
+    assertThat(report.topTags().get(0).count()).isEqualTo(2);
+    assertThat(report.latest()).hasSize(3);
+    assertThat(report.latest().get(0).tags()).containsExactly("development", "docker");
+    assertThat(report.latest().get(0).text()).isNull();
+    assertThat(report.truncated()).isFalse();
+  }
+
+  @Test
+  void theReportIsMarkedTruncatedWhenTooManyCasesMatch() {
+    var many = new java.util.ArrayList<EvaluationCase>();
+    for (int i = 0; i <= EvaluationAdminService.MAX_REPORT_CASES; i++) many.add(done(EvaluationCase.Source.LIVE, 1.0, 1.0));
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(many);
+
+    var report = admin.report(crateId, java.time.Instant.EPOCH, java.time.Instant.now(), false);
+
+    assertThat(report.truncated()).isTrue();
+    assertThat(report.questions()).isEqualTo(EvaluationAdminService.MAX_REPORT_CASES);
+    assertThat(report.latest()).hasSize(EvaluationAdminService.MAX_REPORT_ROWS);
+  }
+
+  @Test
+  void topicSwitchesAreStoredThroughTheSettingsApply() {
+    var stored = new EvaluationSettings(crateId);
+    when(settingsRepository.findById(crateId)).thenReturn(Optional.of(stored));
+    when(settingsRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+    var view = settings.apply(crateId, new EvaluationSettingsService.Request(null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, true, false));
+
+    assertThat(view.storeTopic()).isTrue();
+    assertThat(view.storeTags()).isFalse();
+  }
+
   // ---- access
 
   @Test
@@ -183,8 +247,9 @@ class EvaluationAdminTest {
 
     assertThatThrownBy(() -> api.settings(crateId)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.summary(crateId, 7)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.report(crateId, 7)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.cases(crateId, 10)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> api.update(crateId, new EvaluationSettingsService.Request(true, null, null, null, null, null, null, null, null, null, null, null, null, null, null))).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.update(crateId, new EvaluationSettingsService.Request(true, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null))).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.run(crateId)).isInstanceOf(AccessDeniedException.class);
     verifyNoInteractions(cases, golden, settingsRepository);
   }

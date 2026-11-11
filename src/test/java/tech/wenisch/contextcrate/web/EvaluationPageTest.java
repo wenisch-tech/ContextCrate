@@ -54,12 +54,12 @@ class EvaluationPageTest {
     when(access.activeElevation(crateId)).thenReturn(java.util.Optional.empty());
     when(crateService.require(crateId, tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER)).thenReturn(new Crate(crateId, "Handbook", null, null));
     when(settings.view(crateId)).thenReturn(new EvaluationSettingsService.View(true, 0.5, 5, 20, true, true, true, true, true, 30,
-        null, null, "https://judge.example/v1", "judge-1", true, 120, true));
+        null, null, "https://judge.example/v1", "judge-1", true, 120, true, true, true));
     when(admin.summary(crateId, 7)).thenReturn(new EvaluationAdminService.Summary(7, 1, 0, averages(12, 0.8), averages(0, null),
         List.of(new EvaluationAdminService.Day(LocalDate.of(2026, 11, 1), averages(12, 0.8)))));
     var text = new EvaluationAdminService.TextView("Who is on call?", "The secondary.", new ObjectMapper().readValue("{\"chunks\":[{\"uri\":\"u1\",\"content\":\"alpha\"}]}", java.util.Map.class), new ObjectMapper().readValue("{\"errors\":[]}", java.util.Map.class), "{ \"errors\" : [ ] }");
     when(admin.cases(crateId, 50, true)).thenReturn(List.of(new EvaluationAdminService.CaseView(UUID.randomUUID(), Instant.now(), "LIVE", "DONE", 5,
-        0.6, 0.5, 1.0, 0.7, 0.9, 0.75, 4, 3, 0.8, 0.6, null, "judge-1", null, text)));
+        0.6, 0.5, 1.0, 0.7, 0.9, 0.75, 4, 3, 0.8, 0.6, null, "judge-1", null, "Who covers on-call duty", List.of("operations", "oncall"), text)));
     when(admin.golden(crateId)).thenReturn(List.of(new EvaluationAdminService.GoldenView(UUID.randomUUID(), "How to escalate?", "Page the secondary.", List.of("docs/oncall.md"), Instant.now())));
     when(sharedModels.options(any(), any())).thenReturn(List.of());
     var model = new ConcurrentModel();
@@ -84,7 +84,58 @@ class EvaluationPageTest {
     assertThat(html).contains("RAG evaluation", "Handbook", "0.80", "Precision@K", "NDCG", "Log every question", "judge-1", "How to escalate?", "docs/oncall.md");
     // The owner sees the text of logged questions.
     assertThat(html).contains("Who is on call?", "The secondary.", "alpha");
+    // Topic and tags are shown and configurable.
+    assertThat(html).contains("Who covers on-call duty", "oncall", "Store request topic", "Store tags", "Open report");
     // The stored API key never reaches the page, only the fact that one is stored.
     assertThat(html).contains("Stored").doesNotContain("secret-key");
+  }
+
+  private String render(String template, ConcurrentModel model) {
+    var resolver = new ClassLoaderTemplateResolver();
+    resolver.setPrefix("templates/");
+    resolver.setSuffix(".html");
+    resolver.setCharacterEncoding("UTF-8");
+    var engine = new SpringTemplateEngine();
+    engine.setTemplateResolver(resolver);
+    var exchange = org.thymeleaf.web.servlet.JakartaServletWebApplication
+        .buildApplication(new org.springframework.mock.web.MockServletContext())
+        .buildExchange(new org.springframework.mock.web.MockHttpServletRequest(), new org.springframework.mock.web.MockHttpServletResponse());
+    var context = new org.thymeleaf.context.WebContext(exchange, java.util.Locale.ENGLISH, model.asMap());
+    context.setVariable("_csrf", Map.of("parameterName", "_csrf", "token", "t"));
+    context.setVariable("currentPath", "/crates/" + crateId + "/evaluation/report");
+    context.setVariable("applicationVersion", "test");
+    return engine.process(template, context);
+  }
+
+  @Test
+  void theReportPageShowsTopicsTagsAndTheGlossaryAndHasAPrintableVariant() {
+    when(access.currentUser()).thenReturn(mock(AppUser.class));
+    when(access.require(crateId, tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER)).thenReturn(tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER);
+    when(access.activeElevation(crateId)).thenReturn(java.util.Optional.empty());
+    when(crateService.require(crateId, tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER)).thenReturn(new Crate(crateId, "Handbook", null, null));
+    when(settings.view(crateId)).thenReturn(new EvaluationSettingsService.View(true, 0.5, 5, 20, true, true, true, true, false, 30,
+        null, null, "https://judge.example/v1", "judge-1", true, 120, true, true, true));
+    var now = Instant.now();
+    var row = new EvaluationAdminService.CaseView(UUID.randomUUID(), now, "LIVE", "DONE", 5, 0.6, 0.5, 1.0, 0.7, 0.9, 0.75, 4, 3,
+        0.8, 0.6, null, "judge-1", null, "Deploying with Docker", List.of("development", "docker"), null);
+    when(admin.report(eq(crateId), any(), any(), eq(true))).thenReturn(new EvaluationAdminService.Report(now.minusSeconds(86400), now, 12, 0, false,
+        averages(12, 0.8), averages(0, null), List.of(new EvaluationAdminService.Day(LocalDate.of(2026, 11, 1), averages(12, 0.8))),
+        List.of(new EvaluationAdminService.Ranked("Deploying with Docker", 7, 0.8, 0.7, 0.6)),
+        List.of(new EvaluationAdminService.Ranked("docker", 7, 0.8, 0.7, 0.6)), List.of(row), 12));
+
+    var normal = new ConcurrentModel();
+    controller.crate(crateId, normal);
+    assertThat(controller.report(crateId, "30d", null, null, false, normal)).isEqualTo("evaluation-report");
+    String html = render("evaluation-report", normal);
+    assertThat(html).contains("Evaluation report", "Handbook", "Deploying with Docker", "development", "Most requested topics",
+        "What the metrics mean", "Faithfulness", "Printable view", "Last 30 days", "sidebar");
+    assertThat(html).doesNotContain("Print / Save as PDF");
+
+    var print = new ConcurrentModel();
+    controller.crate(crateId, print);
+    controller.report(crateId, "custom", "2026-11-01", "2026-11-07", true, print);
+    String printable = render("evaluation-report", print);
+    assertThat(printable).contains("Print / Save as PDF", "2026-11-01", "2026-11-07", "report-print", "What the metrics mean");
+    assertThat(printable).doesNotContain("class=\"sidebar");
   }
 }

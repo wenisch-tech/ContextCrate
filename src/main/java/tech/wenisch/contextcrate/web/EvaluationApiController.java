@@ -63,6 +63,16 @@ public class EvaluationApiController {
     return admin.summary(crateId, days);
   }
 
+  /** Report over the last {@code days} days (UTC, including today): averages, trend, top topics and tags, latest questions. */
+  @GetMapping("/report")
+  public EvaluationAdminService.Report report(@PathVariable UUID crateId, @RequestParam(defaultValue = "7") int days) {
+    requireOwner(crateId);
+    var today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+    int window = Math.max(1, Math.min(days, 365));
+    return admin.report(crateId, today.minusDays(window - 1L).atStartOfDay(java.time.ZoneOffset.UTC).toInstant(),
+        today.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant(), true);
+  }
+
   @GetMapping("/cases")
   public List<EvaluationAdminService.CaseView> cases(@PathVariable UUID crateId, @RequestParam(defaultValue = "50") int limit) {
     requireOwner(crateId);

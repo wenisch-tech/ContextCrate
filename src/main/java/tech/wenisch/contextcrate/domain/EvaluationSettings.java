@@ -22,6 +22,10 @@ public class EvaluationSettings {
   @Column(name = "completeness_enabled", nullable = false) private boolean completenessEnabled = true;
   /** When true questions, answers, delivered chunks and judge reasoning are kept per case for the retention period. */
   @Column(name = "log_questions", nullable = false) private boolean logQuestions;
+  /** When true the judge rewrites each live question into a neutral topic statement that is stored instead of the raw text. */
+  @Column(name = "store_topic", nullable = false) private boolean storeTopic;
+  /** When true the judge derives up to 5 category tags per live question. */
+  @Column(name = "store_tags", nullable = false) private boolean storeTags;
   @Column(name = "retention_days", nullable = false) private int retentionDays = 30;
   @Column(name = "judge_shared_model_id") private UUID judgeSharedModelId;
   @Column(name = "judge_base_url", length = 2000) private String judgeBaseUrl;
@@ -42,6 +46,8 @@ public class EvaluationSettings {
   public boolean isAnswerRelevanceEnabled() { return answerRelevanceEnabled; }
   public boolean isCompletenessEnabled() { return completenessEnabled; }
   public boolean isLogQuestions() { return logQuestions; }
+  public boolean isStoreTopic() { return storeTopic; }
+  public boolean isStoreTags() { return storeTags; }
   public int getRetentionDays() { return retentionDays; }
   public UUID getJudgeSharedModelId() { return judgeSharedModelId; }
   public String getJudgeBaseUrl() { return judgeBaseUrl; }
@@ -58,6 +64,8 @@ public class EvaluationSettings {
     this.answerRelevanceEnabled = answerRelevance; this.completenessEnabled = completeness;
     this.logQuestions = logQuestions; this.retentionDays = retentionDays;
   }
+
+  public void updateTopics(boolean storeTopic, boolean storeTags) { this.storeTopic = storeTopic; this.storeTags = storeTags; }
 
   /** A blank API key keeps the stored key. A shared model replaces the own endpoint. */
   public void updateJudge(UUID sharedModelId, String baseUrl, String model, String apiKey, int timeoutSeconds) {

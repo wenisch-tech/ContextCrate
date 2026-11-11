@@ -26,6 +26,7 @@ import tech.wenisch.contextcrate.repository.EvaluationGoldenItemRepository;
  */
 @Service
 public class EvaluationAdminService {
+  public static final int MAX_REPORT_CASES = 5_000, MAX_REPORT_ROWS = 200, TOP_N = 15;
   public static final int MAX_GOLDEN_ITEMS = 200, MAX_CASES = 200, MAX_QUESTION = 2_000, MAX_REFERENCE = 8_000;
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -40,7 +41,14 @@ public class EvaluationAdminService {
   public record CaseView(UUID id, Instant createdAt, String source, String status, Integer k, Double precisionAtK,
       Double recallAtK, Double mrr, Double map, Double ndcg, Double faithfulness, Integer statementsTotal,
       Integer statementsSupported, Double answerRelevance, Double completeness, Double referenceRecall,
-      String judgeModel, String error, TextView text) {}
+      String judgeModel, String error, String topic, List<String> tags, TextView text) {}
+
+  /** One topic or tag in the report with how often it was asked and how well it was answered. */
+  public record Ranked(String label, long count, Double faithfulness, Double answerRelevance, Double completeness) {}
+
+  /** The reporting page: everything for one crate and one time frame. {@code truncated} when more than MAX_REPORT_CASES matched. */
+  public record Report(Instant from, Instant to, long questions, long failed, boolean truncated, Averages live, Averages golden,
+      List<Day> trend, List<Ranked> topTopics, List<Ranked> topTags, List<CaseView> latest, long withTopic) {}
 
   /** Only present while the case still carries its text (per-question logging) and the viewer may see it. */
   public record TextView(String question, String answer, Map<String, Object> snapshot, Map<String, Object> details, String detailsText) {}
@@ -74,6 +82,56 @@ public class EvaluationAdminService {
         cases.countByCrateIdAndStatus(crateId, EvaluationCase.Status.FAILED), averages(live), averages(goldenCases), trend);
   }
 
+  /**
+   * Report over {@code [from, to)}. Topics and tags are grouped over all matching live cases (at most
+   * {@link #MAX_REPORT_CASES}); the question list shows the newest {@link #MAX_REPORT_ROWS}.
+   */
+  @Transactional(readOnly = true)
+  public Report report(UUID crateId, Instant from, Instant to, boolean includeText) {
+    List<EvaluationCase> found = new ArrayList<>(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
+        crateId, EvaluationCase.Status.DONE, from, to, PageRequest.of(0, MAX_REPORT_CASES + 1)));
+    boolean truncated = found.size() > MAX_REPORT_CASES;
+    if (truncated) found = found.subList(0, MAX_REPORT_CASES);
+    List<EvaluationCase> live = found.stream().filter(c -> c.getSource() == EvaluationCase.Source.LIVE).toList();
+    List<EvaluationCase> goldenCases = found.stream().filter(c -> c.getSource() == EvaluationCase.Source.GOLDEN).toList();
+    Map<LocalDate, List<EvaluationCase>> byDay = new TreeMap<>();
+    for (EvaluationCase c : live) byDay.computeIfAbsent(c.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate(), d -> new ArrayList<>()).add(c);
+    List<Day> trend = byDay.entrySet().stream().map(e -> new Day(e.getKey(), averages(e.getValue()))).toList();
+
+    Map<String, List<EvaluationCase>> topics = new LinkedHashMap<>(), tags = new LinkedHashMap<>();
+    Map<String, String> labels = new HashMap<>();
+    long withTopic = 0;
+    for (EvaluationCase c : live) {
+      if (c.getTopic() != null) {
+        withTopic++;
+        String key = c.getTopic().toLowerCase(Locale.ROOT).replaceAll("[\\s.?!]+$", "");
+        labels.putIfAbsent(key, c.getTopic());
+        topics.computeIfAbsent(key, k -> new ArrayList<>()).add(c);
+      }
+      for (String tag : readTags(c.getTags())) tags.computeIfAbsent(tag, k -> new ArrayList<>()).add(c);
+    }
+    List<CaseView> latest = live.stream().limit(MAX_REPORT_ROWS).map(c -> view(c, includeText)).toList();
+    return new Report(from, to, live.size(), cases.countByCrateIdAndStatus(crateId, EvaluationCase.Status.FAILED), truncated,
+        averages(live), averages(goldenCases), trend, ranked(topics, labels), ranked(tags, Map.of()), latest, withTopic);
+  }
+
+  private static List<Ranked> ranked(Map<String, List<EvaluationCase>> groups, Map<String, String> labels) {
+    return groups.entrySet().stream()
+        .map(e -> new Ranked(labels.getOrDefault(e.getKey(), e.getKey()), e.getValue().size(), avg(e.getValue(), EvaluationCase::getFaithfulness),
+            avg(e.getValue(), EvaluationCase::getAnswerRelevance), avg(e.getValue(), EvaluationCase::getCompleteness)))
+        .sorted(Comparator.comparingLong(Ranked::count).reversed().thenComparing(Ranked::label))
+        .limit(TOP_N).toList();
+  }
+
+  static List<String> readTags(String json) {
+    if (json == null || json.isBlank()) return List.of();
+    try {
+      List<String> out = new ArrayList<>();
+      for (JsonNode n : MAPPER.readTree(json)) out.add(n.asText());
+      return out;
+    } catch (Exception e) { return List.of(); }
+  }
+
   static Averages averages(List<EvaluationCase> list) {
     return new Averages(list.size(), avg(list, EvaluationCase::getPrecisionAtK), avg(list, EvaluationCase::getRecallAtK),
         avg(list, EvaluationCase::getMrr), avg(list, EvaluationCase::getAveragePrecision), avg(list, EvaluationCase::getNdcg),
@@ -96,7 +154,7 @@ public class EvaluationAdminService {
     if (includeText && c.hasText()) text = new TextView(c.getQuestion(), c.getAnswer(), map(c.getSnapshotJson()), map(c.getDetailsJson()), pretty(c.getDetailsJson()));
     return new CaseView(c.getId(), c.getCreatedAt(), c.getSource().name(), c.getStatus().name(), c.getK(), c.getPrecisionAtK(),
         c.getRecallAtK(), c.getMrr(), c.getAveragePrecision(), c.getNdcg(), c.getFaithfulness(), c.getStatementsTotal(),
-        c.getStatementsSupported(), c.getAnswerRelevance(), c.getCompleteness(), c.getReferenceRecall(), c.getJudgeModel(), c.getError(), text);
+        c.getStatementsSupported(), c.getAnswerRelevance(), c.getCompleteness(), c.getReferenceRecall(), c.getJudgeModel(), c.getError(), c.getTopic(), readTags(c.getTags()), text);
   }
 
   /** Plain maps, not Jackson tree nodes: the web layer serialises with its own Jackson version. */

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Evaluation report · ContextCrate</title>
+  <link rel="stylesheet" href="/css/contextcrate.css"><script defer src="/js/contextcrate.js"></script></head>
+<body th:classappend="${print} ? 'report-print'">
+<th:block th:unless="${print}"><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header></th:block>
+<main class="page report">
+  <div class="mb-4">
+    <p class="eyebrow">QUALITY REPORT</p>
+    <h1 class="display-6 fw-semibold">Evaluation report</h1>
+    <p class="text-secondary">
+      Crate <strong th:text="${crate.name}"></strong> · <span th:text="${from}"></span> to <span th:text="${to}"></span> (UTC)
+      <span th:if="${print}"> · generated <span th:text="${#strings.substring(generatedAt.toString(), 0, 16)}"></span> UTC</span>
+    </p>
+  </div>
+
+  <form method="get" class="card panel p-3 mb-4 no-print d-flex gap-3 align-items-center" style="flex-wrap:wrap">
+    <label class="small text-secondary" for="range">Timeframe</label>
+    <select class="form-select form-select-sm" id="range" name="range" style="width:auto">
+      <option value="7d" th:selected="${range == '7d'}">Last 7 days</option>
+      <option value="30d" th:selected="${range == '30d'}">Last 30 days</option>
+      <option value="90d" th:selected="${range == '90d'}">Last 90 days</option>
+      <option value="custom" th:selected="${range == 'custom'}">Custom</option>
+    </select>
+    <label class="small text-secondary" for="from">From</label><input class="form-control form-control-sm" style="width:auto" type="date" id="from" name="from" th:value="${from}">
+    <label class="small text-secondary" for="to">To</label><input class="form-control form-control-sm" style="width:auto" type="date" id="to" name="to" th:value="${to}">
+    <button class="btn btn-primary btn-sm" type="submit">Show</button>
+    <span class="ms-auto d-flex gap-2">
+      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true)}" target="_blank" rel="noopener">Printable view</a>
+      <a class="btn btn-outline-secondary btn-sm" th:href="@{/crates/{id}/evaluation(id=${crate.id})}">Back to evaluation</a>
+    </span>
+  </form>
+  <p class="no-print small text-secondary" th:if="${range != 'custom'}">The date fields are used when “Custom” is selected.</p>
+  <div class="no-print mb-4" th:if="${print}"><button class="btn btn-primary" type="button" onclick="window.print()">Print / Save as PDF</button>
+    <span class="small text-secondary ms-2">In the print dialog choose “Save as PDF” as the destination.</span></div>
+
+  <div class="alert alert-warning" th:if="${report.truncated}">More than <span th:text="${T(tech.wenisch.contextcrate.evaluation.EvaluationAdminService).MAX_REPORT_CASES}"></span> answers matched; the report covers the newest ones. Choose a shorter timeframe for complete numbers.</div>
+  <div class="alert alert-info" th:unless="${settings.storeTopic or settings.storeTags}">Topics and tags are not being collected. Switch on “Store request topic” and “Store tags” in the evaluation settings to see what users ask about.</div>
+
+  <section class="mb-5">
+    <h2 class="h5">Summary</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="metric-card"><span>Questions evaluated</span><strong th:text="${report.questions}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card"><span>Faithfulness</span><strong th:text="${report.live.faithfulness == null ? '–' : #numbers.formatDecimal(report.live.faithfulness, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card"><span>Answer relevance</span><strong th:text="${report.live.answerRelevance == null ? '–' : #numbers.formatDecimal(report.live.answerRelevance, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-3"><div class="metric-card"><span>Completeness</span><strong th:text="${report.live.completeness == null ? '–' : #numbers.formatDecimal(report.live.completeness, 1, 2)}"></strong></div></div>
+    </div>
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-2"><div class="metric-card"><span>Precision@K</span><strong th:text="${report.live.precisionAtK == null ? '–' : #numbers.formatDecimal(report.live.precisionAtK, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>Recall@K</span><strong th:text="${report.live.recallAtK == null ? '–' : #numbers.formatDecimal(report.live.recallAtK, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>MRR</span><strong th:text="${report.live.mrr == null ? '–' : #numbers.formatDecimal(report.live.mrr, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>MAP</span><strong th:text="${report.live.map == null ? '–' : #numbers.formatDecimal(report.live.map, 1, 2)}"></strong></div></div>
+      <div class="col-6 col-md-2"><div class="metric-card"><span>NDCG</span><strong th:text="${report.live.ndcg == null ? '–' : #numbers.formatDecimal(report.live.ndcg, 1, 2)}"></strong></div></div>
+    </div>
+    <p class="small text-secondary">Averages over live answers in the timeframe; a dash means the metric was not recorded. <span th:text="${report.failed}"></span> evaluations failed (all time).</p>
+    <p class="small" th:if="${report.golden.cases > 0}">Golden set in this timeframe (<span th:text="${report.golden.cases}"></span> questions): faithfulness <strong th:text="${report.golden.faithfulness == null ? '–' : #numbers.formatDecimal(report.golden.faithfulness, 1, 2)}"></strong>, recall@K <strong th:text="${report.golden.recallAtK == null ? '–' : #numbers.formatDecimal(report.golden.recallAtK, 1, 2)}"></strong>, reference recall <strong th:text="${report.golden.referenceRecall == null ? '–' : #numbers.formatDecimal(report.golden.referenceRecall, 1, 2)}"></strong>.</p>
+  </section>
+
+  <section class="mb-5" th:if="${!report.trend.empty}">
+    <h2 class="h5">Faithfulness per day</h2>
+    <div class="card panel p-3">
+      <div class="analytics-chart analytics-chart-brand report-chart" role="img" aria-label="Average faithfulness per day">
+        <div class="analytics-bar" th:each="row:${report.trend}" th:style="|height:${row.averages.faithfulness == null ? 0 : row.averages.faithfulness * 100}%|"
+             th:title="|${row.day}: ${row.averages.faithfulness == null ? '–' : #numbers.formatDecimal(row.averages.faithfulness, 1, 2)} (${row.averages.cases} answers)|"></div>
+      </div>
+      <div class="d-flex small text-secondary mt-2" style="justify-content:space-between"><span th:text="${report.trend[0].day}"></span><span th:text="${report.trend[report.trend.size() - 1].day}"></span></div>
+    </div>
+  </section>
+
+  <section class="mb-5">
+    <h2 class="h5">Most requested topics</h2>
+    <p class="text-secondary small" th:if="${report.topTopics.empty}">No topics recorded in this timeframe.</p>
+    <div class="card panel table-responsive" th:if="${!report.topTopics.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th></tr></thead>
+      <tbody><tr th:each="t:${report.topTopics}">
+        <td th:text="${t.label}"></td><td th:text="${t.count}"></td>
+        <td style="width:20%"><div class="report-bar" th:style="|width:${t.count * 100 / report.topTopics[0].count}%|"></div></td>
+        <td th:text="${t.faithfulness == null ? '–' : #numbers.formatDecimal(t.faithfulness, 1, 2)}"></td>
+        <td th:text="${t.answerRelevance == null ? '–' : #numbers.formatDecimal(t.answerRelevance, 1, 2)}"></td>
+        <td th:text="${t.completeness == null ? '–' : #numbers.formatDecimal(t.completeness, 1, 2)}"></td>
+      </tr></tbody></table></div>
+  </section>
+
+  <section class="mb-5">
+    <h2 class="h5">Most used tags</h2>
+    <p class="text-secondary small" th:if="${report.topTags.empty}">No tags recorded in this timeframe.</p>
+    <div class="card panel table-responsive" th:if="${!report.topTags.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Tag</th><th>Asked</th><th></th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th></tr></thead>
+      <tbody><tr th:each="t:${report.topTags}">
+        <td><span class="badge text-bg-secondary" th:text="${t.label}"></span></td><td th:text="${t.count}"></td>
+        <td style="width:20%"><div class="report-bar" th:style="|width:${t.count * 100 / report.topTags[0].count}%|"></div></td>
+        <td th:text="${t.faithfulness == null ? '–' : #numbers.formatDecimal(t.faithfulness, 1, 2)}"></td>
+        <td th:text="${t.answerRelevance == null ? '–' : #numbers.formatDecimal(t.answerRelevance, 1, 2)}"></td>
+        <td th:text="${t.completeness == null ? '–' : #numbers.formatDecimal(t.completeness, 1, 2)}"></td>
+      </tr></tbody></table></div>
+  </section>
+
+  <section class="mb-5">
+    <h2 class="h5">Questions asked</h2>
+    <p class="text-secondary small">Newest <span th:text="${report.latest.size()}"></span> of <span th:text="${report.questions}"></span> answers. The topic is the judge's neutral rewrite of the question; raw questions appear only when “Log every question” is on.</p>
+    <div class="card panel table-responsive"><table class="table align-middle mb-0">
+      <thead><tr><th>Time (UTC)</th><th>Topic / question</th><th>Tags</th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th></tr></thead>
+      <tbody>
+        <tr th:each="c:${report.latest}">
+          <td class="small" th:text="${#strings.substring(c.createdAt.toString(), 0, 16).replace('T', ' ')}"></td>
+          <td class="small">
+            <div th:if="${c.topic != null}" th:text="${c.topic}"></div>
+            <div th:if="${c.text != null and c.text.question != null}" class="text-secondary"><span th:text="${#strings.abbreviate(c.text.question, 140)}"></span></div>
+            <span th:if="${c.topic == null and (c.text == null or c.text.question == null)}" class="text-secondary">–</span>
+          </td>
+          <td><span class="badge text-bg-secondary me-1" th:each="t:${c.tags}" th:text="${t}"></span></td>
+          <td th:text="${c.faithfulness == null ? '–' : #numbers.formatDecimal(c.faithfulness, 1, 2)}"></td>
+          <td th:text="${c.answerRelevance == null ? '–' : #numbers.formatDecimal(c.answerRelevance, 1, 2)}"></td>
+          <td th:text="${c.completeness == null ? '–' : #numbers.formatDecimal(c.completeness, 1, 2)}"></td>
+        </tr>
+        <tr th:if="${report.latest.empty}"><td colspan="6" class="empty-state">No evaluated answers in this timeframe.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="mb-5 report-glossary">
+    <h2 class="h5">What the metrics mean</h2>
+    <p class="text-secondary small">All scores range from 0 (worst) to 1 (best). They are produced by a judge model that reads the question, the retrieved passages and the answer, so treat them as a trend indicator, not as proof. Only sampled answers are evaluated.</p>
+    <dl class="small">
+      <dt>Faithfulness</dt><dd>Is the answer grounded in the delivered sources? The answer is split into single statements and each is checked against the retrieved passages. Score = supported statements ÷ all statements. A low value means the model added facts that are not in your documents (hallucination).</dd>
+      <dt>Answer relevance</dt><dd>Does the answer address what was asked? The judge writes the questions the answer would be a reply to; the score is how similar they are to the real question. Low values mean the answer drifts off-topic or is evasive.</dd>
+      <dt>Completeness</dt><dd>Does the answer cover all parts of the question? The question is split into sub-questions (core, background, follow-up) and each is rated as not, partly or fully addressed. Core parts weigh most. Low values mean parts of the question were left unanswered.</dd>
+      <dt>Precision@K</dt><dd>Of the top K retrieved passages, the share that is relevant to the question. Low: the retrieval delivers noise.</dd>
+      <dt>Recall@K</dt><dd>Of all relevant passages found in the candidate pool (or named in the golden set), the share that made it into the top K. Low: relevant material is missed.</dd>
+      <dt>MRR (mean reciprocal rank)</dt><dd>1 ÷ position of the first relevant passage, averaged. 1.0 means the best passage is always first.</dd>
+      <dt>MAP (mean average precision)</dt><dd>Rewards ranking relevant passages above irrelevant ones across the whole top K.</dd>
+      <dt>NDCG</dt><dd>Like MAP but uses graded relevance (0–3): highly relevant passages should appear before marginal ones.</dd>
+      <dt>Reference recall</dt><dd>Golden set only: the share of statements in your reference answer that the produced answer contains.</dd>
+      <dt>Topic and tags</dt><dd>The judge rewrites each question into a neutral topic and assigns up to 5 category tags, so you can see what users ask about without storing the raw questions. The grouping is textual: similar topics worded differently are counted separately.</dd>
+    </dl>
+  </section>
+</main>
+</body></html>

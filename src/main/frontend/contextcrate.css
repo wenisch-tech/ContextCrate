@@ -382,3 +382,25 @@
 }
 @keyframes chat-spin { to { transform: rotate(360deg); } }
 @keyframes chat-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Evaluation report: bars, and a print layout (black on white, no navigation) for "save as PDF". */
+@layer components {
+  .report-bar { height: .6rem; min-width: 2px; border-radius: .2rem; background: var(--color-brand-500); }
+  .report-chart { height: 6rem; }
+  .report-glossary dt { margin-top: .75rem; font-weight: 600; color: var(--color-ink-100); }
+  .report-glossary dd { margin: .15rem 0 0; max-width: 60rem; }
+}
+@media print {
+  @page { margin: 14mm; }
+  html, body { background: #fff !important; background-image: none !important; display: block !important; min-height: 0 !important; }
+  .sidebar, .topbar, .no-print, .overlay, .alert-info { display: none !important; }
+  .report, .report * { color: #111 !important; background: transparent !important; box-shadow: none !important; border-color: #bbb !important; backdrop-filter: none !important; }
+  .report { max-width: none !important; padding: 0 !important; }
+  .report .table { min-width: 0 !important; }
+  .report .table-responsive { overflow: visible !important; }
+  .report .badge { border: 1px solid #888; padding: 0 .35rem; border-radius: .25rem; }
+  .report .report-bar, .report .analytics-bar { background: #555 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report section, .report .metric-card, .report tr, .report dt, .report dd { break-inside: avoid; }
+  .report h2 { break-after: avoid; }
+  .report-glossary { break-before: page; }
+}

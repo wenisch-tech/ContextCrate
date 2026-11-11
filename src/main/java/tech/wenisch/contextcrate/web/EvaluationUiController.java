@@ -61,6 +61,44 @@ public class EvaluationUiController {
     return "evaluation";
   }
 
+  /**
+   * The report page. {@code range} is a preset (7d, 30d, 90d) or {@code custom} with {@code from}/{@code to}
+   * (ISO dates, both inclusive, UTC). {@code print=true} renders the same page without navigation, for "save as PDF".
+   */
+  @GetMapping("/report")
+  String report(@PathVariable UUID crateId, @RequestParam(defaultValue = "7d") String range,
+      @RequestParam(required = false) String from, @RequestParam(required = false) String to,
+      @RequestParam(defaultValue = "false") boolean print, Model model) {
+    java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+    java.time.LocalDate start, end = today;
+    String selected = range;
+    switch (range) {
+      case "30d" -> start = today.minusDays(29);
+      case "90d" -> start = today.minusDays(89);
+      case "custom" -> {
+        try {
+          start = java.time.LocalDate.parse(from);
+          end = java.time.LocalDate.parse(to);
+        } catch (RuntimeException e) {
+          start = today.minusDays(6); end = today; selected = "7d";
+        }
+        if (end.isBefore(start)) { var swap = start; start = end; end = swap; }
+        if (java.time.temporal.ChronoUnit.DAYS.between(start, end) > 365) start = end.minusDays(365);
+      }
+      default -> { start = today.minusDays(6); selected = "7d"; }
+    }
+    var instantFrom = start.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    var instantTo = end.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    model.addAttribute("settings", settings.view(crateId));
+    model.addAttribute("report", admin.report(crateId, instantFrom, instantTo, true));
+    model.addAttribute("range", selected);
+    model.addAttribute("from", start);
+    model.addAttribute("to", end);
+    model.addAttribute("print", print);
+    model.addAttribute("generatedAt", java.time.Instant.now());
+    return "evaluation-report";
+  }
+
   @PostMapping("/settings")
   String save(@PathVariable UUID crateId, RedirectAttributes redirect,
       @RequestParam(defaultValue = "false") boolean enabled, @RequestParam(defaultValue = "1.0") double samplingRate,
@@ -68,6 +106,7 @@ public class EvaluationUiController {
       @RequestParam(defaultValue = "false") boolean context, @RequestParam(defaultValue = "false") boolean faithfulness,
       @RequestParam(defaultValue = "false") boolean answerRelevance, @RequestParam(defaultValue = "false") boolean completeness,
       @RequestParam(defaultValue = "false") boolean logQuestions, @RequestParam(defaultValue = "30") int retentionDays,
+      @RequestParam(defaultValue = "false") boolean storeTopic, @RequestParam(defaultValue = "false") boolean storeTags,
       @RequestParam(defaultValue = "") String judgeSharedModelId, @RequestParam(defaultValue = "") String judgeBaseUrl,
       @RequestParam(defaultValue = "") String judgeModel, @RequestParam(defaultValue = "") String judgeApiKey,
       @RequestParam(defaultValue = "120") int judgeTimeoutSeconds) {
@@ -75,9 +114,10 @@ public class EvaluationUiController {
       UUID shared = judgeSharedModelId.isBlank() ? null : UUID.fromString(judgeSharedModelId);
       var view = settings.apply(crateId, new EvaluationSettingsService.Request(enabled, samplingRate, topK, poolSize, context,
           faithfulness, answerRelevance, completeness, logQuestions, retentionDays, shared, shared == null ? judgeBaseUrl : null,
-          shared == null ? judgeModel : null, judgeApiKey, judgeTimeoutSeconds));
+          shared == null ? judgeModel : null, judgeApiKey, judgeTimeoutSeconds, storeTopic, storeTags));
       audits.save(new AuditLog(crateId, actor(), "EVALUATION_SETTINGS_CHANGED", "evaluation",
-          "enabled=" + view.enabled() + ", sampling=" + view.samplingRate() + ", logQuestions=" + view.logQuestions()));
+          "enabled=" + view.enabled() + ", sampling=" + view.samplingRate() + ", logQuestions=" + view.logQuestions()
+              + ", storeTopic=" + view.storeTopic() + ", storeTags=" + view.storeTags()));
     });
   }
 

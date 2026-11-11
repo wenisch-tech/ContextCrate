@@ -175,6 +175,11 @@ it is designed to hold them as briefly as possible:
 - Cases that are never evaluated are deleted after **one hour**.
 - With **Log every question** the text, the judge's reasoning and the statements are kept for each
   case until the **retention period** ends (default 30 days, then the whole case is deleted).
+- With **Store request topic** and/or **Store tags** the judge additionally rewrites each live question
+  into a short neutral topic (names and addresses are to be left out, but this depends on the judge
+  model) and assigns up to 5 tags. These are kept **independently of Log every question**, until the
+  retention period ends, so the report can show what users ask about without raw questions. If even a
+  rewritten topic is too sensitive for a crate, leave both options off.
 - The judge model **receives the question, the retrieved chunks and the answer**. Use a provider you
   trust with the content of the crate, with TLS.
 - The settings, the scores and the logged text are visible to the **crate owners** only (and to an administrator with an active [elevation](../operations/administration.md)). Editors, viewers and crate API keys cannot see or change anything.
@@ -208,6 +213,8 @@ or in the [REST API](../api.md).
 | Dimensions | all on | Context relevance, faithfulness, answer relevance, completeness |
 | Log every question | off | Keep text and judge reasoning per case |
 | Keep cases | 30 days | Retention of cases (1 to 365) |
+| Store request topic | off | The judge rewrites each live question into a neutral topic; only the rewrite is kept |
+| Store tags | off | The judge assigns up to 5 category tags (for example `development`, `python`) |
 | Judge model | – | Shared judge model or own endpoint, model and key; nothing is evaluated without one |
 
 ## The evaluation page
@@ -215,7 +222,21 @@ or in the [REST API](../api.md).
 The page shows the averages for the last day, week, month or quarter, a **daily trend**, the
 **golden-set** results, and the **latest evaluated answers** with their scores. With per-question
 logging on, every row expands to the answer, the delivered sources and the
-judge's reasoning, so you can read *why* a score is low.
+judge's reasoning, so you can read *why* a score is low. With topics and tags switched on, the topic
+and tags are shown for every answer, also without per-question logging.
+
+### The report
+
+**Open report** leads to a page for a chosen timeframe (last 7, 30 or 90 days, or a custom date range,
+in UTC). It shows the summary metrics, a daily faithfulness chart, the **most requested topics** and
+**most used tags** (with how often they were asked and their average scores), the **questions asked**
+and an explanation of every metric. Topics are grouped by their wording, so the same question
+phrased differently can appear as two topics. The report covers at most 5000 answers; for longer
+timeframes it says so.
+
+**Printable view** opens the same report without navigation, in black on white. Use the browser's
+print dialog and choose *Save as PDF*. The normal page prints cleanly as well. The same data is
+available as JSON at `GET /api/v1/crates/{crateId}/evaluation/report?days=30`.
 
 ## Metrics and Grafana
 
