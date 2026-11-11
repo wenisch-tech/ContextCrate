@@ -180,6 +180,7 @@ it is designed to hold them as briefly as possible:
   model) and assigns up to 5 tags. These are kept **independently of Log every question**, until the
   retention period ends, so the report can show what users ask about without raw questions. If even a
   rewritten topic is too sensitive for a crate, leave both options off.
+- Building the report sends the stored topic wordings to the crate's embedding model, or to the judge model if there are none. The summary sends aggregated scores, topics and tags to the judge model.
 - The judge model **receives the question, the retrieved chunks and the answer**. Use a provider you
   trust with the content of the crate, with TLS.
 - The settings, the scores and the logged text are visible to the **crate owners** only (and to an administrator with an active [elevation](../operations/administration.md)). Editors, viewers and crate API keys cannot see or change anything.
@@ -230,13 +231,24 @@ and tags are shown for every answer, also without per-question logging.
 **Open report** leads to a page for a chosen timeframe (last 7, 30 or 90 days, or a custom date range,
 in UTC). It shows the summary metrics, a daily faithfulness chart, the **most requested topics** and
 **most used tags** (with how often they were asked and their average scores), the **questions asked**
-and an explanation of every metric. Topics are grouped by their wording, so the same question
-phrased differently can appear as two topics. The report covers at most 5000 answers; for longer
+and an explanation of every metric. Topics that mean the same are counted together even when worded
+differently ("Deploy with Docker" and "Docker deployment steps"). This happens when the report is built,
+using the crate's **embedding model** (topics with a cosine similarity of at least 0.80 are merged) or,
+without embeddings, the **judge model**, and finally the exact text (ignoring case and trailing
+punctuation). The report says which method was used and lists the other wordings under each topic.
+Tags are merged only when spelled the same.
+
+**Generate summary** asks the judge model to read the figures of the report and write what people
+searched for, which topics were answered well, which were not, and what to improve. The judge
+receives only aggregated numbers, the topic wordings and the tags - no questions or answers. The
+summary is kept for an hour per timeframe, so reloading or opening the printable view does not ask
+again; the printable view includes it when it was generated. Check it against the tables; topics with
+fewer than three answers are marked as too few to judge. The report covers at most 5000 answers; for longer
 timeframes it says so.
 
 **Printable view** opens the same report without navigation, in black on white. Use the browser's
 print dialog and choose *Save as PDF*. The normal page prints cleanly as well. The same data is
-available as JSON at `GET /api/v1/crates/{crateId}/evaluation/report?days=30`.
+available as JSON at `GET /api/v1/crates/{crateId}/evaluation/report?days=30` (add `&summary=true` for the summary).
 
 ## Metrics and Grafana
 

@@ -108,7 +108,7 @@ class EvaluationPageTest {
   }
 
   @Test
-  void theReportPageShowsTopicsTagsAndTheGlossaryAndHasAPrintableVariant() {
+  void theReportPageShowsTopicsTagsAndTheGlossaryAndHasAPrintableVariant() throws Exception {
     when(access.currentUser()).thenReturn(mock(AppUser.class));
     when(access.require(crateId, tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER)).thenReturn(tech.wenisch.contextcrate.domain.CrateMember.Role.OWNER);
     when(access.activeElevation(crateId)).thenReturn(java.util.Optional.empty());
@@ -120,22 +120,25 @@ class EvaluationPageTest {
         0.8, 0.6, null, "judge-1", null, "Deploying with Docker", List.of("development", "docker"), null);
     when(admin.report(eq(crateId), any(), any(), eq(true))).thenReturn(new EvaluationAdminService.Report(now.minusSeconds(86400), now, 12, 0, false,
         averages(12, 0.8), averages(0, null), List.of(new EvaluationAdminService.Day(LocalDate.of(2026, 11, 1), averages(12, 0.8))),
-        List.of(new EvaluationAdminService.Ranked("Deploying with Docker", 7, 0.8, 0.7, 0.6)),
-        List.of(new EvaluationAdminService.Ranked("docker", 7, 0.8, 0.7, 0.6)), List.of(row), 12));
+        List.of(new EvaluationAdminService.Ranked("Deploying with Docker", 7, 0.8, 0.7, 0.6, List.of("Docker deployment steps"))),
+        List.of(new EvaluationAdminService.Ranked("docker", 7, 0.8, 0.7, 0.6, List.of())), List.of(row), 12, "embedding", null));
 
     var normal = new ConcurrentModel();
     controller.crate(crateId, normal);
-    assertThat(controller.report(crateId, "30d", null, null, false, normal)).isEqualTo("evaluation-report");
+    assertThat(controller.report(crateId, "30d", null, null, false, false, normal)).isEqualTo("evaluation-report");
     String html = render("evaluation-report", normal);
     assertThat(html).contains("Evaluation report", "Handbook", "Deploying with Docker", "development", "Most requested topics",
-        "What the metrics mean", "Faithfulness", "Printable view", "Last 30 days", "sidebar");
+        "What the metrics mean", "Faithfulness", "Printable view", "Last 30 days", "sidebar", "also asked as:", "Docker deployment steps", "matched with embeddings", "Generate summary");
     assertThat(html).doesNotContain("Print / Save as PDF");
 
     var print = new ConcurrentModel();
     controller.crate(crateId, print);
-    controller.report(crateId, "custom", "2026-11-01", "2026-11-07", true, print);
+    var summary = new EvaluationAdminService.ReportSummary("People mostly ask about Docker.", List.of("Docker: 7x, faithfulness 0.80"), List.of("Passwords: 2x, faithfulness 0.30"),
+        List.of("Document password resets"), "judge-1", Instant.now());
+    when(admin.summarize(eq(crateId), any())).thenReturn(summary);
+    controller.report(crateId, "custom", "2026-11-01", "2026-11-07", true, true, print);
     String printable = render("evaluation-report", print);
     assertThat(printable).contains("Print / Save as PDF", "2026-11-01", "2026-11-07", "report-print", "What the metrics mean");
-    assertThat(printable).doesNotContain("class=\"sidebar");
+    assertThat(printable).doesNotContain("class=\"sidebar").contains("People mostly ask about Docker.", "Needs attention", "Document password resets").doesNotContain("Generate summary");
   }
 }

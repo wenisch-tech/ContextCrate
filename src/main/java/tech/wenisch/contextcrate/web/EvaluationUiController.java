@@ -68,7 +68,7 @@ public class EvaluationUiController {
   @GetMapping("/report")
   String report(@PathVariable UUID crateId, @RequestParam(defaultValue = "7d") String range,
       @RequestParam(required = false) String from, @RequestParam(required = false) String to,
-      @RequestParam(defaultValue = "false") boolean print, Model model) {
+      @RequestParam(defaultValue = "false") boolean print, @RequestParam(defaultValue = "false") boolean summary, Model model) {
     java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
     java.time.LocalDate start, end = today;
     String selected = range;
@@ -90,7 +90,18 @@ public class EvaluationUiController {
     var instantFrom = start.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     var instantTo = end.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     model.addAttribute("settings", settings.view(crateId));
-    model.addAttribute("report", admin.report(crateId, instantFrom, instantTo, true));
+    var report = admin.report(crateId, instantFrom, instantTo, true);
+    if (summary) {
+      try {
+        report = report.withSummary(admin.summarize(crateId, report));
+      } catch (IllegalStateException e) {
+        model.addAttribute("summaryError", e.getMessage());
+      } catch (Exception e) {
+        model.addAttribute("summaryError", "The summary could not be generated. Check the judge model and try again.");
+      }
+    }
+    model.addAttribute("report", report);
+    model.addAttribute("summaryRequested", summary);
     model.addAttribute("range", selected);
     model.addAttribute("from", start);
     model.addAttribute("to", end);

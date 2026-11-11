@@ -26,7 +26,8 @@
     <label class="small text-secondary" for="to">To</label><input class="form-control form-control-sm" style="width:auto" type="date" id="to" name="to" th:value="${to}">
     <button class="btn btn-primary btn-sm" type="submit">Show</button>
     <span class="ms-auto d-flex gap-2">
-      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true)}" target="_blank" rel="noopener">Printable view</a>
+      <a class="btn btn-outline-primary btn-sm" th:unless="${report.summary != null}" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=true)}" title="Asks the judge model to read the numbers below">Generate summary</a>
+      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true,summary=${report.summary != null})}" target="_blank" rel="noopener">Printable view</a>
       <a class="btn btn-outline-secondary btn-sm" th:href="@{/crates/{id}/evaluation(id=${crate.id})}">Back to evaluation</a>
     </span>
   </form>
@@ -37,8 +38,20 @@
   <div class="alert alert-warning" th:if="${report.truncated}">More than <span th:text="${T(tech.wenisch.contextcrate.evaluation.EvaluationAdminService).MAX_REPORT_CASES}"></span> answers matched; the report covers the newest ones. Choose a shorter timeframe for complete numbers.</div>
   <div class="alert alert-info" th:unless="${settings.storeTopic or settings.storeTags}">Topics and tags are not being collected. Switch on “Store request topic” and “Store tags” in the evaluation settings to see what users ask about.</div>
 
-  <section class="mb-5">
+  <div class="alert alert-danger" th:if="${summaryError != null}" th:text="${summaryError}"></div>
+  <section class="mb-5 report-summary" th:if="${report.summary != null}">
     <h2 class="h5">Summary</h2>
+    <div class="card panel p-3 small">
+      <p th:text="${report.summary.overview}"></p>
+      <div th:if="${!report.summary.well.empty}"><strong>Worked well</strong><ul><li th:each="i:${report.summary.well}" th:text="${i}"></li></ul></div>
+      <div th:if="${!report.summary.poorly.empty}"><strong>Needs attention</strong><ul><li th:each="i:${report.summary.poorly}" th:text="${i}"></li></ul></div>
+      <div th:if="${!report.summary.suggestions.empty}"><strong>Suggestions</strong><ul class="mb-0"><li th:each="i:${report.summary.suggestions}" th:text="${i}"></li></ul></div>
+      <p class="text-secondary mt-2 mb-0">Written by <span th:text="${report.summary.model}"></span> on <span th:text="${#strings.substring(report.summary.generatedAt.toString(), 0, 16).replace('T', ' ')}"></span> UTC from the figures in this report. Check it against the tables.</p>
+    </div>
+  </section>
+
+  <section class="mb-5">
+    <h2 class="h5">Key figures</h2>
     <div class="row g-3 mb-3">
       <div class="col-6 col-md-3"><div class="metric-card"><span>Questions evaluated</span><strong th:text="${report.questions}"></strong></div></div>
       <div class="col-6 col-md-3"><div class="metric-card"><span>Faithfulness</span><strong th:text="${report.live.faithfulness == null ? '–' : #numbers.formatDecimal(report.live.faithfulness, 1, 2)}"></strong></div></div>
@@ -69,11 +82,14 @@
 
   <section class="mb-5">
     <h2 class="h5">Most requested topics</h2>
+    <p class="text-secondary small" th:if="${report.groupingMethod == 'embedding'}">Topics worded differently but meaning the same are counted together (matched with embeddings).</p>
+    <p class="text-secondary small" th:if="${report.groupingMethod == 'judge'}">Topics worded differently but meaning the same are counted together (matched by the judge model).</p>
+    <p class="text-secondary small" th:if="${report.groupingMethod == 'text'}">Topics are counted by wording only: no embedding model or judge model is available for matching by meaning.</p>
     <p class="text-secondary small" th:if="${report.topTopics.empty}">No topics recorded in this timeframe.</p>
     <div class="card panel table-responsive" th:if="${!report.topTopics.empty}"><table class="table align-middle mb-0">
       <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th></tr></thead>
       <tbody><tr th:each="t:${report.topTopics}">
-        <td th:text="${t.label}"></td><td th:text="${t.count}"></td>
+        <td><span th:text="${t.label}"></span><div class="small text-secondary" th:if="${!t.variants.empty}">also asked as: <span th:text="${#strings.listJoin(t.variants, '; ')}"></span></div></td><td th:text="${t.count}"></td>
         <td style="width:20%"><div class="report-bar" th:style="|width:${t.count * 100 / report.topTopics[0].count}%|"></div></td>
         <td th:text="${t.faithfulness == null ? '–' : #numbers.formatDecimal(t.faithfulness, 1, 2)}"></td>
         <td th:text="${t.answerRelevance == null ? '–' : #numbers.formatDecimal(t.answerRelevance, 1, 2)}"></td>
@@ -130,7 +146,7 @@
       <dt>MAP (mean average precision)</dt><dd>Rewards ranking relevant passages above irrelevant ones across the whole top K.</dd>
       <dt>NDCG</dt><dd>Like MAP but uses graded relevance (0–3): highly relevant passages should appear before marginal ones.</dd>
       <dt>Reference recall</dt><dd>Golden set only: the share of statements in your reference answer that the produced answer contains.</dd>
-      <dt>Topic and tags</dt><dd>The judge rewrites each question into a neutral topic and assigns up to 5 category tags, so you can see what users ask about without storing the raw questions. The grouping is textual: similar topics worded differently are counted separately.</dd>
+      <dt>Topic and tags</dt><dd>The judge rewrites each question into a neutral topic and assigns up to 5 category tags, so you can see what users ask about without storing the raw questions. When building the report, topics that mean the same are merged (by embeddings, or by the judge model if there are no embeddings). Tags are only merged when they are spelled the same.</dd>
     </dl>
   </section>
 </main>

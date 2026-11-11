@@ -27,7 +27,17 @@ class EvaluationAdminTest {
   private final SharedModelRepository sharedModels = mock(SharedModelRepository.class);
   private final EvaluationSettingsService settings = new EvaluationSettingsService(settingsRepository, sharedModels);
   private final EvaluationCollector collector = mock(EvaluationCollector.class);
-  private final EvaluationAdminService admin = new EvaluationAdminService(cases, golden, settings, collector, mock(AuditLogRepository.class));
+  private final tech.wenisch.contextcrate.embedding.EmbeddingProvider embeddings = mock(tech.wenisch.contextcrate.embedding.EmbeddingProvider.class);
+  private final java.util.List<String> judgeCalls = new java.util.ArrayList<>();
+  private boolean judgeAvailable = false;
+  private String judgeReply = "{}";
+  private final JudgeClient judge = new JudgeClient() {
+    @Override public boolean available(UUID id) { return judgeAvailable; }
+    @Override public String model(UUID id) { return "judge-model"; }
+    @Override public String ask(UUID id, String system, String user) { judgeCalls.add(user); return judgeReply; }
+  };
+  private final EvaluationAdminService admin = new EvaluationAdminService(cases, golden, settings, collector, mock(AuditLogRepository.class),
+      new TopicGrouper(embeddings, judge), judge);
 
   private EvaluationCase done(EvaluationCase.Source source, Double faithfulness, Double precision) {
     var c = new EvaluationCase(UUID.randomUUID(), crateId, source, null, "secret question", "secret answer", "{}");
@@ -211,6 +221,62 @@ class EvaluationAdminTest {
   }
 
   @Test
+  void paraphrasedTopicsAreMergedByMeaningWhenEmbeddingsExist() throws Exception {
+    var now = java.time.Instant.now();
+    when(embeddings.available()).thenReturn(true);
+    when(embeddings.embedQueries(any())).thenAnswer(i -> ((List<String>) i.getArgument(0)).stream()
+        .map(t -> t.toLowerCase().contains("docker") ? new float[] {1f, 0f} : new float[] {0f, 1f}).toList());
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
+        .thenReturn(List.of(withTopic("Deploy with Docker", "[]", 1.0, now), withTopic("Docker deployment steps", "[]", 0.5, now),
+            withTopic("Docker deployment steps", "[]", 0.5, now), withTopic("Reset a password", "[]", 0.8, now)));
+
+    var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), false);
+
+    assertThat(report.groupingMethod()).isEqualTo("embedding");
+    assertThat(report.topTopics()).hasSize(2);
+    assertThat(report.topTopics().get(0).label()).isEqualTo("Docker deployment steps");
+    assertThat(report.topTopics().get(0).count()).isEqualTo(3);
+    assertThat(report.topTopics().get(0).variants()).containsExactly("Deploy with Docker");
+    assertThat(report.topTopics().get(0).faithfulness()).isCloseTo(0.6667, org.assertj.core.data.Offset.offset(0.001));
+  }
+
+  @Test
+  void theSummaryIsWrittenFromAggregatedNumbersOnlyAndIsCached() throws Exception {
+    var now = java.time.Instant.now();
+    var secret = withTopic("Reset a password", "[\"security\"]", 0.4, now);
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(secret));
+    var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
+    judgeAvailable = true;
+    judgeReply = "Sure: {\"overview\":\"  People asked about passwords. \",\"well\":[],\"poorly\":[\"Reset a password: faithfulness 0.40\"],"
+        + "\"suggestions\":[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"]}";
+
+    var summary = admin.summarize(crateId, report);
+    admin.summarize(crateId, report);
+
+    assertThat(summary.overview()).isEqualTo("People asked about passwords.");
+    assertThat(summary.poorly()).containsExactly("Reset a password: faithfulness 0.40");
+    assertThat(summary.suggestions()).hasSize(6);
+    assertThat(summary.model()).isEqualTo("judge-model");
+    assertThat(judgeCalls).hasSize(1); // the second call came from the cache
+    assertThat(judgeCalls.get(0)).contains("Reset a password", "faithfulness 0.40").doesNotContain("secret question").doesNotContain("secret answer");
+  }
+
+  @Test
+  void aSummaryNeedsAJudgeAndData() throws Exception {
+    var now = java.time.Instant.now();
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(withTopic("T", "[]", 1.0, now)));
+    var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), false);
+    assertThatThrownBy(() -> admin.summarize(crateId, report)).hasMessageContaining("judge");
+
+    judgeAvailable = true;
+    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), eq(now.plusSeconds(3600)), any(), any())).thenReturn(List.of());
+    var none = admin.report(crateId, now.plusSeconds(3600), now.plusSeconds(7200), false);
+    assertThatThrownBy(() -> admin.summarize(crateId, none)).hasMessageContaining("no evaluated answers");
+    judgeReply = "{\"overview\":\"\"}";
+    assertThatThrownBy(() -> admin.summarize(crateId, report)).hasMessageContaining("empty");
+  }
+
+  @Test
   void theReportIsMarkedTruncatedWhenTooManyCasesMatch() {
     var many = new java.util.ArrayList<EvaluationCase>();
     for (int i = 0; i <= EvaluationAdminService.MAX_REPORT_CASES; i++) many.add(done(EvaluationCase.Source.LIVE, 1.0, 1.0));
@@ -247,7 +313,7 @@ class EvaluationAdminTest {
 
     assertThatThrownBy(() -> api.settings(crateId)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.summary(crateId, 7)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> api.report(crateId, 7)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.report(crateId, 7, false)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.cases(crateId, 10)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.update(crateId, new EvaluationSettingsService.Request(true, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null))).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.run(crateId)).isInstanceOf(AccessDeniedException.class);
