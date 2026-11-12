@@ -44,6 +44,9 @@ public class RagSettings {
   @Column(name="image_max_bytes",nullable=false) private int imageMaxBytes=5_242_880;
   @Column(name="image_min_size",nullable=false) private int imageMinSize=64;
   @Column(name="image_skip_patterns",nullable=false,length=500) private String imageSkipPatterns="";
+  /** Attach the pictures of retrieved image sources to the answer request as base64 {@code image_url} parts. */
+  @Column(name="send_images_to_model",nullable=false) private boolean sendImagesToModel=true;
+  public boolean isSendImagesToModel(){return sendImagesToModel;} public void updateSendImages(boolean enabled){this.sendImagesToModel=enabled;}
   public boolean isImageIndexingEnabled(){return imageIndexingEnabled;} public boolean isImageDescriptionEnabled(){return imageDescriptionEnabled;}
   public java.util.UUID getImageVisionModelId(){return imageVisionModelId;} public int getImageMaxPerRun(){return imageMaxPerRun;} public int getImageMaxBytes(){return imageMaxBytes;}
   public int getImageMinSize(){return imageMinSize;} public String getImageSkipPatterns(){return imageSkipPatterns;}

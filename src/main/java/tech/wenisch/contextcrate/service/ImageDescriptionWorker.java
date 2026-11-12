@@ -34,7 +34,6 @@ import tech.wenisch.contextcrate.storage.*;
 @Service
 public class ImageDescriptionWorker {
   private static final Logger log = LoggerFactory.getLogger(ImageDescriptionWorker.class);
-  private static final Set<String> TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
   private static final int MIN_BYTES = 5 * 1024;
   private static final String PROMPT =
       "Describe this image so it can be found by search. State what it shows, transcribe any"
@@ -46,7 +45,7 @@ public class ImageDescriptionWorker {
   private final DocumentChunkRepository chunks;
   private final NormalizedDocumentRepository documents;
   private final ArtifactStore artifacts;
-  private final UrlPolicy urls;
+  private final ImageBytes imageBytes;
   private final PipelineQueue queue;
   private final RagSettingsService rag;
   private final SharedModelRepository shared;
@@ -57,11 +56,11 @@ public class ImageDescriptionWorker {
   private tech.wenisch.contextcrate.metrics.CrateMetrics cm = tech.wenisch.contextcrate.metrics.CrateMetrics.noop();
 
   public ImageDescriptionWorker(DocumentImageRepository images, DocumentChunkRepository chunks,
-      NormalizedDocumentRepository documents, ArtifactStore artifacts, UrlPolicy urls,
+      NormalizedDocumentRepository documents, ArtifactStore artifacts, ImageBytes imageBytes,
       PipelineQueue queue, RagSettingsService rag, SharedModelRepository shared,
       RuntimeProviderSettings providers, ObjectMapper mapper) {
     this.images = images; this.chunks = chunks; this.documents = documents; this.artifacts = artifacts;
-    this.urls = urls; this.queue = queue; this.rag = rag; this.shared = shared;
+    this.imageBytes = imageBytes; this.queue = queue; this.rag = rag; this.shared = shared;
     this.providers = providers; this.mapper = mapper;
   }
 
@@ -81,7 +80,7 @@ public class ImageDescriptionWorker {
         finish(image, "skipped", () -> image.skip("image descriptions are disabled"));
         return;
       }
-      byte[] bytes = load(image, settings.getImageMaxBytes());
+      byte[] bytes = imageBytes.load(image, settings.getImageMaxBytes());
       String reason = check(bytes, image.getUrl());
       if (reason != null) {
         finish(image, "skipped", () -> image.skip(reason));
@@ -97,10 +96,10 @@ public class ImageDescriptionWorker {
         model = known.get().getModel();
       } else {
         var endpoint = endpoint(settings);
-        description = ask(endpoint, bytes, mimeOf(bytes, image.getUrl()));
+        description = ask(endpoint, bytes, ImageBytes.mimeOf(bytes));
         model = endpoint.model();
       }
-      image.stored(image.getArtifactKey(), hash);
+      image.stored(keep(image, bytes, hash), hash);
       if (description == null || description.isBlank() || description.strip().toUpperCase(Locale.ROOT).startsWith("DECORATIVE")) {
         finish(image, "skipped", () -> image.skip("model: decorative"));
         return;
@@ -116,44 +115,26 @@ public class ImageDescriptionWorker {
     }
   }
 
+  /**
+   * Keeps the bytes of an image that has no stored copy (pictures found on web pages), so that an answer can show the
+   * picture to the model without downloading it again. A failure to store is not an error: the answer path downloads.
+   */
+  private String keep(DocumentImage image, byte[] bytes, String hash) {
+    if (image.getArtifactKey() != null) return image.getArtifactKey();
+    try {
+      String key = "crates/" + image.getCrateId() + "/images/" + hash + ".img";
+      artifacts.put(key, new ByteArrayInputStream(bytes), bytes.length + 1L);
+      return key;
+    } catch (Exception e) {
+      log.warn("Could not store image {}: {}", image.getUrl(), e.toString());
+      return null;
+    }
+  }
+
   private void finish(DocumentImage image, String outcome, Runnable change) {
     change.run();
     images.save(image);
     cm.count("images.descriptions", image.getCrateId(), "outcome", outcome);
-  }
-
-  private byte[] load(DocumentImage image, int maxBytes) throws Exception {
-    if (image.getArtifactKey() != null) {
-      try (InputStream in = artifacts.open(image.getArtifactKey())) { return readLimited(in, maxBytes); }
-    }
-    String url = image.getUrl();
-    for (int hop = 0; hop < 4; hop++) {
-      urls.assertSafe(url);
-      HttpResponse<InputStream> response = client.send(
-          HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
-              .header("Accept", "image/*").header("User-Agent", "ContextCrateBot/0.1").GET().build(),
-          HttpResponse.BodyHandlers.ofInputStream());
-      int status = response.statusCode();
-      if (status / 100 == 3 && response.headers().firstValue("Location").isPresent()) {
-        response.body().close();
-        url = URI.create(url).resolve(response.headers().firstValue("Location").get()).toString();
-        continue;
-      }
-      try (InputStream in = response.body()) {
-        if (status / 100 != 2) throw new IllegalStateException("Image download returned HTTP " + status);
-        String type = response.headers().firstValue("Content-Type").orElse("").toLowerCase(Locale.ROOT);
-        if (!type.isEmpty() && !TYPES.contains(type.split(";")[0].strip()))
-          throw new IllegalStateException("not a supported image type: " + type);
-        return readLimited(in, maxBytes);
-      }
-    }
-    throw new IllegalStateException("too many redirects");
-  }
-
-  private static byte[] readLimited(InputStream in, int max) throws java.io.IOException {
-    byte[] data = in.readNBytes(max + 1);
-    if (data.length > max) throw new IllegalStateException("image larger than " + max + " bytes");
-    return data;
   }
 
   /** Post-download filter: too small, banner-shaped, unreadable. Returns the reason or null. */
@@ -173,14 +154,6 @@ public class ImageDescriptionWorker {
       // formats ImageIO cannot decode (webp) are let through
     }
     return null;
-  }
-
-  private static String mimeOf(byte[] b, String url) {
-    if (b.length > 3 && (b[0] & 0xff) == 0x89 && b[1] == 'P') return "image/png";
-    if (b.length > 2 && (b[0] & 0xff) == 0xff && (b[1] & 0xff) == 0xd8) return "image/jpeg";
-    if (b.length > 3 && b[0] == 'G' && b[1] == 'I' && b[2] == 'F') return "image/gif";
-    if (b.length > 11 && b[8] == 'W' && b[9] == 'E' && b[10] == 'B') return "image/webp";
-    return "image/png";
   }
 
   private record Endpoint(String baseUrl, String model, String apiKey, int timeoutSeconds, String headers) {}

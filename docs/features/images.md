@@ -14,6 +14,7 @@ completely.
 | **Index images** | on | Master switch. Off: images are ignored everywhere, including image files in Git. |
 | **Describe images with a vision model** | off | Downloads each image that passes the filter and has a vision model describe it. |
 | Vision model | the crate's answer model | A shared answer model chosen by an administrator, or the crate's own answer model. It must accept images. |
+| **Send images to the answer model** | on | Attaches the picture of a retrieved image source to the answer request (see below). Applies to answers at once. |
 | Maximum images described per run | 200 | Upper bound on vision calls (and cost) per ingestion run. |
 | Maximum bytes per image | 5 MiB | Larger images are skipped. |
 | Smallest image | 64 px | Images declared smaller than this in width or height are skipped. |
@@ -21,7 +22,7 @@ completely.
 
 The same fields are available through `PUT /api/v1/crates/{crateId}/settings/rag`:
 `imageIndexingEnabled`, `imageDescriptionEnabled`, `imageVisionModelId`, `imageMaxPerRun`,
-`imageMaxBytes`, `imageMinSize`, `imageSkipPatterns`. Omitted fields keep their value.
+`imageMaxBytes`, `imageMinSize`, `imageSkipPatterns`, and `sendImagesToModel` for the answer option. Omitted fields keep their value.
 
 Changes apply to the next ingestion run. Switching image handling off does not remove image
 entries that are already indexed; they disappear when the documents are ingested again.
@@ -133,10 +134,33 @@ checkout is gone after the run. Describe them by letting the image file itself b
 | Many `failed` description outcomes | The model rejects images, the format is unsupported, or the endpoint times out | Check the model, and the `contextcrate_images_descriptions_total` metric |
 | Images behind a login are not described | Pages that need a login do not expose their images to the download | Make the images publicly reachable or import them from the repository |
 
+## Sending images to the answer model
+
+A description makes an image findable, but it can miss details. With **Send images to the answer model** (on by
+default, in the Images section of the crate settings) the answer model also gets the picture itself. When a retrieved
+source is an image, ContextCrate adds the image to the request in the multimodal format of the OpenAI chat
+completions API: the message with the sources becomes a list of parts, a `text` part with the sources followed by
+`image_url` parts whose URL is a `data:image/png;base64,...` string, each preceded by a short text naming the source
+(`Image belonging to [SOURCE 2]:`). Messages without a picture are unchanged plain strings.
+
+- **Which images:** the images of the sources the answer is built from, only those that were described, in source order.
+  At most **4** per answer and about 12 MB in total; each image is limited by *Maximum bytes per image*. Only
+  png, jpeg, gif and webp are sent. An image that cannot be read is left out, the answer is generated anyway.
+- **Where the bytes come from:** images that are described from now on are kept in the artifact store, so answering does not
+  download them again. Images described earlier are downloaded when needed, with the same address checks as crawling.
+- **Verification:** if answer verification is on, the verifier sees the same pictures, so statements that come from a
+  picture are not flagged as unsupported. Grading, HyDE, compression, query transformation and enrichment stay text-only.
+- **Models without vision:** the answer model must accept images. If it answers the request with an error, ContextCrate
+  asks again without the pictures (when nothing had been streamed yet), writes a warning to the log and counts
+  `answer.images{outcome="fallback"}`. So the default does not break a text-only model, but every answer then costs
+  a second request: switch the option off for such a crate.
+- **Cost and privacy:** pictures use tokens, and they are sent to the answer model endpoint, not only the description.
+
 ## Privacy and security
 
 - With **Describe images** on, image content is sent to the configured model endpoint. It is off
   by default, and an administrator can forbid it.
+- With **Send images to the answer model** (default on) the pictures of retrieved image sources are sent to the answer model endpoint as base64. Switch it off for crates whose images must not leave the system through the answer endpoint.
 - A description is retrieved content like any other: it is treated as untrusted when it is given
   to the answer model, because an image can contain text that tries to give instructions.
 - API keys of shared models are never shown to crate owners.
@@ -144,4 +168,4 @@ checkout is gone after the run. Describe them by letting the image file itself b
 ## Metrics
 
 `contextcrate_images_total{result="kept|skipped"}` counts filter decisions and
-`contextcrate_images_descriptions_total{outcome="described|skipped|failed"}` the vision results.
+`contextcrate_images_descriptions_total{outcome="described|skipped|failed"}` the vision results. `contextcrate_answer_images_total{outcome="sent|skipped|fallback"}` counts answers that carried pictures, pictures that were left out, and answers repeated without pictures.

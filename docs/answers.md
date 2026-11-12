@@ -62,6 +62,7 @@ The crate-specific authenticated **Settings** page controls answer policy withou
 - **Knowledge-base-only answers** prevents general-knowledge answers. If retrieval finds no chunks, ContextCrate returns a clear no-answer result without calling the LLM.
 - **Client-supplied conversation history** can be disabled for strictly single-turn answers.
 - **Inline citations** controls whether the model is instructed to write `[n]` markers; **structured sources** controls whether the `sources` SSE event is returned to clients.
+- **Send images to the answer model** (default on) attaches the pictures of retrieved image sources to the answer request as base64 `image_url` parts; see [Images](features/images.md#sending-images-to-the-answer-model).
 - **Default retrieval mode** and **maximum sources** set the RAG policy used when callers omit request-level retrieval options. The deployment configuration remains the upper source-count limit.
 
 These settings are stored in ContextCrate’s database and take effect on the next answer request. Endpoint URL, model, API key, context budget, and token limits remain deployment-level settings because they affect secrets and infrastructure.

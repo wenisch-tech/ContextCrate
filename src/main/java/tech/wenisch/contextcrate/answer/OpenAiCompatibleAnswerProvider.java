@@ -34,7 +34,7 @@ public class OpenAiCompatibleAnswerProvider implements AnswerGenerationProvider 
     if (!available()) throw new IllegalStateException("Answer generation is not configured");
     var c=settings.effectiveAnswer();
     var response=client.send(request(c).POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(
-        Map.of("model",c.model(),"stream",false,"temperature",temperature,"max_tokens",c.maxOutputTokens(),"messages",messages)))).build(),HttpResponse.BodyHandlers.ofString());
+        Map.of("model",c.model(),"stream",false,"temperature",temperature,"max_tokens",c.maxOutputTokens(),"messages",wire(messages))))).build(),HttpResponse.BodyHandlers.ofString());
     if(response.statusCode()/100!=2){httpError(response.statusCode());throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());}
     var content=mapper.readTree(response.body()).path("choices").path(0).path("message").path("content");
     if(content.isMissingNode()||content.isNull())throw new IllegalStateException("Answer provider returned no completion content");
@@ -44,10 +44,29 @@ public class OpenAiCompatibleAnswerProvider implements AnswerGenerationProvider 
     if (!available()) throw new IllegalStateException("Answer generation is not configured");
     var c=settings.effectiveAnswer();
     var request=request(c);
-    var body=Map.of("model",c.model(),"stream",true,"temperature",c.temperature(),"max_tokens",c.maxOutputTokens(),"messages",messages);
+    var body=Map.of("model",c.model(),"stream",true,"temperature",c.temperature(),"max_tokens",c.maxOutputTokens(),"messages",wire(messages));
     var response=client.send(request.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofLines());
     if(response.statusCode()/100!=2){httpError(response.statusCode());throw new IllegalStateException("Answer provider returned HTTP "+response.statusCode());}
     try(var lines=response.body()) { lines.filter(line->line.startsWith("data:")).map(line->line.substring(5).trim()).takeWhile(data->!data.equals("[DONE]")).forEach(data->{try{var text=mapper.readTree(data).path("choices").path(0).path("delta").path("content");if(!text.isMissingNode()&&!text.isNull())delta.accept(text.asText());}catch(Exception e){throw new IllegalStateException("Invalid streaming response from answer provider",e);}}); }
+  }
+  /**
+   * The messages as the OpenAI chat completions API expects them. A message without images is
+   * {@code {role, content: "text"}}; with images the content is an array of {@code text} and
+   * {@code image_url} parts, the pictures as {@code data:<mime>;base64,...} URLs.
+   */
+  static List<Map<String,Object>> wire(List<Message> messages) {
+    List<Map<String,Object>> out=new ArrayList<>();
+    for(Message m:messages){
+      if(m.images().isEmpty()){out.add(Map.of("role",m.role(),"content",m.content()==null?"":m.content()));continue;}
+      List<Map<String,Object>> parts=new ArrayList<>();
+      parts.add(Map.of("type","text","text",m.content()==null?"":m.content()));
+      for(Image image:m.images()){
+        if(image.citation()>0)parts.add(Map.of("type","text","text","Image belonging to [SOURCE "+image.citation()+"]:"));
+        parts.add(Map.of("type","image_url","image_url",Map.of("url","data:"+image.mime()+";base64,"+Base64.getEncoder().encodeToString(image.data()))));
+      }
+      out.add(Map.of("role",m.role(),"content",parts));
+    }
+    return out;
   }
   private static HttpRequest.Builder request(RuntimeProviderSettings.Answering c) {
     var request=HttpRequest.newBuilder(URI.create(c.baseUrl().replaceAll("/+$","")+"/chat/completions"))

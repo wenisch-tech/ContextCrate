@@ -44,7 +44,7 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 | [Contextual chunk headers](docs/features/contextual-headers.md) | Puts an LLM-written title, summary and section path in front of each chunk before it is embedded, so fragments keep their context. |
 | [Proposition retrieval](docs/features/retrieval.md) | Indexes self-contained, graded statements extracted from each chunk instead of the raw chunk. |
 | [Document enrichment](docs/features/document-enrichment.md) | The mirror image of HyDE: a model writes N questions (3 to 50) per chunk at indexing time; they are embedded and point back at the chunk, so user questions match questions, and the parent chunk is returned. |
-| [Images](docs/features/images.md) | Indexes images by alt text and optional vision-model descriptions. |
+| [Images](docs/features/images.md) | Indexes images by alt text and optional vision-model descriptions, and sends the pictures of retrieved image sources to the answer model (OpenAI multimodal format). |
 
 ### Retrieval
 

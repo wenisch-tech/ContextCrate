@@ -51,6 +51,7 @@ public class RagSettingsService {
   @Transactional public RagSettings updateFusion(java.util.UUID crateId,double vectorWeight){
     if(Double.isNaN(vectorWeight)||vectorWeight<0||vectorWeight>1)throw new IllegalArgumentException("fusion vector weight must be between 0 and 1");
     var value=current(crateId);value.updateFusionVectorWeight(vectorWeight);return settings.save(value);}
+  @Transactional public RagSettings updateSendImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateSendImages(enabled);return settings.save(value);}
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);
