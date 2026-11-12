@@ -47,6 +47,7 @@ public class EvaluationService {
   private final JudgeClient judge;
   private final SearchIndex index;
   private final EmbeddingProvider embeddings;
+  private EvaluationIgnoreService ignore;
   private AnswerService answers;
   private CrateMetrics metrics = CrateMetrics.noop();
 
@@ -57,6 +58,9 @@ public class EvaluationService {
 
   @Autowired(required = false)
   public void setMetrics(CrateMetrics metrics) { this.metrics = metrics; }
+
+  @Autowired(required = false)
+  public void setIgnore(EvaluationIgnoreService ignore) { this.ignore = ignore; }
 
   @Autowired(required = false)
   public void setAnswers(AnswerService answers) { this.answers = answers; }
@@ -70,6 +74,16 @@ public class EvaluationService {
     String source = evaluation.getSource().name().toLowerCase(Locale.ROOT);
     try (var ignored = CrateContext.use(crateId)) {
       EvaluationSettings config = settings.current(crateId);
+      // A rule may have been added after the case was queued: no judge calls for it.
+      if (ignore != null && evaluation.getSource() == EvaluationCase.Source.LIVE && evaluation.getQuestion() != null) {
+        var rule = ignore.matchQuestion(crateId, evaluation.getQuestion());
+        if (rule.isPresent()) {
+          evaluation.ignoreWithoutEvaluation(rule.get());
+          cases.save(evaluation);
+          metrics.count("evaluation.cases", crateId, "outcome", "ignored", "source", source);
+          return;
+        }
+      }
       if (!judge.available(crateId)) {
         evaluation.failed("No judge model is configured");
         finishFailed(evaluation, config, source);
@@ -90,6 +104,7 @@ public class EvaluationService {
         details.put("gap", "no-sources");
         runDimension("topic", crateId, errors, () -> topic(evaluation, true, true));
         if (!errors.isEmpty()) details.put("errors", errors);
+        applyTopicRules(evaluation);
         evaluation.done(judge.model(crateId), MAPPER.writeValueAsString(details), errors.isEmpty() ? null : String.join("; ", errors));
         emit(evaluation, crateId, source);
         finish(evaluation, config);
@@ -110,6 +125,7 @@ public class EvaluationService {
       final boolean wantTopic = config.isStoreTopic() || evaluation.isGap(), wantTags = config.isStoreTags() || evaluation.isGap();
       if (live && (wantTopic || wantTags)) runDimension("topic", crateId, errors, () -> topic(evaluation, wantTopic, wantTags));
       if (errors.size() > 0) details.put("errors", errors);
+      applyTopicRules(evaluation);
       String detailsJson = MAPPER.writeValueAsString(details);
       if (attempted > 0 && succeeded == 0) {
         evaluation.failed(String.join("; ", errors));
@@ -140,6 +156,12 @@ public class EvaluationService {
       errors.add(name + ": " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
       return false;
     }
+  }
+
+  /** Topic and tag rules can only match once the topic is known; the case then counts as ignored. */
+  private void applyTopicRules(EvaluationCase evaluation) {
+    if (ignore == null || evaluation.getSource() != EvaluationCase.Source.LIVE || evaluation.isIgnored()) return;
+    ignore.matchTopicOrTags(evaluation.getCrateId(), evaluation.getTopic(), evaluation.getTags()).ifPresent(evaluation::ignoredBy);
   }
 
   /** Asks whether the answer gave the requested information; only question and answer are sent. */

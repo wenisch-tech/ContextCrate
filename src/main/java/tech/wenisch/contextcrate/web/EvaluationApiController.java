@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import tech.wenisch.contextcrate.domain.AuditLog;
 import tech.wenisch.contextcrate.domain.CrateMember;
 import tech.wenisch.contextcrate.evaluation.EvaluationAdminService;
+import tech.wenisch.contextcrate.evaluation.EvaluationIgnoreService;
 import tech.wenisch.contextcrate.evaluation.EvaluationSettingsService;
 import tech.wenisch.contextcrate.repository.AuditLogRepository;
 import tech.wenisch.contextcrate.repository.CrateRepository;
@@ -67,7 +68,7 @@ public class EvaluationApiController {
   @GetMapping("/report")
   public EvaluationAdminService.Report report(@PathVariable UUID crateId, @RequestParam(defaultValue = "7") int days,
       @RequestParam(defaultValue = "false") boolean summary,
-      @RequestParam(defaultValue = "false") boolean gaps) throws Exception {
+      @RequestParam(defaultValue = "false") boolean gaps, @RequestParam(defaultValue = "false") boolean ignored) throws Exception {
     requireOwner(crateId);
     var today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
     int window = Math.max(1, Math.min(days, 365));
@@ -75,13 +76,41 @@ public class EvaluationApiController {
         today.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant(), true);
     if (summary) report = report.withSummary(admin.summarize(crateId, report));
     if (gaps) report = report.withGapSummary(admin.summarizeGaps(crateId, report));
+    if (ignored) report = report.withIgnored(admin.ignoredSummary(crateId,
+        today.minusDays(window - 1L).atStartOfDay(java.time.ZoneOffset.UTC).toInstant(), today.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant()));
     return report;
   }
 
-  @GetMapping("/cases")
-  public List<EvaluationAdminService.CaseView> cases(@PathVariable UUID crateId, @RequestParam(defaultValue = "50") int limit) {
+  @GetMapping("/ignore-rules")
+  public List<EvaluationIgnoreService.RuleView> ignoreRules(@PathVariable UUID crateId) {
     requireOwner(crateId);
-    return admin.cases(crateId, limit, true);
+    return admin.ignoreRules(crateId);
+  }
+
+  public record IgnoreRequest(String kind, List<String> patterns, String pattern, Boolean containsMatch) {}
+
+  /** Adds rules for {@code pattern} or each of {@code patterns}; kind is question, topic or tag. */
+  @PostMapping("/ignore-rules")
+  @ResponseStatus(HttpStatus.CREATED)
+  public List<EvaluationIgnoreService.RuleView> addIgnoreRule(@PathVariable UUID crateId, @RequestBody IgnoreRequest request) {
+    requireMutable(crateId);
+    List<String> patterns = request.patterns() != null ? request.patterns() : request.pattern() == null ? List.of() : List.of(request.pattern());
+    admin.addIgnoreRules(crateId, actor(), request.kind(), patterns, Boolean.TRUE.equals(request.containsMatch()));
+    return admin.ignoreRules(crateId);
+  }
+
+  @DeleteMapping("/ignore-rules/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteIgnoreRule(@PathVariable UUID crateId, @PathVariable UUID id) {
+    requireMutable(crateId);
+    admin.deleteIgnoreRule(crateId, actor(), id);
+  }
+
+  @GetMapping("/cases")
+  public List<EvaluationAdminService.CaseView> cases(@PathVariable UUID crateId, @RequestParam(defaultValue = "50") int limit,
+      @RequestParam(defaultValue = "false") boolean showIgnored) {
+    requireOwner(crateId);
+    return admin.cases(crateId, limit, true, showIgnored);
   }
 
   @GetMapping("/golden")

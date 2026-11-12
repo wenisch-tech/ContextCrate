@@ -135,6 +135,35 @@ most; missing follow-ups hurt little.
 is split into statements and the judge checks for each whether the generated answer contains it. The
 share found is the recall-like **reference recall**.
 
+## Ignoring questions
+
+Monitoring tools often send fixed questions, for example a LiteLLM health check asking "what is 1+1".
+Such messages would skew the averages, fill the list and show up as topics, so the owner can ignore them.
+Rules are per crate and are managed under **Ignore rules** on the evaluation page (or with
+`GET/POST /api/v1/crates/{crateId}/evaluation/ignore-rules` and `DELETE .../ignore-rules/{id}`).
+
+| Rule | Matches | Checked |
+|---|---|---|
+| **Question** | The question text, ignoring case, extra spaces and a trailing `?` `.` `!`. Optionally also when the question *contains* the text. | Before anything else: the message is only counted, never sampled, queued or sent to the judge. Ignored questions cost nothing. |
+| **Topic** | The stored topic, with the same normalization and the same optional "contains". | Once the topic is known, so the message was already evaluated; it is then hidden. |
+| **Tag** | A tag, exactly. | Like topic rules. |
+
+You do not have to type rules: press **Ignore** next to a question, a topic or a tag in the list of latest
+answers, or next to a topic in the report (this ignores the topic and all the other wordings listed under
+it). A new rule also hides the messages it matches **that already exist**; removing a rule brings them back.
+
+What ignoring does:
+
+- The list of latest answers **hides** ignored messages by default; **Show ignored** lists them, marked.
+- Ignored messages are **left out of every figure**: the averages, the daily trend, the topics and tags, the unanswered
+  questions and the Prometheus evaluation metrics (for topic and tag rules the metrics were already recorded).
+- They are **counted per rule**. The report has a **Show ignored summary** button; it adds a section with each rule
+  and how many messages it caught in the timeframe, and nothing more (no topics, scores or text).
+
+A question rule stores the text you typed or clicked. Rule changes are written to the audit log without that text.
+Matching is by wording, not by meaning: a topic rule for "Simple arithmetic" does not catch "Basic maths questions".
+For health checks a **question** rule is the right choice, because it is applied before the judge is called.
+
 ## The golden set
 
 The golden set is a list of questions you know the right answer to. It turns the judge-based estimates

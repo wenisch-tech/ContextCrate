@@ -425,4 +425,62 @@ class EvaluationServiceTest {
     assertThat(failing.getAnswerStatus()).isNull();
     assertThat(failing.getError()).contains("answer_status");
   }
+
+  // ---- ignore rules
+
+  @Test
+  void aQuestionRuleAddedAfterQueueingStopsTheEvaluationBeforeAnyJudgeCall() throws Exception {
+    only(true, true, true, true, false);
+    var ignore = mock(EvaluationIgnoreService.class);
+    var rule = UUID.randomUUID();
+    when(ignore.matchQuestion(crateId, "what is 1+1")).thenReturn(Optional.of(rule));
+    var evaluation = caseOf("what is 1+1", "2", "alpha");
+    var service = service();
+    service.setIgnore(ignore);
+
+    service.evaluate(crateId, evaluation.getId());
+
+    assertThat(calls).isEmpty();
+    assertThat(evaluation.getIgnoredRuleId()).isEqualTo(rule);
+    assertThat(evaluation.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+    assertThat(evaluation.hasText()).isFalse();
+    assertThat(evaluation.getPrecisionAtK()).isNull();
+  }
+
+  @Test
+  void topicAndTagRulesApplyOnceTheTopicIsKnown() throws Exception {
+    only(true, false, false, false, false);
+    settings.updateTopics(true, true);
+    script = (system, user) -> system.startsWith("You summarise") ? "{\"topic\":\"Simple arithmetic\",\"tags\":[\"math\"]}" : score(3);
+    var ignore = mock(EvaluationIgnoreService.class);
+    var rule = UUID.randomUUID();
+    when(ignore.matchQuestion(any(), any())).thenReturn(Optional.empty());
+    when(ignore.matchTopicOrTags(crateId, "Simple arithmetic", "[\"math\"]")).thenReturn(Optional.of(rule));
+    var evaluation = caseOf("what is 2+2", "4", "alpha");
+    var service = service();
+    service.setIgnore(ignore);
+
+    service.evaluate(crateId, evaluation.getId());
+
+    assertThat(evaluation.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+    assertThat(evaluation.getIgnoredRuleId()).isEqualTo(rule);
+    assertThat(evaluation.getTopic()).isEqualTo("Simple arithmetic"); // kept, so the rule can be shown and checked
+  }
+
+  @Test
+  void withoutMatchingRulesNothingIsIgnored() throws Exception {
+    only(true, false, false, false, false);
+    script = (system, user) -> score(3);
+    var ignore = mock(EvaluationIgnoreService.class);
+    when(ignore.matchQuestion(any(), any())).thenReturn(Optional.empty());
+    when(ignore.matchTopicOrTags(any(), any(), any())).thenReturn(Optional.empty());
+    var evaluation = caseOf("q", "a", "alpha");
+    var service = service();
+    service.setIgnore(ignore);
+
+    service.evaluate(crateId, evaluation.getId());
+
+    assertThat(evaluation.isIgnored()).isFalse();
+    assertThat(evaluation.getPrecisionAtK()).isEqualTo(1.0);
+  }
 }

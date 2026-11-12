@@ -50,11 +50,14 @@ public class EvaluationUiController {
   private String actor() { return access.currentUser().getEmail(); }
 
   @GetMapping
-  String page(@PathVariable UUID crateId, @RequestParam(defaultValue = "7") int days, Model model) {
+  String page(@PathVariable UUID crateId, @RequestParam(defaultValue = "7") int days,
+      @RequestParam(defaultValue = "false") boolean showIgnored, Model model) {
     var view = settings.view(crateId);
     model.addAttribute("settings", view);
     model.addAttribute("summary", admin.summary(crateId, days));
-    model.addAttribute("cases", admin.cases(crateId, 50, true));
+    model.addAttribute("cases", admin.cases(crateId, 50, true, showIgnored));
+    model.addAttribute("showIgnored", showIgnored);
+    model.addAttribute("ignoreRules", admin.ignoreRules(crateId));
     model.addAttribute("golden", admin.golden(crateId));
     model.addAttribute("judgeModels", sharedModels.options(SharedModel.Kind.JUDGE, view.judgeSharedModelId()));
     model.addAttribute("days", days);
@@ -69,7 +72,7 @@ public class EvaluationUiController {
   String report(@PathVariable UUID crateId, @RequestParam(defaultValue = "7d") String range,
       @RequestParam(required = false) String from, @RequestParam(required = false) String to,
       @RequestParam(defaultValue = "false") boolean print, @RequestParam(defaultValue = "false") boolean summary,
-      @RequestParam(defaultValue = "false") boolean gaps, Model model) {
+      @RequestParam(defaultValue = "false") boolean gaps, @RequestParam(defaultValue = "false") boolean ignored, Model model) {
     java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
     java.time.LocalDate start, end = today;
     String selected = range;
@@ -110,6 +113,7 @@ public class EvaluationUiController {
         model.addAttribute("gapError", "The analysis could not be generated. Check the judge model and try again.");
       }
     }
+    if (ignored) report = report.withIgnored(admin.ignoredSummary(crateId, instantFrom, instantTo));
     model.addAttribute("report", report);
     model.addAttribute("summaryRequested", summary);
     model.addAttribute("range", selected);
@@ -118,6 +122,40 @@ public class EvaluationUiController {
     model.addAttribute("print", print);
     model.addAttribute("generatedAt", java.time.Instant.now());
     return "evaluation-report";
+  }
+
+  /**
+   * Adds ignore rules: one per {@code pattern} (a topic cluster sends all its wordings). {@code back} is the page to
+   * return to; only pages of this crate's evaluation area are accepted.
+   */
+  @PostMapping("/ignore")
+  String ignore(@PathVariable UUID crateId, RedirectAttributes redirect, @RequestParam String kind,
+      @RequestParam java.util.List<String> pattern, @RequestParam(defaultValue = "false") boolean containsMatch,
+      @RequestParam(defaultValue = "") String back) {
+    mutable(crateId);
+    try {
+      admin.addIgnoreRules(crateId, actor(), kind, pattern, containsMatch);
+      redirect.addFlashAttribute("ignoreNotice", "Ignore rule added. Matching messages are hidden and no longer counted.");
+    } catch (IllegalArgumentException e) {
+      redirect.addFlashAttribute("evaluationError", e.getMessage());
+    }
+    return "redirect:" + backTarget(crateId, back);
+  }
+
+  @PostMapping("/ignore/{id}/delete")
+  String deleteIgnore(@PathVariable UUID crateId, @PathVariable UUID id, RedirectAttributes redirect, @RequestParam(defaultValue = "") String back) {
+    mutable(crateId);
+    admin.deleteIgnoreRule(crateId, actor(), id);
+    redirect.addFlashAttribute("ignoreNotice", "Ignore rule removed. The messages it caught count again.");
+    return "redirect:" + backTarget(crateId, back);
+  }
+
+  /** Only a path inside this crate's evaluation area is a valid return target; anything else goes to the evaluation page. */
+  static String backTarget(UUID crateId, String back) {
+    String base = "/crates/" + crateId + "/evaluation";
+    boolean valid = back != null && back.startsWith(base) && !back.contains("//") && !back.contains("\\") && !back.contains("\n") && !back.contains("\r")
+        && (back.length() == base.length() || "/?#".indexOf(back.charAt(base.length())) >= 0);
+    return valid ? back : base + "#ignore";
   }
 
   @PostMapping("/settings")

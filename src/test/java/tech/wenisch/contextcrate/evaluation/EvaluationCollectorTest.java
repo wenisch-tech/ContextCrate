@@ -138,12 +138,12 @@ class EvaluationCollectorTest {
 
   @Test
   void questionsThatFoundNothingAreKeptDespiteSamplingWhenUnansweredQuestionsAreTracked() throws Exception {
-    config.update(true, 0.01, 5, 20, true, true, true, true, false, 30);
+    config.update(true, 0.0, 5, 20, true, true, true, true, false, 30); // nothing is sampled
     var empty = new AnswerService.Prepared(crateId, "q", List.of(), "hybrid", List.of(), "alice", true, true, true, false, "revise-once");
     var collector = collector(direct());
 
     for (int i = 0; i < 20; i++) collector.offer(empty, AnswerService.NO_ANSWER);
-    verifyNoInteractions(cases); // tracking is off: the 1% sampling applies as before
+    verifyNoInteractions(cases); // tracking is off: sampling applies as before
 
     config.updateTracking(true);
     for (int i = 0; i < 20; i++) collector.offer(empty, AnswerService.NO_ANSWER);
@@ -151,6 +151,47 @@ class EvaluationCollectorTest {
     // answers that did find sources are still sampled
     clearInvocations(cases);
     for (int i = 0; i < 20; i++) collector.offer(prepared(), "an answer");
-    verify(cases, atMost(10)).save(any(EvaluationCase.class));
+    verify(cases, never()).save(any(EvaluationCase.class));
+  }
+
+  @Test
+  void aQuestionCaughtByAnIgnoreRuleIsCountedButNeverSampledQueuedOrStored() throws Exception {
+    config.update(true, 0.01, 5, 20, true, true, true, true, false, 30);
+    var ignore = mock(EvaluationIgnoreService.class);
+    var rule = UUID.randomUUID();
+    when(ignore.matchQuestion(crateId, "private question")).thenReturn(java.util.Optional.of(rule));
+    var collector = collector(direct());
+    collector.setIgnore(ignore);
+    when(settings.judgeAvailable(crateId)).thenReturn(false); // not even a judge is needed
+
+    for (int i = 0; i < 5; i++) collector.offer(prepared(), "an answer");
+
+    var saved = ArgumentCaptor.forClass(EvaluationCase.class);
+    verify(cases, times(5)).save(saved.capture());
+    assertThat(saved.getAllValues()).allSatisfy(c -> {
+      assertThat(c.getIgnoredRuleId()).isEqualTo(rule);
+      assertThat(c.getStatus()).isEqualTo(EvaluationCase.Status.DONE);
+      assertThat(c.getQuestion()).isNull();
+      assertThat(c.getAnswer()).isNull();
+      assertThat(c.getSnapshotJson()).isNull();
+    });
+    verifyNoInteractions(queue);
+  }
+
+  @Test
+  void questionsWithoutAMatchingRuleAreHandledAsBefore() throws Exception {
+    config.update(true, 1.0, 5, 20, true, true, true, true, false, 30);
+    var ignore = mock(EvaluationIgnoreService.class);
+    when(ignore.matchQuestion(any(), any())).thenReturn(java.util.Optional.empty());
+    var collector = collector(direct());
+    collector.setIgnore(ignore);
+
+    collector.offer(prepared(), "an answer");
+
+    var saved = ArgumentCaptor.forClass(EvaluationCase.class);
+    verify(cases).save(saved.capture());
+    assertThat(saved.getValue().isIgnored()).isFalse();
+    assertThat(saved.getValue().getQuestion()).isEqualTo("private question");
+    verify(queue).publish(any(PipelineMessage.class));
   }
 }

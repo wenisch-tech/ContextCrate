@@ -41,6 +41,7 @@ public class EvaluationCollector implements AutoCloseable {
   private final ObjectMapper mapper;
   private final ThreadPoolExecutor executor;
   private CrateMetrics metrics = CrateMetrics.noop();
+  private EvaluationIgnoreService ignore;
 
   @Autowired
   public EvaluationCollector(EvaluationSettingsService settings, EvaluationCaseRepository cases, PipelineQueue queue, ObjectMapper mapper) {
@@ -54,6 +55,9 @@ public class EvaluationCollector implements AutoCloseable {
   EvaluationCollector(EvaluationSettingsService settings, EvaluationCaseRepository cases, PipelineQueue queue, ObjectMapper mapper, ThreadPoolExecutor executor) {
     this.settings = settings; this.cases = cases; this.queue = queue; this.mapper = mapper; this.executor = executor;
   }
+
+  @Autowired(required = false)
+  public void setIgnore(EvaluationIgnoreService ignore) { this.ignore = ignore; }
 
   @Autowired(required = false)
   public void setMetrics(CrateMetrics metrics) { this.metrics = metrics; }
@@ -81,7 +85,17 @@ public class EvaluationCollector implements AutoCloseable {
   private void accept(UUID crateId, AnswerService.Prepared prepared, String answerText) {
     try {
       var config = settings.current(crateId);
-      if (!config.isEnabled() || !settings.judgeAvailable(crateId)) return;
+      if (!config.isEnabled()) return;
+      // Monitoring traffic (health checks): counted per rule, but never sampled, queued or sent to the judge.
+      if (ignore != null) {
+        var rule = ignore.matchQuestion(crateId, prepared.question());
+        if (rule.isPresent()) {
+          cases.save(EvaluationCase.ignoredQuestion(UUID.randomUUID(), crateId, rule.get()));
+          metrics.count("evaluation.cases", crateId, "outcome", "ignored", "source", "live");
+          return;
+        }
+      }
+      if (!settings.judgeAvailable(crateId)) return;
       // Questions that found nothing are always kept when unanswered questions are tracked: they cost no judge scoring and are the gaps to close.
       boolean gap = config.isTrackUnanswered() && prepared.sources().isEmpty();
       if (!gap && config.getSamplingRate() < 1.0 && ThreadLocalRandom.current().nextDouble() >= config.getSamplingRate()) {

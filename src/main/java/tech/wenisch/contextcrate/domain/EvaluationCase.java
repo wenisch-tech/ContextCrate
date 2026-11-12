@@ -43,6 +43,8 @@ public class EvaluationCase {
   @Column(columnDefinition = "text") private String error;
   /** Neutral rewrite of the question; kept after {@link #scrub()}. */
   @Column(columnDefinition = "text") private String topic;
+  /** The ignore rule that caught this case; ignored cases are counted per rule but left out of lists, averages and reports. */
+  @Column(name = "ignored_rule_id") private UUID ignoredRuleId;
   /** ANSWERED, PARTIAL or UNANSWERED, or null when not assessed; kept after {@link #scrub()}. */
   @Column(name = "answer_status", length = 12) private String answerStatus;
   /** Why a question was not (fully) answered: no-sources, not-in-sources or partial. */
@@ -85,6 +87,24 @@ public class EvaluationCase {
   public String getError() { return error; }
   public String getTopic() { return topic; }
   public String getTags() { return tags; }
+  public UUID getIgnoredRuleId() { return ignoredRuleId; }
+  public boolean isIgnored() { return ignoredRuleId != null; }
+
+  /** Marks the case as caught by a rule; scores and text stay as they are. */
+  public void ignoredBy(UUID ruleId) { this.ignoredRuleId = ruleId; }
+
+  /** A live case caught by a question rule before any evaluation: counted, finished, and without any text. */
+  public static EvaluationCase ignoredQuestion(UUID id, UUID crateId, UUID ruleId) {
+    var c = new EvaluationCase(id, crateId, Source.LIVE, null, null, null, null);
+    c.ignoredRuleId = ruleId; c.status = Status.DONE; c.evaluatedAt = Instant.now();
+    return c;
+  }
+
+  /** Finishes a waiting case without evaluating it because a question rule now matches. */
+  public void ignoreWithoutEvaluation(UUID ruleId) {
+    this.ignoredRuleId = ruleId; this.status = Status.DONE; this.evaluatedAt = Instant.now(); scrub();
+  }
+
   public String getAnswerStatus() { return answerStatus; }
   public String getGapReason() { return gapReason; }
   public boolean isGap() { return "UNANSWERED".equals(answerStatus) || "PARTIAL".equals(answerStatus); }

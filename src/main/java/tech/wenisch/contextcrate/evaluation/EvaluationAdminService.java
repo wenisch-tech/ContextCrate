@@ -41,7 +41,7 @@ public class EvaluationAdminService {
   public record CaseView(UUID id, Instant createdAt, String source, String status, Integer k, Double precisionAtK,
       Double recallAtK, Double mrr, Double map, Double ndcg, Double faithfulness, Integer statementsTotal,
       Integer statementsSupported, Double answerRelevance, Double completeness, Double referenceRecall,
-      String judgeModel, String error, String topic, List<String> tags, TextView text) {}
+      String judgeModel, String error, String topic, List<String> tags, boolean ignored, TextView text) {}
 
   /** One topic or tag in the report with how often it was asked and how well it was answered. */
   public record Ranked(String label, long count, Double faithfulness, Double answerRelevance, Double completeness, List<String> variants) {}
@@ -52,12 +52,16 @@ public class EvaluationAdminService {
   /** The reporting page: everything for one crate and one time frame. {@code truncated} when more than MAX_REPORT_CASES matched. */
   public record Report(Instant from, Instant to, long questions, long failed, boolean truncated, Averages live, Averages golden,
       List<Day> trend, List<Ranked> topTopics, List<Ranked> topTags, List<CaseView> latest, long withTopic,
-      String groupingMethod, ReportSummary summary, GapReport gaps) {
+      String groupingMethod, ReportSummary summary, GapReport gaps, EvaluationIgnoreService.Summary ignored) {
     public Report withSummary(ReportSummary value) {
-      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, value, gaps);
+      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, value, gaps, ignored);
+    }
+    /** The per-rule totals of ignored messages; shown only when asked for. */
+    public Report withIgnored(EvaluationIgnoreService.Summary value) {
+      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, summary, gaps, value);
     }
     public Report withGapSummary(GapSummary value) {
-      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, summary, gaps.withSummary(value));
+      return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, summary, gaps.withSummary(value), ignored);
     }
   }
 
@@ -94,11 +98,13 @@ public class EvaluationAdminService {
   private final AuditLogRepository audits;
   private final TopicGrouper grouper;
   private final JudgeClient judge;
+  private final EvaluationIgnoreService ignore;
 
   public EvaluationAdminService(EvaluationCaseRepository cases, EvaluationGoldenItemRepository golden,
-      EvaluationSettingsService settings, EvaluationCollector collector, AuditLogRepository audits, TopicGrouper grouper, JudgeClient judge) {
+      EvaluationSettingsService settings, EvaluationCollector collector, AuditLogRepository audits, TopicGrouper grouper, JudgeClient judge,
+      EvaluationIgnoreService ignore) {
     this.cases = cases; this.golden = golden; this.settings = settings; this.collector = collector; this.audits = audits;
-    this.grouper = grouper; this.judge = judge;
+    this.grouper = grouper; this.judge = judge; this.ignore = ignore;
   }
 
   // ------------------------------------------------------------------ summary and cases
@@ -107,7 +113,7 @@ public class EvaluationAdminService {
   public Summary summary(UUID crateId, int days) {
     int window = Math.max(1, Math.min(days, 365));
     Instant since = Instant.now().minus(window, ChronoUnit.DAYS);
-    List<EvaluationCase> done = cases.findByCrateIdAndStatusAndCreatedAtAfter(crateId, EvaluationCase.Status.DONE, since);
+    List<EvaluationCase> done = cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtAfter(crateId, EvaluationCase.Status.DONE, since);
     List<EvaluationCase> live = done.stream().filter(c -> c.getSource() == EvaluationCase.Source.LIVE).toList();
     List<EvaluationCase> goldenCases = done.stream().filter(c -> c.getSource() == EvaluationCase.Source.GOLDEN).toList();
     Map<LocalDate, List<EvaluationCase>> byDay = new TreeMap<>();
@@ -123,7 +129,7 @@ public class EvaluationAdminService {
    */
   // Not transactional on purpose: grouping may call an embedding or judge endpoint, which must not hold a database connection.
   public Report report(UUID crateId, Instant from, Instant to, boolean includeText) {
-    List<EvaluationCase> found = new ArrayList<>(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
+    List<EvaluationCase> found = new ArrayList<>(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(
         crateId, EvaluationCase.Status.DONE, from, to, PageRequest.of(0, MAX_REPORT_CASES + 1)));
     boolean truncated = found.size() > MAX_REPORT_CASES;
     if (truncated) found = found.subList(0, MAX_REPORT_CASES);
@@ -156,7 +162,7 @@ public class EvaluationAdminService {
     List<CaseView> latest = live.stream().limit(MAX_REPORT_ROWS).map(c -> view(c, includeText)).toList();
     GapReport gaps = gaps(live, grouping.clusters(), byWording, includeText);
     return new Report(from, to, live.size(), cases.countByCrateIdAndStatus(crateId, EvaluationCase.Status.FAILED), truncated,
-        averages(live), averages(goldenCases), trend, topics, ranked(tags), latest, withTopic, grouping.method(), null, gaps);
+        averages(live), averages(goldenCases), trend, topics, ranked(tags), latest, withTopic, grouping.method(), null, gaps, null);
   }
 
   /** Counts and clusters the live cases that were not (fully) answered, reusing the meaning clusters of the topics. */
@@ -316,17 +322,36 @@ public class EvaluationAdminService {
   }
 
   @Transactional(readOnly = true)
-  public List<CaseView> cases(UUID crateId, int limit, boolean includeText) {
+  public List<CaseView> cases(UUID crateId, int limit, boolean includeText) { return cases(crateId, limit, includeText, false); }
+
+  /** The newest cases; cases caught by an ignore rule are left out unless {@code showIgnored}. */
+  @Transactional(readOnly = true)
+  public List<CaseView> cases(UUID crateId, int limit, boolean includeText, boolean showIgnored) {
     int size = Math.max(1, Math.min(limit, MAX_CASES));
-    return cases.findByCrateIdOrderByCreatedAtDesc(crateId, PageRequest.of(0, size)).stream().map(c -> view(c, includeText)).toList();
+    var page = PageRequest.of(0, size);
+    var found = showIgnored ? cases.findByCrateIdOrderByCreatedAtDesc(crateId, page) : cases.findByCrateIdAndIgnoredRuleIdIsNullOrderByCreatedAtDesc(crateId, page);
+    return found.stream().map(c -> view(c, includeText)).toList();
   }
+
+  // ------------------------------------------------------------------ ignore rules
+
+  public List<EvaluationIgnoreService.RuleView> ignoreRules(UUID crateId) { return ignore.views(crateId); }
+
+  public void addIgnoreRules(UUID crateId, String actor, String kind, List<String> patterns, boolean containsMatch) {
+    ignore.addAll(crateId, actor, kind, patterns, containsMatch);
+  }
+
+  public void deleteIgnoreRule(UUID crateId, String actor, UUID id) { ignore.delete(crateId, actor, id); }
+
+  /** Messages caught per ignore rule within {@code [from, to)}: the rule and a number, nothing else. */
+  public EvaluationIgnoreService.Summary ignoredSummary(UUID crateId, Instant from, Instant to) { return ignore.summary(crateId, from, to); }
 
   static CaseView view(EvaluationCase c, boolean includeText) {
     TextView text = null;
     if (includeText && c.hasText()) text = new TextView(c.getQuestion(), c.getAnswer(), map(c.getSnapshotJson()), map(c.getDetailsJson()), pretty(c.getDetailsJson()));
     return new CaseView(c.getId(), c.getCreatedAt(), c.getSource().name(), c.getStatus().name(), c.getK(), c.getPrecisionAtK(),
         c.getRecallAtK(), c.getMrr(), c.getAveragePrecision(), c.getNdcg(), c.getFaithfulness(), c.getStatementsTotal(),
-        c.getStatementsSupported(), c.getAnswerRelevance(), c.getCompleteness(), c.getReferenceRecall(), c.getJudgeModel(), c.getError(), c.getTopic(), readTags(c.getTags()), text);
+        c.getStatementsSupported(), c.getAnswerRelevance(), c.getCompleteness(), c.getReferenceRecall(), c.getJudgeModel(), c.getError(), c.getTopic(), readTags(c.getTags()), c.isIgnored(), text);
   }
 
   /** Plain maps, not Jackson tree nodes: the web layer serialises with its own Jackson version. */

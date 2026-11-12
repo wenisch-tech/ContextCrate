@@ -36,8 +36,10 @@ class EvaluationAdminTest {
     @Override public String model(UUID id) { return "judge-model"; }
     @Override public String ask(UUID id, String system, String user) { judgeCalls.add(user); return judgeReply; }
   };
+  private final EvaluationIgnoreRuleRepository ignoreRules = mock(EvaluationIgnoreRuleRepository.class);
+  private final EvaluationIgnoreService ignoreService = new EvaluationIgnoreService(ignoreRules, cases, mock(AuditLogRepository.class));
   private final EvaluationAdminService admin = new EvaluationAdminService(cases, golden, settings, collector, mock(AuditLogRepository.class),
-      new TopicGrouper(embeddings, judge), judge);
+      new TopicGrouper(embeddings, judge), judge, ignoreService);
 
   private EvaluationCase done(EvaluationCase.Source source, Double faithfulness, Double precision) {
     var c = new EvaluationCase(UUID.randomUUID(), crateId, source, null, "secret question", "secret answer", "{}");
@@ -115,7 +117,7 @@ class EvaluationAdminTest {
     var a = done(EvaluationCase.Source.LIVE, 1.0, 0.5);
     var b = done(EvaluationCase.Source.LIVE, 0.5, null);
     var g = done(EvaluationCase.Source.GOLDEN, 0.0, 1.0);
-    when(cases.findByCrateIdAndStatusAndCreatedAtAfter(eq(crateId), eq(EvaluationCase.Status.DONE), any())).thenReturn(List.of(a, b, g));
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtAfter(eq(crateId), eq(EvaluationCase.Status.DONE), any())).thenReturn(List.of(a, b, g));
 
     var summary = admin.summary(crateId, 7);
 
@@ -131,7 +133,7 @@ class EvaluationAdminTest {
   @Test
   void textIsOnlyReturnedWhenAllowedAndStillPresent() {
     var logged = done(EvaluationCase.Source.LIVE, 1.0, 1.0);
-    when(cases.findByCrateIdOrderByCreatedAtDesc(eq(crateId), any())).thenReturn(List.of(logged));
+    when(cases.findByCrateIdAndIgnoredRuleIdIsNullOrderByCreatedAtDesc(eq(crateId), any())).thenReturn(List.of(logged));
 
     assertThat(admin.cases(crateId, 50, false).getFirst().text()).isNull();
     assertThat(admin.cases(crateId, 50, true).getFirst().text().question()).isEqualTo("secret question");
@@ -197,7 +199,7 @@ class EvaluationAdminTest {
   @Test
   void theReportGroupsTopicsAndTagsAndKeepsRawTextOut() throws Exception {
     var now = java.time.Instant.now();
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
         .thenReturn(List.of(
             withTopic("How to deploy with Docker", "[\"development\",\"docker\"]", 1.0, now),
             withTopic("how to deploy with docker.", "[\"docker\"]", 0.5, now),
@@ -226,7 +228,7 @@ class EvaluationAdminTest {
     when(embeddings.available()).thenReturn(true);
     when(embeddings.embedQueries(any())).thenAnswer(i -> ((List<String>) i.getArgument(0)).stream()
         .map(t -> t.toLowerCase().contains("docker") ? new float[] {1f, 0f} : new float[] {0f, 1f}).toList());
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
         .thenReturn(List.of(withTopic("Deploy with Docker", "[]", 1.0, now), withTopic("Docker deployment steps", "[]", 0.5, now),
             withTopic("Docker deployment steps", "[]", 0.5, now), withTopic("Reset a password", "[]", 0.8, now)));
 
@@ -244,7 +246,7 @@ class EvaluationAdminTest {
   void theSummaryIsWrittenFromAggregatedNumbersOnlyAndIsCached() throws Exception {
     var now = java.time.Instant.now();
     var secret = withTopic("Reset a password", "[\"security\"]", 0.4, now);
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(secret));
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(secret));
     var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
     judgeAvailable = true;
     judgeReply = "Sure: {\"overview\":\"  People asked about passwords. \",\"well\":[],\"poorly\":[\"Reset a password: faithfulness 0.40\"],"
@@ -264,12 +266,12 @@ class EvaluationAdminTest {
   @Test
   void aSummaryNeedsAJudgeAndData() throws Exception {
     var now = java.time.Instant.now();
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(withTopic("T", "[]", 1.0, now)));
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(withTopic("T", "[]", 1.0, now)));
     var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), false);
     assertThatThrownBy(() -> admin.summarize(crateId, report)).hasMessageContaining("judge");
 
     judgeAvailable = true;
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), eq(now.plusSeconds(3600)), any(), any())).thenReturn(List.of());
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), eq(now.plusSeconds(3600)), any(), any())).thenReturn(List.of());
     var none = admin.report(crateId, now.plusSeconds(3600), now.plusSeconds(7200), false);
     assertThatThrownBy(() -> admin.summarize(crateId, none)).hasMessageContaining("no evaluated answers");
     judgeReply = "{\"overview\":\"\"}";
@@ -280,7 +282,7 @@ class EvaluationAdminTest {
   void theReportIsMarkedTruncatedWhenTooManyCasesMatch() {
     var many = new java.util.ArrayList<EvaluationCase>();
     for (int i = 0; i <= EvaluationAdminService.MAX_REPORT_CASES; i++) many.add(done(EvaluationCase.Source.LIVE, 1.0, 1.0));
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(many);
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(many);
 
     var report = admin.report(crateId, java.time.Instant.EPOCH, java.time.Instant.now(), false);
 
@@ -313,8 +315,8 @@ class EvaluationAdminTest {
 
     assertThatThrownBy(() -> api.settings(crateId)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.summary(crateId, 7)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> api.report(crateId, 7, false, false)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> api.cases(crateId, 10)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.report(crateId, 7, false, false, false)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> api.cases(crateId, 10, false)).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.update(crateId, new EvaluationSettingsService.Request(true, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null))).isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> api.run(crateId)).isInstanceOf(AccessDeniedException.class);
     verifyNoInteractions(cases, golden, settingsRepository);
@@ -324,10 +326,10 @@ class EvaluationAdminTest {
   void anOwnerSeesScoresAndTheTextOfLoggedQuestions() {
     var access = mock(CrateAccessService.class);
     when(access.currentUser()).thenReturn(mock(AppUser.class));
-    when(cases.findByCrateIdOrderByCreatedAtDesc(eq(crateId), any())).thenReturn(List.of(done(EvaluationCase.Source.LIVE, 1.0, 1.0)));
+    when(cases.findByCrateIdAndIgnoredRuleIdIsNullOrderByCreatedAtDesc(eq(crateId), any())).thenReturn(List.of(done(EvaluationCase.Source.LIVE, 1.0, 1.0)));
     var api = new EvaluationApiController(access, mock(CrateRepository.class), settings, admin, mock(AuditLogRepository.class));
 
-    var rows = api.cases(crateId, 10);
+    var rows = api.cases(crateId, 10, false);
 
     assertThat(rows.getFirst().faithfulness()).isEqualTo(1.0);
     assertThat(rows.getFirst().text().question()).isEqualTo("secret question");
@@ -359,7 +361,7 @@ class EvaluationAdminTest {
         .map(t -> t.toLowerCase().contains("key") ? new float[] {1f, 0f} : new float[] {0f, 1f}).toList());
     var answered = withTopic("Reset a password", "[]", 0.9, now);
     answered.answerStatus("ANSWERED", null);
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any()))
         .thenReturn(List.of(
             gap("Rotate an API key", "[\"security\"]", "UNANSWERED", "no-sources", now),
             gap("API key rotation steps", "[\"security\",\"api\"]", "UNANSWERED", "not-in-sources", now.minusSeconds(60)),
@@ -392,7 +394,7 @@ class EvaluationAdminTest {
   @Test
   void aReportWithoutTrackedAnswersHasNoGaps() throws Exception {
     var now = java.time.Instant.now();
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(withTopic("T", "[]", 1.0, now)));
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(withTopic("T", "[]", 1.0, now)));
 
     var gaps = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), false).gaps();
 
@@ -406,7 +408,7 @@ class EvaluationAdminTest {
   void theGapAnalysisIsWrittenFromClusteredTopicsOnlyAndNeedsGaps() throws Exception {
     var now = java.time.Instant.now();
     var question = gap("Rotate an API key", "[\"security\"]", "UNANSWERED", "no-sources", now);
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(question));
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of(question));
     var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
     judgeAvailable = true;
     judgeReply = "{\"overview\":\"One topic is missing.\",\"themes\":[\"API keys: 1\"],\"causes\":[\"No page\"],\"actions\":[\"Write a rotation guide\"]}";
@@ -420,8 +422,48 @@ class EvaluationAdminTest {
     assertThat(judgeCalls.get(0)).contains("Rotate an API key", "no-sources 1", "security").doesNotContain("secret question");
     assertThat(report.withGapSummary(analysis).gaps().summary()).isEqualTo(analysis);
 
-    when(cases.findByCrateIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of());
+    when(cases.findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), any(), any(), any(), any())).thenReturn(List.of());
     var none = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
     assertThatThrownBy(() -> admin.summarizeGaps(crateId, none)).hasMessageContaining("no unanswered questions");
+  }
+
+  // ---- ignore rules in the list and the report
+
+  @Test
+  void theListHidesIgnoredCasesUnlessAskedAndMarksThem() {
+    var normal = done(EvaluationCase.Source.LIVE, 1.0, 0.5);
+    var health = done(EvaluationCase.Source.LIVE, 1.0, 0.5);
+    health.ignoredBy(UUID.randomUUID());
+    when(cases.findByCrateIdAndIgnoredRuleIdIsNullOrderByCreatedAtDesc(eq(crateId), any())).thenReturn(List.of(normal));
+    when(cases.findByCrateIdOrderByCreatedAtDesc(eq(crateId), any())).thenReturn(List.of(normal, health));
+
+    assertThat(admin.cases(crateId, 50, false)).hasSize(1);
+    assertThat(admin.cases(crateId, 50, false, false)).extracting(EvaluationAdminService.CaseView::ignored).containsExactly(false);
+    assertThat(admin.cases(crateId, 50, false, true)).extracting(EvaluationAdminService.CaseView::ignored).containsExactly(false, true);
+  }
+
+  @Test
+  void summaryAndReportOnlyAskForCasesThatAreNotIgnored() throws Exception {
+    var now = java.time.Instant.now();
+    admin.summary(crateId, 7);
+    admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), false);
+
+    verify(cases).findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtAfter(eq(crateId), eq(EvaluationCase.Status.DONE), any());
+    verify(cases).findByCrateIdAndStatusAndIgnoredRuleIdIsNullAndCreatedAtBetweenOrderByCreatedAtDesc(eq(crateId), eq(EvaluationCase.Status.DONE), any(), any(), any());
+    verify(cases, never()).findByCrateIdAndStatusAndCreatedAtAfter(any(), any(), any());
+  }
+
+  @Test
+  void theIgnoredSummaryIsTheRuleAndATotalOnly() {
+    var rule = new tech.wenisch.contextcrate.domain.EvaluationIgnoreRule(UUID.randomUUID(), crateId,
+        tech.wenisch.contextcrate.domain.EvaluationIgnoreRule.Kind.QUESTION, "what is 1+1", false, "owner");
+    when(ignoreRules.findByCrateIdOrderByCreatedAtAsc(crateId)).thenReturn(List.of(rule));
+    var now = java.time.Instant.now();
+    when(cases.countIgnoredBetween(crateId, now.minusSeconds(60), now)).thenReturn(java.util.Collections.singletonList(new Object[] {rule.getId(), 1440L}));
+
+    var report = admin.ignoredSummary(crateId, now.minusSeconds(60), now);
+
+    assertThat(report.total()).isEqualTo(1440);
+    assertThat(report.rules()).containsExactly(new EvaluationIgnoreService.RuleCount("QUESTION", "what is 1+1", false, 1440));
   }
 }

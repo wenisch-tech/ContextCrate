@@ -26,8 +26,9 @@
     <label class="small text-secondary" for="to">To</label><input class="form-control form-control-sm" style="width:auto" type="date" id="to" name="to" th:value="${to}">
     <button class="btn btn-primary btn-sm" type="submit">Show</button>
     <span class="ms-auto d-flex gap-2">
-      <a class="btn btn-outline-primary btn-sm" th:unless="${report.summary != null}" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=true,gaps=${report.gaps.summary != null})}" title="Asks the judge model to read the numbers below">Generate summary</a>
-      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true,summary=${report.summary != null},gaps=${report.gaps.summary != null})}" target="_blank" rel="noopener">Printable view</a>
+      <a class="btn btn-outline-primary btn-sm" th:unless="${report.summary != null}" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=true,gaps=${report.gaps.summary != null},ignored=${report.ignored != null})}" title="Asks the judge model to read the numbers below">Generate summary</a>
+      <a class="btn btn-outline-secondary btn-sm" th:unless="${report.ignored != null}" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=${report.summary != null},gaps=${report.gaps.summary != null},ignored=true)}" title="Shows how many messages each ignore rule caught">Show ignored summary</a>
+      <a class="btn btn-outline-primary btn-sm" th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},print=true,summary=${report.summary != null},gaps=${report.gaps.summary != null},ignored=${report.ignored != null})}" target="_blank" rel="noopener">Printable view</a>
       <a class="btn btn-outline-secondary btn-sm" th:href="@{/crates/{id}/evaluation(id=${crate.id})}">Back to evaluation</a>
     </span>
   </form>
@@ -38,6 +39,8 @@
   <div class="alert alert-warning" th:if="${report.truncated}">More than <span th:text="${T(tech.wenisch.contextcrate.evaluation.EvaluationAdminService).MAX_REPORT_CASES}"></span> answers matched; the report covers the newest ones. Choose a shorter timeframe for complete numbers.</div>
   <div class="alert alert-info" th:unless="${settings.storeTopic or settings.storeTags}">Topics and tags are not being collected. Switch on “Store request topic” and “Store tags” in the evaluation settings to see what users ask about.</div>
 
+  <div class="alert alert-success no-print" th:if="${ignoreNotice != null}" th:text="${ignoreNotice}"></div>
+  <div class="alert alert-danger" th:if="${evaluationError != null}" th:text="${evaluationError}"></div>
   <div class="alert alert-danger" th:if="${summaryError != null}" th:text="${summaryError}"></div>
   <section class="mb-5 report-summary" th:if="${report.summary != null}">
     <h2 class="h5">Summary</h2>
@@ -55,7 +58,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2" style="flex-wrap:wrap;gap:.5rem">
       <h2 class="h5 mb-0">Questions the knowledge base could not answer</h2>
       <a class="btn btn-outline-primary btn-sm no-print" th:if="${report.gaps.summary == null and report.gaps.gaps > 0}"
-         th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=${report.summary != null},gaps=true)}"
+         th:href="@{/crates/{id}/evaluation/report(id=${crate.id},range=${range},from=${from},to=${to},summary=${report.summary != null},gaps=true,ignored=${report.ignored != null})}"
          title="Asks the judge model what these questions say about missing content">Analyze gaps</a>
     </div>
     <p class="text-secondary small">A question counts as <strong>not answered</strong> when nothing relevant was found or the answer says the information is not available, and as <strong>partly answered</strong> when only some parts were covered. These are the places where documentation or sources are missing.</p>
@@ -79,7 +82,7 @@
 
     <h3 class="h6" th:if="${!report.gaps.topics.empty}">Topics without a good answer</h3>
     <div class="card panel table-responsive mb-3" th:if="${!report.gaps.topics.empty}"><table class="table align-middle mb-0">
-      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Nothing found</th><th>Not in documents</th><th>Partly</th><th>Tags</th><th>Last asked (UTC)</th></tr></thead>
+      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Nothing found</th><th>Not in documents</th><th>Partly</th><th>Tags</th><th>Last asked (UTC)</th><th class="no-print" th:unless="${print}"></th></tr></thead>
       <tbody><tr th:each="t:${report.gaps.topics}">
         <td><span th:text="${t.label}"></span><div class="small text-secondary" th:if="${!t.variants.empty}">also asked as: <span th:text="${#strings.listJoin(t.variants, '; ')}"></span></div></td>
         <td th:text="${t.count}"></td>
@@ -87,6 +90,12 @@
         <td th:text="${t.noSources}"></td><td th:text="${t.notInSources}"></td><td th:text="${t.partial}"></td>
         <td><span class="badge text-bg-secondary me-1" th:each="g:${t.tags}" th:text="${g}"></span></td>
         <td class="small" th:text="${#strings.substring(t.lastAsked.toString(), 0, 16).replace('T', ' ')}"></td>
+        <td class="no-print text-end" th:unless="${print}">
+          <form method="post" th:action="@{/crates/{id}/evaluation/ignore(id=${crate.id})}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="kind" value="topic">
+            <input type="hidden" name="pattern" th:value="${t.label}"><input type="hidden" name="pattern" th:each="v:${t.variants}" th:value="${v}">
+            <input type="hidden" name="back" th:value="${'/crates/' + crate.id + '/evaluation/report?range=custom&from=' + from + '&to=' + to}">
+            <button class="btn btn-sm btn-outline-secondary" title="Hide this topic and its other wordings from the evaluation and the report">Ignore</button></form></td>
       </tr></tbody></table></div>
 
     <h3 class="h6" th:if="${!report.gaps.latest.empty}">Latest unanswered questions</h3>
@@ -140,13 +149,19 @@
     <p class="text-secondary small" th:if="${report.groupingMethod == 'text'}">Topics are counted by wording only: no embedding model or judge model is available for matching by meaning.</p>
     <p class="text-secondary small" th:if="${report.topTopics.empty}">No topics recorded in this timeframe.</p>
     <div class="card panel table-responsive" th:if="${!report.topTopics.empty}"><table class="table align-middle mb-0">
-      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th></tr></thead>
+      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th><th class="no-print" th:unless="${print}"></th></tr></thead>
       <tbody><tr th:each="t:${report.topTopics}">
         <td><span th:text="${t.label}"></span><div class="small text-secondary" th:if="${!t.variants.empty}">also asked as: <span th:text="${#strings.listJoin(t.variants, '; ')}"></span></div></td><td th:text="${t.count}"></td>
         <td style="width:20%"><div class="report-bar" th:style="|width:${t.count * 100 / report.topTopics[0].count}%|"></div></td>
         <td th:text="${t.faithfulness == null ? '–' : #numbers.formatDecimal(t.faithfulness, 1, 2)}"></td>
         <td th:text="${t.answerRelevance == null ? '–' : #numbers.formatDecimal(t.answerRelevance, 1, 2)}"></td>
         <td th:text="${t.completeness == null ? '–' : #numbers.formatDecimal(t.completeness, 1, 2)}"></td>
+        <td class="no-print text-end" th:unless="${print}">
+          <form method="post" th:action="@{/crates/{id}/evaluation/ignore(id=${crate.id})}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="kind" value="topic">
+            <input type="hidden" name="pattern" th:value="${t.label}"><input type="hidden" name="pattern" th:each="v:${t.variants}" th:value="${v}">
+            <input type="hidden" name="back" th:value="${'/crates/' + crate.id + '/evaluation/report?range=custom&from=' + from + '&to=' + to}">
+            <button class="btn btn-sm btn-outline-secondary" title="Hide this topic and its other wordings from the evaluation and the report">Ignore</button></form></td>
       </tr></tbody></table></div>
   </section>
 
@@ -183,6 +198,22 @@
           <td th:text="${c.completeness == null ? '–' : #numbers.formatDecimal(c.completeness, 1, 2)}"></td>
         </tr>
         <tr th:if="${report.latest.empty}"><td colspan="6" class="empty-state">No evaluated answers in this timeframe.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="mb-5 report-ignored" id="ignored" th:if="${report.ignored != null}">
+    <h2 class="h5">Ignored messages</h2>
+    <p class="text-secondary small">Messages that match an ignore rule are left out of every figure on this page. This is only how many each rule caught in the timeframe.</p>
+    <p class="text-secondary small" th:if="${report.ignored.rules.empty}">There are no ignore rules.</p>
+    <div class="card panel table-responsive" th:if="${!report.ignored.rules.empty}"><table class="table align-middle mb-0">
+      <thead><tr><th>Rule</th><th>Kind</th><th>Messages</th></tr></thead>
+      <tbody>
+        <tr th:each="r:${report.ignored.rules}">
+          <td class="small"><span th:text="${r.pattern}"></span><span class="text-secondary" th:if="${r.containsMatch}"> (contains)</span></td>
+          <td th:text="${#strings.capitalize(#strings.toLowerCase(r.kind))}"></td>
+          <td th:text="${r.count}"></td>
+        </tr>
+        <tr><td colspan="2"><strong>Total</strong></td><td><strong th:text="${report.ignored.total}"></strong></td></tr>
       </tbody></table></div>
   </section>
 
