@@ -15,6 +15,7 @@ completely.
 | **Describe images with a vision model** | off | Downloads each image that passes the filter and has a vision model describe it. |
 | Vision model | the crate's answer model | A shared answer model chosen by an administrator, or the crate's own answer model. It must accept images. |
 | **Send images to the answer model** | on | Attaches the picture of a retrieved image source to the answer request (see below). Applies to answers at once. |
+| **Show images in the answer** | on | Lets the answer model place a picture of a source in its answer, returned to the client as a base64 Markdown image (see below). |
 | Maximum images described per run | 200 | Upper bound on vision calls (and cost) per ingestion run. |
 | Maximum bytes per image | 5 MiB | Larger images are skipped. |
 | Smallest image | 64 px | Images declared smaller than this in width or height are skipped. |
@@ -22,7 +23,7 @@ completely.
 
 The same fields are available through `PUT /api/v1/crates/{crateId}/settings/rag`:
 `imageIndexingEnabled`, `imageDescriptionEnabled`, `imageVisionModelId`, `imageMaxPerRun`,
-`imageMaxBytes`, `imageMinSize`, `imageSkipPatterns`, and `sendImagesToModel` for the answer option. Omitted fields keep their value.
+`imageMaxBytes`, `imageMinSize`, `imageSkipPatterns`, and `sendImagesToModel` and `includeImagesInAnswer` for the answer options. Omitted fields keep their value.
 
 Changes apply to the next ingestion run. Switching image handling off does not remove image
 entries that are already indexed; they disappear when the documents are ingested again.
@@ -155,6 +156,27 @@ completions API: the message with the sources becomes a list of parts, a `text` 
   `answer.images{outcome="fallback"}`. So the default does not break a text-only model, but every answer then costs
   a second request: switch the option off for such a crate.
 - **Cost and privacy:** pictures use tokens, and they are sent to the answer model endpoint, not only the description.
+
+## Returning images to the user
+
+Seeing a picture is not enough when the user asks "show me the Grafana dashboard": the answer model can describe the
+picture, but the user would never see it. With **Show images in the answer** (on by default; needs *Send images to the
+answer model*) the model is told which pictures it was given and may place one where it helps:
+
+1. The model writes `[[image:n]]` on its own line, `n` being the number of the source the picture belongs to. It is told
+   to use a marker only for a picture it was given and at most once per picture.
+2. ContextCrate replaces the marker by a Markdown image with the picture inline:
+   `![Image from source 2](data:image/png;base64,...)`. A marker for a picture that was not given, or a second marker for the
+   same picture, is removed.
+3. The OpenAI-compatible chat completions API (`message.content`, streamed and not streamed) and the answers API (`delta` event)
+   return that text. Chat UIs that render Markdown, such as Open WebUI or LibreChat, show the picture; a client that does not
+   render `data:` URLs shows the Markdown text. Citations are added before the picture is embedded, so footnotes are not affected.
+4. Everything else sees the answer **without** markers and picture data: answer verification, evaluation (stored answers
+   and scores), the audit log, and the MCP tool answer.
+
+The model decides when a picture helps; it is not appended to every answer. If the model did not receive pictures (no image
+source was retrieved, the option is off, or the model rejected images and ContextCrate answered again without them), no
+picture is returned. A picture can add several MB to a response, at most 4 per answer.
 
 ## Privacy and security
 

@@ -94,7 +94,7 @@ public class AnswerService {
     metrics.count("answer.requests",request.crateId(),"transformed",transformed);
     metrics.time("answer.prepare.duration",request.crateId(),System.nanoTime()-prepareStarted,"transformed",transformed);
     for(var source:sources)hot.record(request.crateId(),source.documentId(),source.chunkId());
-    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied(),retrieved.hydeQueries(),promptLayers(request.crateId(),policy),policy.isSendImagesToModel());
+    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied(),retrieved.hydeQueries(),promptLayers(request.crateId(),policy),policy.isSendImagesToModel(),policy.isSendImagesToModel()&&policy.isIncludeImagesInAnswer());
   }
   /**
    * Retrieves chunks for the question. With query transformation enabled the question is turned into
@@ -174,6 +174,8 @@ public class AnswerService {
     }
     return accepted;
   }
+  /** Tells the model it may show a picture of a source; the marker is replaced by the picture in the response. */
+  static final String IMAGE_MARKER_PROMPT=" Some sources come with their picture (shown after the sources, labeled with the source number). If showing a picture helps the user, for example when they ask to see a dashboard, diagram, chart or screenshot, write [[image:n]] on its own line where the picture belongs, with n the number of its source. Use a marker only for a picture you were given, at most once per picture, and do not describe the marker.";
   /** Shown instead of an answer when strict grounding finds no source. */
   public static final String NO_ANSWER="No answer was found in the knowledge base.";
   /** Called by the API layers when strict grounding finds no source and no answer is generated: the gap is still evaluated. */
@@ -200,6 +202,10 @@ public class AnswerService {
       success=true;
       Result result=prepared.answerVerificationEnabled()?verify(prepared,answer.toString(),images):new Result(answer.toString(),null);
       verification=result.verificationStatus()==null?"disabled":result.verificationStatus();
+      // The model may have placed pictures with [[image:n]]. Plain text (evaluation, MCP, audit) never contains the markers;
+      // clients that can show pictures get them through Result.embedImages.
+      boolean placed=prepared.includeImages()&&!images.isEmpty();
+      result=new Result(stripImageMarkers(result.text()),result.verificationStatus(),placed?result.text():null,placed?images:List.of());
       // RAG evaluation: a non-blocking hand-over; the answer is never delayed or affected by it.
       if(evaluation!=null){try{evaluation.offer(prepared,result.text());}catch(RuntimeException evaluationFailure){}}
       return result;
@@ -258,7 +264,9 @@ public class AnswerService {
   }
   private List<AnswerGenerationProvider.Message> messages(Prepared p,List<AnswerGenerationProvider.Image> images) {
     List<AnswerGenerationProvider.Message> messages=new ArrayList<>();
-    messages.add(new AnswerGenerationProvider.Message("system",SystemPrompts.compose(builtInPrompt(p.strictGrounding(),p.inlineCitations()),p.prompts())));
+    String system=SystemPrompts.compose(builtInPrompt(p.strictGrounding(),p.inlineCitations()),p.prompts());
+    if(p.includeImages()&&!images.isEmpty())system+=IMAGE_MARKER_PROMPT;
+    messages.add(new AnswerGenerationProvider.Message("system",system));
     messages.add(new AnswerGenerationProvider.Message("user",sourceContext(p)).withImages(images));
     for(var h:p.history())messages.add(new AnswerGenerationProvider.Message(h.role(),h.content()));
     messages.add(new AnswerGenerationProvider.Message("user",p.question()));return messages;
@@ -277,13 +285,42 @@ public class AnswerService {
     public String viewUrl() { return tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(sourceUri); }
   }
   /** @param searchQueries what retrieval searched for; @param transformations strategies that changed the query set */
-  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages) {
+  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages,boolean includeImages) {
+    /** Without the answer-image switch: pictures are only shown to the model, never returned. */
+    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,hydeQueries,prompts,sendImages,false); }
     /** Without the image switch: no pictures are sent. */
-    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,hydeQueries,prompts,false); }
+    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,hydeQueries,prompts,false,false); }
     /** Without system prompt layers: the built-in prompt only. */
     public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,hydeQueries,SystemPrompts.Layers.NONE); }
     public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,List.of(question),List.of(),0); }
     public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,0); }
   }
-  public record Result(String text,String verificationStatus) {}
+  static final java.util.regex.Pattern IMAGE_MARKER=java.util.regex.Pattern.compile("[ \\t]*\\[\\[image:(\\d{1,3})\\]\\]");
+  static String stripImageMarkers(String text){return text==null?null:IMAGE_MARKER.matcher(text).replaceAll("");}
+  /**
+   * The answer. {@code text} never contains picture markers. When the model placed pictures, {@code markedText} is the answer with
+   * its {@code [[image:n]]} markers and {@code images} are the pictures it was shown; {@link #embedImages} puts them back
+   * into any text derived from {@code markedText}, as Markdown images with base64 data URLs.
+   */
+  public record Result(String text,String verificationStatus,@JsonIgnore String markedText,@JsonIgnore List<AnswerGenerationProvider.Image> images) {
+    public Result { images=images==null?List.of():List.copyOf(images); }
+    public Result(String text,String verificationStatus) { this(text,verificationStatus,null,List.of()); }
+    /** The answer for a client that can show pictures. */
+    public String rendered() { return embedImages(markedText==null?text:markedText); }
+    /** Replaces the markers of {@code text} by {@code ![..](data:<mime>;base64,..)}; a picture appears once, unknown markers vanish. */
+    public String embedImages(String text) {
+      if(text==null||images.isEmpty())return stripImageMarkers(text);
+      java.util.Set<Integer> shown=new java.util.HashSet<>();
+      var matcher=IMAGE_MARKER.matcher(text);var out=new StringBuilder();
+      while(matcher.find()){
+        int n=Integer.parseInt(matcher.group(1));
+        var image=images.stream().filter(i->i.citation()==n).findFirst().orElse(null);
+        String replacement=image==null||!shown.add(n)?"":"\n![Image from source "+n+"](data:"+image.mime()+";base64,"+java.util.Base64.getEncoder().encodeToString(image.data())+")\n";
+        matcher.appendReplacement(out,java.util.regex.Matcher.quoteReplacement(replacement));
+      }
+      matcher.appendTail(out);return out.toString();
+    }
+    /** The answer text including its markers, for further processing before {@link #embedImages}. */
+    public String textWithMarkers() { return markedText==null?text:markedText; }
+  }
 }

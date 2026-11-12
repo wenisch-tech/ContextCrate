@@ -30,4 +30,11 @@ class RagSettingsSendImagesTest {
     assertThat(service().updateSendImages(crateId, false).isSendImagesToModel()).isFalse();
     assertThat(service().updateSendImages(crateId, true).isSendImagesToModel()).isTrue();
   }
+
+  @Test
+  void placingPicturesInTheAnswerIsOnByDefaultToo() {
+    assertThat(stored.isIncludeImagesInAnswer()).isTrue();
+    assertThat(service().updateIncludeImages(crateId, false).isIncludeImagesInAnswer()).isFalse();
+    assertThat(service().updateIncludeImages(crateId, true).isIncludeImagesInAnswer()).isTrue();
+  }
 }

@@ -46,6 +46,9 @@ public class RagSettings {
   @Column(name="image_skip_patterns",nullable=false,length=500) private String imageSkipPatterns="";
   /** Attach the pictures of retrieved image sources to the answer request as base64 {@code image_url} parts. */
   @Column(name="send_images_to_model",nullable=false) private boolean sendImagesToModel=true;
+  /** Let the answer model place a picture of a source in its answer; the client receives it as a base64 Markdown image. */
+  @Column(name="include_images_in_answer",nullable=false) private boolean includeImagesInAnswer=true;
+  public boolean isIncludeImagesInAnswer(){return includeImagesInAnswer;} public void updateIncludeImages(boolean enabled){this.includeImagesInAnswer=enabled;}
   public boolean isSendImagesToModel(){return sendImagesToModel;} public void updateSendImages(boolean enabled){this.sendImagesToModel=enabled;}
   public boolean isImageIndexingEnabled(){return imageIndexingEnabled;} public boolean isImageDescriptionEnabled(){return imageDescriptionEnabled;}
   public java.util.UUID getImageVisionModelId(){return imageVisionModelId;} public int getImageMaxPerRun(){return imageMaxPerRun;} public int getImageMaxBytes(){return imageMaxBytes;}

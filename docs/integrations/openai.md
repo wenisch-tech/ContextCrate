@@ -107,6 +107,15 @@ wrote, so a citation cannot point somewhere the model made up. A marker that doe
 retrieved source, or whose source has no plain `http(s)` URL to link to, is left as plain `[n]` text
 and does not appear in the reference list — there is nothing accurate to point it at.
 
+## Images in answers
+
+If the answer model was given a picture of a retrieved source and decides it helps (for example when the user asks to see a
+dashboard or diagram), the assistant message contains it inline as a Markdown image with a base64 data URL:
+`![Image from source 2](data:image/png;base64,...)`. This is plain text in `message.content` (streamed or not), so every
+OpenAI-compatible client works; clients that render Markdown, such as Open WebUI, show the picture. It is controlled by the crate
+setting **Show images in the answer** (default on) and described in [Images](../features/images.md#returning-images-to-the-user).
+Responses with pictures can be several MB larger than text-only ones.
+
 ## Conversation mapping
 
 - The **last `user` message** becomes the question. Earlier `user`/`assistant` messages become

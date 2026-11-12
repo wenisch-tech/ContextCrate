@@ -296,4 +296,28 @@ class OpenAiChatCompletionsMappingTest {
     var completion = (OpenAiChatCompletionsController.ChatCompletion) response.getBody();
     assertThat(completion.choices().get(0).message().content()).isEqualTo("See [1].");
   }
+
+  @Test
+  void aPictureTheModelPlacedInTheAnswerIsReturnedAsABase64MarkdownImage() throws Exception {
+    var png = new byte[] {(byte) 0x89, 'P', 'N', 'G', 1, 2};
+    var image = new tech.wenisch.contextcrate.answer.AnswerGenerationProvider.Image("image/png", png, 2);
+    when(answers.prepare(any())).thenReturn(prepared(List.of(source(1, "https://example.test/docs"), source(2, "https://example.test/grafana.png"))));
+    when(answers.generate(any())).thenReturn(new AnswerService.Result("Here is the dashboard [1].", null,
+        "Here is the dashboard [1].\n[[image:2]]", List.of(image)));
+
+    var response = controller.chatCompletions(crateId, request(new ChatMessage("user", "show me the grafana dashboard")));
+
+    var content = (String) ((OpenAiChatCompletionsController.ChatCompletion) response.getBody()).choices().get(0).message().content();
+    assertThat(content).contains("![Image from source 2](data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png) + ")");
+    assertThat(content).startsWith("Here is the dashboard").doesNotContain("[[image:");
+  }
+
+  @Test
+  void withoutPlacedPicturesTheAnswerIsAsBefore() throws Exception {
+    when(answers.generate(any())).thenReturn(new AnswerService.Result("answer", null));
+
+    var response = controller.chatCompletions(crateId, request(new ChatMessage("user", "q")));
+
+    assertThat(((OpenAiChatCompletionsController.ChatCompletion) response.getBody()).choices().get(0).message().content()).isEqualTo("answer");
+  }
 }

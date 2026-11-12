@@ -60,6 +60,7 @@ public class CrateSettingsApiController {
       updated=rag.updateImages(crateId,r.imageIndexingEnabled()==null?current.isImageIndexingEnabled():r.imageIndexingEnabled(),r.imageDescriptionEnabled()==null?current.isImageDescriptionEnabled():r.imageDescriptionEnabled(),r.imageVisionModelId()==null?current.getImageVisionModelId():r.imageVisionModelId(),r.imageMaxPerRun()==null?current.getImageMaxPerRun():r.imageMaxPerRun(),r.imageMaxBytes()==null?current.getImageMaxBytes():r.imageMaxBytes(),r.imageMinSize()==null?current.getImageMinSize():r.imageMinSize(),r.imageSkipPatterns()==null?current.getImageSkipPatterns():r.imageSkipPatterns());
     }
     if(r.sendImagesToModel()!=null)updated=rag.updateSendImages(crateId,r.sendImagesToModel());
+    if(r.includeImagesInAnswer()!=null)updated=rag.updateIncludeImages(crateId,r.includeImagesInAnswer());
     if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy)||headerChanged||enrichmentChanged)rebuild.rebuildAsync(crateId);return updated;
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
@@ -82,7 +83,7 @@ public class CrateSettingsApiController {
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
       boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Boolean enrichmentEnabled,Integer enrichmentQuestions,Integer contextWindow,Boolean contextCompression,String contextHeaderVariant,Integer contextHeaderWords,
-      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel){}
+      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

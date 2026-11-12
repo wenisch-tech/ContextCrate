@@ -41,6 +41,12 @@ class AnswerServiceImagesTest {
     when(imageService.imagesFor(any())).thenReturn(List.of(diagram));
   }
 
+  private AnswerService.Prepared prepared(boolean sendImages, boolean verification, boolean includeImages) {
+    var source = new AnswerService.Source(1, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "T", "https://example.test/diagram.png", 0, "s", 1f, "Image: a diagram");
+    return new AnswerService.Prepared(crateId, "Show me the diagram", List.of(), "hybrid", List.of(source), "alice", false, true, true,
+        verification, "revise-once", List.of("q"), List.of(), 0, SystemPrompts.Layers.NONE, sendImages, includeImages);
+  }
+
   private AnswerService.Prepared prepared(boolean sendImages, boolean verification) {
     var source = new AnswerService.Source(1, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "T", "https://example.test/diagram.png", 0, "s", 1f, "Image: a diagram");
     return new AnswerService.Prepared(crateId, "What does the diagram show?", List.of(), "hybrid", List.of(source), "alice", false, true, true,
@@ -130,5 +136,73 @@ class AnswerServiceImagesTest {
 
     assertThat(result.text()).isEqualTo("The diagram shows three services.");
     assertThat(streamed.getFirst()).allSatisfy(m -> assertThat(m.images()).isEmpty());
+  }
+
+  // ---- returning pictures to the client
+
+  private void modelAnswers(String text) throws Exception {
+    doAnswer(i -> { streamed.add(i.getArgument(0)); ((Consumer<String>) i.getArgument(1)).accept(text); return null; })
+        .when(provider).stream(any(), any());
+  }
+
+  @Test
+  void aPictureThePlacedMarkerPointsToIsEmbeddedForClientsAndNeverInThePlainText() throws Exception {
+    modelAnswers("Here is the diagram:\n[[image:1]]\nIt has three services.");
+    var collector = mock(tech.wenisch.contextcrate.evaluation.EvaluationCollector.class);
+    service.setEvaluation(collector);
+
+    var result = service.generate(prepared(true, false, true));
+
+    assertThat(result.text()).isEqualTo("Here is the diagram:\n\nIt has three services.").doesNotContain("[[image");
+    String png = java.util.Base64.getEncoder().encodeToString(diagram.data());
+    assertThat(result.rendered()).contains("![Image from source 1](data:image/png;base64," + png + ")").doesNotContain("[[image");
+    // the model was told how to place a picture, and evaluation never receives picture data
+    assertThat(streamed.getFirst().get(0).content()).contains("[[image:n]]");
+    verify(collector).offer(any(), org.mockito.ArgumentMatchers.eq("Here is the diagram:\n\nIt has three services."));
+  }
+
+  @Test
+  void markersForUnknownOrRepeatedPicturesVanish() throws Exception {
+    modelAnswers("A [[image:1]] B [[image:1]] C [[image:7]] D");
+
+    var result = service.generate(prepared(true, false, true));
+
+    assertThat(result.text()).isEqualTo("A B C D");
+    assertThat(result.rendered()).startsWith("A\n![Image from source 1]").endsWith(")\n B C D").doesNotContain("[[image").doesNotContain("source 7");
+    assertThat(result.rendered().split("data:image/png", -1)).hasSize(2); // shown once
+  }
+
+  @Test
+  void withTheOptionOffTheModelIsNotToldAndStrayMarkersAreRemoved() throws Exception {
+    modelAnswers("Shown: [[image:1]] done");
+
+    var result = service.generate(prepared(true, false, false));
+
+    assertThat(streamed.getFirst().get(0).content()).doesNotContain("[[image");
+    assertThat(result.text()).isEqualTo("Shown: done");
+    assertThat(result.rendered()).isEqualTo("Shown: done").doesNotContain("data:");
+    assertThat(result.images()).isEmpty();
+  }
+
+  @Test
+  void withoutPicturesNothingIsEmbeddedEvenIfTheModelWritesAMarker() throws Exception {
+    when(imageService.imagesFor(any())).thenReturn(List.of());
+    modelAnswers("Look [[image:1]] here");
+
+    var result = service.generate(prepared(true, false, true));
+
+    assertThat(result.rendered()).isEqualTo("Look here");
+    assertThat(streamed.getFirst().get(0).content()).doesNotContain("[[image");
+  }
+
+  @Test
+  void whenTheModelRejectedThePicturesNoPictureIsEmbedded() throws Exception {
+    doAnswer(i -> { throw new IllegalStateException("HTTP 400"); })
+        .doAnswer(i -> { ((Consumer<String>) i.getArgument(1)).accept("Text only [[image:1]]"); return null; })
+        .when(provider).stream(any(), any());
+
+    var result = service.generate(prepared(true, false, true));
+
+    assertThat(result.rendered()).isEqualTo("Text only").doesNotContain("data:");
   }
 }

@@ -100,7 +100,7 @@ public class OpenAiChatCompletionsController {
     String model = configuredModel(crateId);
 
     if (!Boolean.TRUE.equals(request.stream())) {
-      String text = annotateCitations(generate(prepared), prepared.sources());
+      String text = answerText(prepared);
       return ResponseEntity.ok(completion(id, model, text, prepared));
     }
 
@@ -110,7 +110,7 @@ public class OpenAiChatCompletionsController {
           try {
             // The role arrives first so a client can render the assistant turn before content.
             send(emitter, chunk(id, model, new Delta("assistant", null), null));
-            String text = annotateCitations(generate(prepared), prepared.sources());
+            String text = answerText(prepared);
             send(emitter, chunk(id, model, new Delta(null, text), null));
             send(emitter, chunk(id, model, new Delta(null, null), "stop"));
             send(emitter, "[DONE]");
@@ -139,10 +139,15 @@ public class OpenAiChatCompletionsController {
    * ContextCrate answers are generated in full before they can be returned — answer verification
    * needs the complete text — so a streamed response carries the whole answer in one content chunk
    * rather than token by token. This is the same shape the native answers API already delivers.
+   *
+   * <p>The assistant message is the answer with citations, and the pictures the model placed in it as Markdown images with
+   * base64 data URLs (the form OpenAI-compatible chat clients render). Citations are annotated first, so the picture
+   * data never passes through the citation rewriting.
    */
-  private String generate(AnswerService.Prepared prepared) throws Exception {
-    if (prepared.strictGrounding() && prepared.sources().isEmpty()) { answers.declined(prepared); return NO_ANSWER; }
-    return answers.generate(prepared).text();
+  private String answerText(AnswerService.Prepared prepared) throws Exception {
+    if (prepared.strictGrounding() && prepared.sources().isEmpty()) { answers.declined(prepared); return annotateCitations(NO_ANSWER, prepared.sources()); }
+    var result = answers.generate(prepared);
+    return result.embedImages(annotateCitations(result.textWithMarkers(), prepared.sources()));
   }
 
   private String configuredModel(UUID crateId) {
