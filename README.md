@@ -50,7 +50,7 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 
 | Option | What it does |
 |---|---|
-| [Hybrid and fusion search](docs/features/retrieval.md) | BM25 keyword and semantic vector search, fused by rank (hybrid) or by weighted, normalized scores (fusion), plus optional cross-encoder [reranking](docs/reranking.md). |
+| [Hybrid and fusion search](docs/features/retrieval.md) | BM25 keyword and semantic vector search, fused by rank (hybrid) or by weighted, normalized scores (fusion), plus optional [reranking](docs/reranking.md): batched cross-encoder reranking (local ONNX or remote) or LLM based reranking. |
 | [Query transformation](docs/features/query-transformation.md) | Rewrites the question, asks a step-back question or splits it into sub-queries, chosen manually or automatically. |
 | [HyDE](docs/features/hyde.md) | Embeds an LLM-written hypothetical answer instead of the question to find the real chunks. |
 
