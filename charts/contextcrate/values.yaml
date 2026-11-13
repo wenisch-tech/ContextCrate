@@ -2,7 +2,7 @@ profile: standalone
 image:
   repository: ghcr.io/wenisch-tech/contextcrate
   browserRepository: ghcr.io/wenisch-tech/contextcrate-browser
-  tag: "1.11.0"
+  tag: "1.11.1"
   pullPolicy: IfNotPresent
 roles:
   all: {enabled: true, replicas: 1}
