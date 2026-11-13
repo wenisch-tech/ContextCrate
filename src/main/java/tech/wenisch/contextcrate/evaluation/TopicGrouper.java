@@ -17,7 +17,7 @@ import tech.wenisch.contextcrate.embedding.EmbeddingProvider;
 public class TopicGrouper {
   private static final Logger log = LoggerFactory.getLogger(TopicGrouper.class);
   /** Cosine similarity from which two topics count as the same question. */
-  static final double MERGE_THRESHOLD = 0.80;
+  static final double MERGE_THRESHOLD = 0.92;
   /** At most this many distinct topics are grouped; the rest stay on their own. */
   public static final int MAX_TOPICS = 300, MAX_JUDGE_TOPICS = 100;
 

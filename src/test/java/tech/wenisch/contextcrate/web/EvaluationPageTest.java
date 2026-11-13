@@ -148,7 +148,7 @@ class EvaluationPageTest {
     var print = new ConcurrentModel();
     controller.crate(crateId, print);
     var summary = new EvaluationAdminService.ReportSummary("People mostly ask about Docker.", List.of("Docker: 7x, faithfulness 0.80"), List.of("Passwords: 2x, faithfulness 0.30"),
-        List.of("Document password resets"), "judge-1", Instant.now());
+        List.of("Precision is low"), List.of("Password resets are missing"), List.of("Document password resets"), "judge-1", Instant.now());
     when(admin.summarize(eq(crateId), any())).thenReturn(summary);
     when(admin.summarizeGaps(eq(crateId), any())).thenReturn(new EvaluationAdminService.GapSummary("Key management is undocumented.",
         List.of("API keys: 3 questions"), List.of("No page on rotation"), List.of("Write a key rotation guide"), "judge-1", Instant.now()));

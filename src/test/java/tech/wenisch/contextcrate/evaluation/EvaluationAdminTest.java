@@ -250,14 +250,14 @@ class EvaluationAdminTest {
     var report = admin.report(crateId, now.minusSeconds(60), now.plusSeconds(60), true);
     judgeAvailable = true;
     judgeReply = "Sure: {\"overview\":\"  People asked about passwords. \",\"well\":[],\"poorly\":[\"Reset a password: faithfulness 0.40\"],"
-        + "\"suggestions\":[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"]}";
+        + "\"suggestions\":[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\",\"h\",\"i\",\"j\",\"k\"]}";
 
     var summary = admin.summarize(crateId, report);
     admin.summarize(crateId, report);
 
     assertThat(summary.overview()).isEqualTo("People asked about passwords.");
     assertThat(summary.poorly()).containsExactly("Reset a password: faithfulness 0.40");
-    assertThat(summary.suggestions()).hasSize(6);
+    assertThat(summary.suggestions()).hasSize(10);
     assertThat(summary.model()).isEqualTo("judge-model");
     assertThat(judgeCalls).hasSize(1); // the second call came from the cache
     assertThat(judgeCalls.get(0)).contains("Reset a password", "faithfulness 0.40").doesNotContain("secret question").doesNotContain("secret answer");

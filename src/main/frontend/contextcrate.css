@@ -387,6 +387,9 @@
 @layer components {
   .report-bar { height: .6rem; min-width: 2px; border-radius: .2rem; background: var(--color-brand-500); }
   .report-chart { height: 6rem; }
+  .report { font-size: 1.0625rem; }
+  .report .small, .report small, .report .table { font-size: .975rem; }
+  .report .metric-card strong { font-size: 1.5rem; }
   .report-glossary dt { margin-top: .75rem; font-weight: 600; color: var(--color-ink-100); }
   .report-glossary dd { margin: .15rem 0 0; max-width: 60rem; }
 }

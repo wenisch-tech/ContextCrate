@@ -26,7 +26,7 @@ import tech.wenisch.contextcrate.repository.EvaluationGoldenItemRepository;
  */
 @Service
 public class EvaluationAdminService {
-  public static final int MAX_REPORT_CASES = 5_000, MAX_REPORT_ROWS = 200, TOP_N = 15, TOP_TOPICS = 25;
+  public static final int MAX_REPORT_CASES = 5_000, MAX_REPORT_ROWS = 200, TOP_N = 15, TOP_TOPICS = 25, TOP_GAP_TOPICS = 10;
   public static final int MAX_GOLDEN_ITEMS = 200, MAX_CASES = 200, MAX_QUESTION = 2_000, MAX_REFERENCE = 8_000;
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -47,12 +47,19 @@ public class EvaluationAdminService {
   public record Ranked(String label, long count, Double faithfulness, Double answerRelevance, Double completeness, List<String> variants) {}
 
   /** Judge-written reading of the report's numbers. */
-  public record ReportSummary(String overview, List<String> well, List<String> poorly, List<String> suggestions, String model, Instant generatedAt) {}
+  public record ReportSummary(String overview, List<String> well, List<String> poorly, List<String> retrieval, List<String> gaps,
+      List<String> suggestions, String model, Instant generatedAt) {}
 
   /** The reporting page: everything for one crate and one time frame. {@code truncated} when more than MAX_REPORT_CASES matched. */
   public record Report(Instant from, Instant to, long questions, long failed, boolean truncated, Averages live, Averages golden,
       List<Day> trend, List<Ranked> topTopics, List<Ranked> topTags, List<CaseView> latest, long withTopic,
       String groupingMethod, ReportSummary summary, GapReport gaps, EvaluationIgnoreService.Summary ignored) {
+    /** The most asked topics that were answered well: grounded, relevant and complete (scores that were not recorded do not count against a topic). */
+    public List<Ranked> wellAnswered() {
+      return topTopics.stream().filter(t -> t.faithfulness() != null && t.faithfulness() >= 0.8
+          && (t.answerRelevance() == null || t.answerRelevance() >= 0.7) && (t.completeness() == null || t.completeness() >= 0.7))
+          .limit(TOP_GAP_TOPICS).toList();
+    }
     public Report withSummary(ReportSummary value) {
       return new Report(from, to, questions, failed, truncated, live, golden, trend, topTopics, topTags, latest, withTopic, groupingMethod, value, gaps, ignored);
     }
@@ -188,7 +195,7 @@ public class EvaluationAdminService {
     List<GapQuestion> latest = gapCases.stream().limit(MAX_REPORT_ROWS)
         .map(c -> new GapQuestion(c.getCreatedAt(), c.getAnswerStatus(), c.getGapReason(), c.getTopic(), readTags(c.getTags()), includeText ? c.getQuestion() : null)).toList();
     return new GapReport(tracked, unanswered, gapCases.size() - unanswered, noSources, notInSources,
-        topics.stream().limit(TOP_TOPICS).toList(), latest, null);
+        topics.stream().limit(TOP_GAP_TOPICS).toList(), latest, null);
   }
 
   private static List<Ranked> ranked(Map<String, List<EvaluationCase>> groups) {
@@ -202,7 +209,7 @@ public class EvaluationAdminService {
   // ------------------------------------------------------------------ summary
 
   private static final long SUMMARY_TTL_SECONDS = 3600;
-  private static final int SUMMARY_CACHE_SIZE = 100, MAX_ITEMS = 6, MAX_TEXT = 500;
+  private static final int SUMMARY_CACHE_SIZE = 100, MAX_ITEMS = 10, MAX_TEXT = 900;
   private record Cached(ReportSummary summary, Instant at) {}
   private final Map<String, Cached> summaries = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -221,8 +228,9 @@ public class EvaluationAdminService {
     if (cached != null && cached.at().plusSeconds(SUMMARY_TTL_SECONDS).isAfter(now)) return cached.summary();
     JsonNode node = JudgeProtocol.askJson(judge, crateId, JudgeProtocol.REPORT_SUMMARY, JudgeProtocol.textInput("DATA", input));
     var summary = new ReportSummary(text(node.path("overview").asText("")), items(node.path("well")), items(node.path("poorly")),
-        items(node.path("suggestions")), judge.model(crateId), now);
-    if (summary.overview().isEmpty() && summary.well().isEmpty() && summary.poorly().isEmpty() && summary.suggestions().isEmpty())
+        items(node.path("retrieval")), items(node.path("gaps")), items(node.path("suggestions")), judge.model(crateId), now);
+    if (summary.overview().isEmpty() && summary.well().isEmpty() && summary.poorly().isEmpty() && summary.retrieval().isEmpty()
+        && summary.gaps().isEmpty() && summary.suggestions().isEmpty())
       throw new IllegalStateException("The judge returned an empty summary");
     if (summaries.size() >= SUMMARY_CACHE_SIZE) summaries.clear();
     summaries.put(key, new Cached(summary, now));
@@ -288,6 +296,26 @@ public class EvaluationAdminService {
     b.append("Period: ").append(r.from()).append(" to ").append(r.to()).append(" (UTC)\n");
     b.append("Questions answered and evaluated: ").append(r.questions()).append(", of which with a stored topic: ").append(r.withTopic()).append('\n');
     b.append("Overall: ").append(scores(r.live().faithfulness(), r.live().answerRelevance(), r.live().completeness())).append('\n');
+    Averages l = r.live();
+    b.append("Retrieval quality (live answers): precision@K ").append(num(l.precisionAtK())).append(", recall@K ").append(num(l.recallAtK()))
+        .append(", MRR ").append(num(l.mrr())).append(", MAP ").append(num(l.map())).append(", NDCG ").append(num(l.ndcg())).append('\n');
+    if (r.golden() != null && r.golden().cases() > 0)
+      b.append("Golden set (").append(r.golden().cases()).append(" questions): ").append(scores(r.golden().faithfulness(), r.golden().answerRelevance(), r.golden().completeness()))
+          .append(", reference recall ").append(num(r.golden().referenceRecall())).append('\n');
+    b.append("Evaluations that failed (all time): ").append(r.failed()).append('\n');
+    if (!r.trend().isEmpty()) {
+      Day first = r.trend().get(0), last = r.trend().get(r.trend().size() - 1);
+      b.append("Trend: ").append(r.trend().size()).append(" days with data; faithfulness on ").append(first.day()).append(" ").append(num(first.averages().faithfulness()))
+          .append(" (").append(first.averages().cases()).append(" answers), on ").append(last.day()).append(" ").append(num(last.averages().faithfulness()))
+          .append(" (").append(last.averages().cases()).append(" answers)\n");
+    }
+    GapReport g = r.gaps();
+    if (g != null && g.tracked() > 0) {
+      b.append("Unanswered questions: ").append(g.unanswered()).append(" not answered and ").append(g.partial()).append(" partly answered of ").append(g.tracked())
+          .append(" assessed; nothing found ").append(g.noSources()).append(", not in documents ").append(g.notInSources()).append('\n');
+      for (GapTopic t : g.topics()) b.append("- gap: \"").append(t.label()).append("\" ").append(t.count()).append("x (nothing found ").append(t.noSources())
+          .append(", not in documents ").append(t.notInSources()).append(", partial ").append(t.partial()).append(")\n");
+    }
     b.append("Topics (grouped by meaning, most asked first):\n");
     for (Ranked t : r.topTopics()) b.append("- \"").append(t.label()).append("\" asked ").append(t.count()).append("x, ").append(scores(t.faithfulness(), t.answerRelevance(), t.completeness())).append('\n');
     b.append("Tags:\n");

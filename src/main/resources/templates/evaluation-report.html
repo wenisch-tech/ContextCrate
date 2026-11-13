@@ -48,6 +48,8 @@
       <p th:text="${report.summary.overview}"></p>
       <div th:if="${!report.summary.well.empty}"><strong>Worked well</strong><ul><li th:each="i:${report.summary.well}" th:text="${i}"></li></ul></div>
       <div th:if="${!report.summary.poorly.empty}"><strong>Needs attention</strong><ul><li th:each="i:${report.summary.poorly}" th:text="${i}"></li></ul></div>
+      <div th:if="${!report.summary.retrieval.empty}"><strong>Retrieval quality</strong><ul><li th:each="i:${report.summary.retrieval}" th:text="${i}"></li></ul></div>
+      <div th:if="${!report.summary.gaps.empty}"><strong>Knowledge gaps</strong><ul><li th:each="i:${report.summary.gaps}" th:text="${i}"></li></ul></div>
       <div th:if="${!report.summary.suggestions.empty}"><strong>Suggestions</strong><ul class="mb-0"><li th:each="i:${report.summary.suggestions}" th:text="${i}"></li></ul></div>
       <p class="text-secondary mt-2 mb-0">Written by <span th:text="${report.summary.model}"></span> on <span th:text="${#strings.substring(report.summary.generatedAt.toString(), 0, 16).replace('T', ' ')}"></span> UTC from the figures in this report. Check it against the tables.</p>
     </div>
@@ -80,7 +82,7 @@
       <p class="text-secondary mt-2 mb-0">Written by <span th:text="${report.gaps.summary.model}"></span> on <span th:text="${#strings.substring(report.gaps.summary.generatedAt.toString(), 0, 16).replace('T', ' ')}"></span> UTC from the topics below. Check it against the tables.</p>
     </div>
 
-    <h3 class="h6" th:if="${!report.gaps.topics.empty}">Topics without a good answer</h3>
+    <h3 class="h6" th:if="${!report.gaps.topics.empty}">Topics without a good answer <span class="text-secondary small fw-normal">(top <span th:text="${report.gaps.topics.size()}"></span>)</span></h3>
     <div class="card panel table-responsive mb-3" th:if="${!report.gaps.topics.empty}"><table class="table align-middle mb-0">
       <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Nothing found</th><th>Not in documents</th><th>Partly</th><th>Tags</th><th>Last asked (UTC)</th><th class="no-print" th:unless="${print}"></th></tr></thead>
       <tbody><tr th:each="t:${report.gaps.topics}">
@@ -162,6 +164,21 @@
             <input type="hidden" name="pattern" th:value="${t.label}"><input type="hidden" name="pattern" th:each="v:${t.variants}" th:value="${v}">
             <input type="hidden" name="back" th:value="${'/crates/' + crate.id + '/evaluation/report?range=custom&from=' + from + '&to=' + to}">
             <button class="btn btn-sm btn-outline-secondary" title="Hide this topic and its other wordings from the evaluation and the report">Ignore</button></form></td>
+      </tr></tbody></table></div>
+  </section>
+
+  <section class="mb-5" id="well" th:if="${!report.wellAnswered.empty}">
+    <h2 class="h5">Topics that were answered well</h2>
+    <p class="text-secondary small">The most asked topics with faithfulness of at least 0.80 and answer relevance and completeness of at least 0.70. These are what the knowledge base covers reliably.</p>
+    <div class="card panel table-responsive"><table class="table align-middle mb-0">
+      <thead><tr><th>Topic</th><th>Asked</th><th></th><th>Faith.</th><th>Ans. rel.</th><th>Compl.</th></tr></thead>
+      <tbody><tr th:each="t:${report.wellAnswered}">
+        <td><span th:text="${t.label}"></span><div class="small text-secondary" th:if="${!t.variants.empty}">also asked as: <span th:text="${#strings.listJoin(t.variants, '; ')}"></span></div></td>
+        <td th:text="${t.count}"></td>
+        <td style="width:20%"><div class="report-bar" th:style="|width:${t.count * 100 / report.wellAnswered[0].count}%|"></div></td>
+        <td th:text="${t.faithfulness == null ? '–' : #numbers.formatDecimal(t.faithfulness, 1, 2)}"></td>
+        <td th:text="${t.answerRelevance == null ? '–' : #numbers.formatDecimal(t.answerRelevance, 1, 2)}"></td>
+        <td th:text="${t.completeness == null ? '–' : #numbers.formatDecimal(t.completeness, 1, 2)}"></td>
       </tr></tbody></table></div>
   </section>
 

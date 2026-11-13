@@ -287,15 +287,16 @@ Every live question is classified:
 The section shows the counts and the share of assessed questions, the **topics without a good answer** (merged
 by meaning like the other topics, with how often they were asked, why they failed, their tags and when they were
 last asked), and the **latest unanswered questions** (the neutral topic, and the raw question while it is still
-stored). **Analyze gaps** asks the judge model for an analysis: which themes are missing, likely causes, and what
+stored). The list shows the **ten** most asked topics without a good answer. **Analyze gaps** asks the judge model for an analysis: which themes are missing, likely causes, and what
 to write or add next. It receives only the clustered topics with counts and reasons, no questions or answers, and
 is cached for an hour like the summary. The printable view includes it when it was generated
 (`&gaps=true` on the JSON endpoint). The classification is a judgement of the judge model, not proof that the
 documents lack the content: check the listed topics before writing new documentation.
 
 **Generate summary** asks the judge model to read the figures of the report and write what people
-searched for, which topics were answered well, which were not, and what to improve. The judge
-receives only aggregated numbers, the topic wordings and the tags - no questions or answers. The
+searched for, which topics were answered well, which were not, what the retrieval metrics say, what the
+unanswered questions reveal and what to improve (up to ten points per list). The judge
+receives only aggregated numbers (including retrieval metrics, trend and gap counts), the topic wordings and the tags - no questions or answers. The
 summary is kept for an hour per timeframe, so reloading or opening the printable view does not ask
 again; the printable view includes it when it was generated. Check it against the tables; topics with
 fewer than three answers are marked as too few to judge. The report covers at most 5000 answers; for longer
