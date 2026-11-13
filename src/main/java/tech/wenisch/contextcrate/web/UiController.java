@@ -758,6 +758,7 @@ public class UiController {
       @RequestParam(required=false) String rerankingBaseUrl, @RequestParam(required=false) String rerankingRemoteModel,
       @RequestParam(required=false) String rerankingApiKey, @RequestParam int rerankingMaxInputCharacters,
       @RequestParam int rerankingTimeoutSeconds,
+      @RequestParam(defaultValue="false") boolean llmRerankEnabled, @RequestParam(defaultValue="4") int llmRerankTopN,
       @RequestParam(defaultValue="false") boolean answeringEnabled, @RequestParam(required=false) String answeringBaseUrl,
       @RequestParam(required=false) String answeringModel, @RequestParam(required=false) String answeringApiKey,
       @RequestParam(required=false) String answeringSharedModelId) {
@@ -766,6 +767,7 @@ public class UiController {
     String embeddingSharedModelId=sharedId(embeddingProvider),rerankingSharedModelId=sharedId(rerankingProvider);
     if(embeddingSharedModelId!=null)embeddingProvider="openai-compatible";
     if(rerankingSharedModelId!=null)rerankingProvider="cohere-compatible";
+    ragSettings.updateLlmRerank(crateId,llmRerankEnabled,llmRerankTopN);
     var previous = providerSettings.effectiveEmbedding(crateId);var previousAnswer=providerSettings.effectiveAnswer(crateId);
     providerSettings.update(crateId,new RuntimeProviderSettings.ProviderForm(embeddingsEnabled,embeddingProvider,embeddingModelId,embeddingRevision,embeddingDownloadUrl,embeddingCachePath,embeddingModelPath,embeddingBaseUrl,embeddingRemoteModel,embeddingApiKey,embeddingDimensions,embeddingMaxInputCharacters,embeddingAutomaticLimitRecovery,rerankingEnabled,rerankingProvider,rerankingCandidateLimit,rerankingModelId,rerankingRevision,rerankingDownloadUrl,rerankingCachePath,rerankingModelPath,rerankingBaseUrl,rerankingRemoteModel,rerankingApiKey,rerankingMaxInputCharacters,rerankingTimeoutSeconds,answeringEnabled,answeringBaseUrl,answeringModel,answeringApiKey,embeddingSharedModelId,rerankingSharedModelId,answeringSharedModelId));
     if (!previous.toString().equals(providerSettings.effectiveEmbedding(crateId).toString())||(("proposition".equals(ragSettings.current(crateId).getRetrievalStrategy())||ragSettings.current(crateId).isEnrichmentEnabled()||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(ragSettings.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providerSettings.effectiveAnswer(crateId).toString())))

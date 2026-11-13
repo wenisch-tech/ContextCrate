@@ -53,6 +53,7 @@ public class RagSettingsService {
     var value=current(crateId);value.updateFusionVectorWeight(vectorWeight);return settings.save(value);}
   @Transactional public RagSettings updateIncludeImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateIncludeImages(enabled);return settings.save(value);}
   @Transactional public RagSettings updateSendImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateSendImages(enabled);return settings.save(value);}
+  @Transactional public RagSettings updateLlmRerank(java.util.UUID crateId,boolean enabled,int topN){var value=current(crateId);value.updateLlmRerank(enabled,topN);return settings.save(value);}
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);

@@ -342,6 +342,7 @@ public class CratePortableService {
     rag.update(crateId,r.path("strictGrounding").asBoolean(),r.path("allowClientHistory").asBoolean(),r.path("inlineCitations").asBoolean(),r.path("structuredSources").asBoolean(),!r.has("gradingEnabled")||r.path("gradingEnabled").asBoolean(),!r.has("answerVerificationEnabled")||r.path("answerVerificationEnabled").asBoolean(),textOr(r,"answerVerificationFailureAction","revise-once"),text(r,"retrievalMode"),textOr(r,"retrievalStrategy","standard"),textOr(r,"propositionFailurePolicy","fail-indexing"),r.path("sourceLimit").asInt());
     rag.updateFusion(crateId,r.path("fusionVectorWeight").asDouble(0.5));
     rag.updateHyde(crateId,r.path("hydeEnabled").asBoolean(false));
+    rag.updateLlmRerank(crateId,r.path("llmRerankEnabled").asBoolean(false),r.path("llmRerankTopN").asInt(4));
     rag.updateContextWindow(crateId,r.path("contextWindow").asInt(0));
     rag.updateEnrichment(crateId,r.path("enrichmentEnabled").asBoolean(false),r.path("enrichmentQuestions").asInt(RagSettingsService.DEFAULT_ENRICHMENT_QUESTIONS));
     rag.updateSystemPrompt(crateId,r.path("systemPrompt").isNull()||r.path("systemPrompt").isMissingNode()?null:r.path("systemPrompt").asText());

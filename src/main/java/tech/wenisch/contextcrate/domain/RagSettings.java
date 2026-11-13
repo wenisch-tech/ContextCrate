@@ -35,6 +35,11 @@ public class RagSettings {
   /** Instructions of the crate owner for the answer model; applied only while the administrator allows crate system prompts. */
   @Column(name="system_prompt",columnDefinition="text") private String systemPrompt;
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
+  /** LLM based reranking: the answer model rates every retrieved candidate from 1 to 10; the best llmRerankTopN are kept. */
+  @Column(name="llm_rerank_enabled",nullable=false) private boolean llmRerankEnabled;
+  @Column(name="llm_rerank_top_n",nullable=false) private int llmRerankTopN=4;
+  public boolean isLlmRerankEnabled(){return llmRerankEnabled;} public int getLlmRerankTopN(){return llmRerankTopN;}
+  public void updateLlmRerank(boolean enabled,int topN){this.llmRerankEnabled=enabled;this.llmRerankTopN=Math.max(1,Math.min(topN,20));}
   /** Retrieval mode "fusion": weight of the vector leg (0 to 1); the keyword leg gets the rest. */
   @Column(name="fusion_vector_weight",nullable=false) private double fusionVectorWeight=0.5;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;
