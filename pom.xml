@@ -18,13 +18,13 @@
         <thymeleaf.version>3.1.6.RELEASE</thymeleaf.version>
         <commons-codec.version>1.23.0</commons-codec.version>
         <commonmark.version>0.32.0</commonmark.version>
-        <treesitter.version>0.25.3</treesitter.version>
+        <treesitter.version>0.26.6</treesitter.version>
         <jsoup.version>1.24.1</jsoup.version>
         <lucene.version>10.6.0</lucene.version>
-        <playwright.version>1.64.0</playwright.version>
-        <aws.version>2.57.13</aws.version>
+        <playwright.version>1.65.0</playwright.version>
+        <aws.version>2.59.1</aws.version>
         <springdoc.version>3.2.0</springdoc.version>
-        <onnxruntime.version>1.31.1</onnxruntime.version>
+        <onnxruntime.version>1.32.0</onnxruntime.version>
         <djl.version>0.40.0</djl.version>
         <jgit.version>7.8.1.202611041320-r</jgit.version>
         <mockito.version>5.24.0</mockito.version>
@@ -34,8 +34,8 @@
         <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
         <!-- Overrides spring-boot-dependencies' tomcat.version (11.0.24). -->
         <tomcat.version>11.0.27</tomcat.version>
-        <mcp.version>2.0.1</mcp.version>
-        <mcp.sdk.version>2.1.0</mcp.sdk.version>
+        <mcp.version>2.0.2</mcp.version>
+        <mcp.sdk.version>2.2.0</mcp.sdk.version>
         <jackson-bom.version>3.2.4</jackson-bom.version>
         <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
         <netty.version>4.2.20.Final</netty.version>
@@ -77,16 +77,16 @@
         <!-- Syntax-aware code chunking. Prebuilt natives (libc only); guarded by a line-based fallback. -->
         <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter</artifactId><version>${treesitter.version}</version></dependency>
         <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-java</artifactId><version>0.23.5</version></dependency>
-        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-python</artifactId><version>0.23.4</version></dependency>
-        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-javascript</artifactId><version>0.23.1</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-python</artifactId><version>0.25.0</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-javascript</artifactId><version>0.25.0</version></dependency>
         <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-typescript</artifactId><version>0.23.2</version></dependency>
-        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-go</artifactId><version>0.23.3</version></dependency>
-        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-rust</artifactId><version>0.23.1</version></dependency>
-        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-c</artifactId><version>0.23.2</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-go</artifactId><version>0.25.0</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-rust</artifactId><version>0.24.0</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-c</artifactId><version>0.24.1</version></dependency>
         <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-cpp</artifactId><version>0.23.4</version></dependency>
         <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-c-sharp</artifactId><version>0.23.1</version></dependency>
         <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-ruby</artifactId><version>0.23.1</version></dependency>
-        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-bash</artifactId><version>0.23.3</version></dependency>
+        <dependency><groupId>io.github.bonede</groupId><artifactId>tree-sitter-bash</artifactId><version>0.25.1</version></dependency>
         <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><version>${jgit.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-core</artifactId><version>${lucene.version}</version></dependency>
         <dependency><groupId>org.apache.lucene</groupId><artifactId>lucene-analysis-common</artifactId><version>${lucene.version}</version></dependency>
