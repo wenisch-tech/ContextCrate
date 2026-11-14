@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
-        with: { node-version: '22', cache: npm, cache-dependency-path: docs-site/package-lock.json }
+        with: { node-version: '26', cache: npm, cache-dependency-path: docs-site/package-lock.json }
       - name: Install
         working-directory: docs-site
         run: npm ci
