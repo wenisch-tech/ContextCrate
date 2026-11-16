@@ -40,6 +40,22 @@ class RetrievalPreparationServiceTest {
     new RetrievalPreparationService(settings,mock(PropositionService.class),headers).prepare(crateId,mock(NormalizedDocument.class),List.of(chunk));
     verifyNoInteractions(headers);
   }
+  @Test void captionsAddOneRecordPerTableNextToTheChunkRecordOnlyWhenEnabled(){
+    var crateId=UUID.randomUUID();var settings=mock(RagSettingsService.class);var captions=mock(CaptionService.class);
+    var rag=new RagSettings(crateId,false,true,true,true,true,true,"revise-once","hybrid","standard","fail-indexing",8);
+    when(settings.current(crateId)).thenReturn(rag);
+    var table="Plan | Price\nFree | 0\nPro | 20";
+    var chunk=new DocumentChunk(UUID.randomUUID(),UUID.randomUUID(),3,"Pricing",table,Hashing.sha256(table));chunk.assignCrate(crateId);
+    when(captions.captionsFor(crateId,List.of(chunk))).thenReturn(java.util.Map.of(chunk.getId(),new CaptionService.Caption("table","Compares plan prices.")));
+    var service=new RetrievalPreparationService(settings,mock(PropositionService.class));service.setCaptionService(captions);
+    assertThat(service.prepare(crateId,List.of(chunk))).singleElement();
+    verifyNoInteractions(captions);
+    rag.updateCaptions(true);
+    assertThat(service.prepare(crateId,List.of(chunk))).hasSize(2).satisfiesExactly(
+      r->{assertThat(r.type()).isEqualTo("chunk");assertThat(r.retrievalText()).isEqualTo(table);},
+      r->{assertThat(r.type()).isEqualTo("caption");assertThat(r.chunkId()).isEqualTo(chunk.getId());assertThat(r.ordinal()).isEqualTo(3);assertThat(r.heading()).isEqualTo("Pricing");
+        assertThat(r.retrievalText()).isEqualTo("Table caption: Compares plan prices.");assertThat(r.sourceContent()).isEqualTo(table);assertThat(r.isQuestion()).isFalse();});
+  }
   private static class Fixture{final UUID crateId=UUID.randomUUID();final DocumentChunk chunk=new DocumentChunk(UUID.randomUUID(),UUID.randomUUID(),0,null,"Source chunk",Hashing.sha256("Source chunk"));final RagSettingsService settings=mock(RagSettingsService.class);final PropositionService propositions=mock(PropositionService.class);final RetrievalPreparationService service=new RetrievalPreparationService(settings,propositions);Fixture(String policy){chunk.assignCrate(crateId);when(settings.current(crateId)).thenReturn(new RagSettings(crateId,false,true,true,true,true,true,"revise-once","hybrid","proposition",policy,8));var evaluation=new PropositionEvaluation(UUID.randomUUID(),crateId,chunk.getId(),chunk.getContentHash(),"fingerprint","model","failed","offline");when(propositions.evaluate(chunk)).thenReturn(new PropositionService.Outcome(evaluation,List.of(),false));}}
   @Test void enrichmentAddsOneQuestionRecordPerQuestionNextToTheChunkRecord(){
     var crateId=UUID.randomUUID();var settings=mock(RagSettingsService.class);var questions=mock(QuestionGenerationService.class);

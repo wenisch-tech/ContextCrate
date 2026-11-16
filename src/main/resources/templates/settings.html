@@ -25,6 +25,7 @@
       <a href="#context-window" :class="{'active':active==='context-window'}">Context window</a>
       <a href="#context-compression" :class="{'active':active==='context-compression'}">Context compression</a>
       <a href="#enrichment" :class="{'active':active==='enrichment'}">Document enrichment</a>
+      <a href="#captions" :class="{'active':active==='captions'}">Captions</a>
       <a href="#grounding" :class="{'active':active==='grounding'}">Grounding &amp; citations</a>
       <a href="#quality" :class="{'active':active==='quality'}">Answer quality</a>
       <a href="#system-prompt" :class="{'active':active==='system-prompt'}" th:if="${systemPrompt != null}">System prompt</a>
@@ -154,6 +155,11 @@
         <section id="enrichment" class="panel scroll-mt-24">
           <div class="panel-header"><div><h2 class="settings-title">Document enrichment</h2><p class="settings-hint">After chunking, the answer model writes questions that each chunk answers. The questions are embedded and indexed next to the chunk and point back at it. A user question is then compared with questions, which look like it, as well as with passages; when a generated question is the nearest match, the chunk it belongs to is retrieved and used as context. The mirror image of HyDE.</p></div><label class="switch-labelled" for="enrichment-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="enrichment-enabled" name="enrichmentEnabled" th:checked="${rag.enrichmentEnabled}"><span></span></span></label></div>
           <div class="panel-body"><div class="field"><label class="field-label" for="enrichment-questions">Questions per chunk</label><input class="input" id="enrichment-questions" type="number" name="enrichmentQuestions" min="3" max="50" step="1" th:value="${rag.enrichmentQuestions}"><p class="field-help">3 to 50, default 5. More questions cover more ways to ask but make ingestion slower and the index larger. Costs one model call per chunk and one embedding per question. Changing this setting rebuilds the index in the background (questions of unchanged chunks with the same count are reused, so only new chunks call the model). If the model cannot be reached, a chunk is indexed without questions and tried again on the next rebuild.</p></div></div>
+        </section>
+
+        <section id="captions" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Captions for tables and diagrams</h2><p class="settings-hint">Before indexing, the answer model writes a short caption for every table and every diagram given as code (Mermaid, PlantUML, Graphviz). The caption is embedded and indexed next to the chunk and points back at it, so a question in plain words finds a table of numbers or a diagram's source; the answer still uses the real table or diagram and its source. Pictures are captioned by the vision model under Images.</p></div><label class="switch-labelled" for="captions-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="captions-enabled" name="captionsEnabled" th:checked="${rag.captionsEnabled}"><span></span></span></label></div>
+          <div class="panel-body"><p class="field-help">Costs one answer-model call per table or diagram (up to 6,000 characters of it are sent to the answer provider); captions of unchanged chunks are reused. Changing this setting rebuilds the index in the background. If the model cannot be reached, a chunk is indexed without caption and tried again on the next rebuild.</p></div>
         </section>
 
         <section id="hyde" class="panel scroll-mt-24">

@@ -45,6 +45,8 @@ public class CrateSettingsApiController {
           r.dartboardDiversityWeight()==null?current.getDartboardDiversityWeight():r.dartboardDiversityWeight(),
           r.dartboardSigma()==null?current.getDartboardSigma():r.dartboardSigma());
     }
+    boolean captionsChanged=false;
+    if(r.captionsEnabled()!=null){updated=rag.updateCaptions(crateId,r.captionsEnabled());captionsChanged=r.captionsEnabled()!=current.isCaptionsEnabled();}
     boolean hierarchicalChanged=false;
     if(r.hierarchicalEnabled()!=null||r.hierarchicalTopK()!=null){
       boolean on=r.hierarchicalEnabled()==null?current.isHierarchicalEnabled():r.hierarchicalEnabled();
@@ -74,7 +76,7 @@ public class CrateSettingsApiController {
     }
     if(r.sendImagesToModel()!=null)updated=rag.updateSendImages(crateId,r.sendImagesToModel());
     if(r.includeImagesInAnswer()!=null)updated=rag.updateIncludeImages(crateId,r.includeImagesInAnswer());
-    if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy)||headerChanged||enrichmentChanged||hierarchicalChanged)rebuild.rebuildAsync(crateId);return updated;
+    if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy)||headerChanged||enrichmentChanged||hierarchicalChanged||captionsChanged)rebuild.rebuildAsync(crateId);return updated;
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
     access.requireMutable(crateId,CrateMember.Role.OWNER);
@@ -91,12 +93,12 @@ public class CrateSettingsApiController {
     access.require(crateId,CrateMember.Role.OWNER);
     var previous=providers.effectiveEmbedding(crateId);var previousAnswer=providers.effectiveAnswer(crateId);providers.update(crateId,form);
     var current=providers.effectiveEmbedding(crateId);
-    if(!previous.toString().equals(current.toString())||(("proposition".equals(rag.current(crateId).getRetrievalStrategy())||rag.current(crateId).isEnrichmentEnabled()||rag.current(crateId).isHierarchicalEnabled()||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(rag.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providers.effectiveAnswer(crateId).toString())))rebuild.rebuildAsync(crateId);
+    if(!previous.toString().equals(current.toString())||(("proposition".equals(rag.current(crateId).getRetrievalStrategy())||rag.current(crateId).isEnrichmentEnabled()||rag.current(crateId).isHierarchicalEnabled()||rag.current(crateId).isCaptionsEnabled()||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(rag.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providers.effectiveAnswer(crateId).toString())))rebuild.rebuildAsync(crateId);
     return providers(crateId);
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
       boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Boolean enrichmentEnabled,Integer enrichmentQuestions,Integer contextWindow,Boolean contextCompression,String contextHeaderVariant,Integer contextHeaderWords,
-      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK,Boolean dartboardEnabled,Integer dartboardOversampling,Double dartboardRelevanceWeight,Double dartboardDiversityWeight,Double dartboardSigma){}
+      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK,Boolean dartboardEnabled,Integer dartboardOversampling,Double dartboardRelevanceWeight,Double dartboardDiversityWeight,Double dartboardSigma,Boolean captionsEnabled){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

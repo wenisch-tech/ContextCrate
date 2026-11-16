@@ -51,10 +51,15 @@ public class HierarchicalRetrievalService {
       for (var hit : hits) sectionIds.add(hit.id());
       if (sectionIds.isEmpty()) { metrics.count("answer.hierarchical", crateId, "outcome", "no-summary"); return null; }
       Set<UUID> chunkIds = new HashSet<>();
-      for (var section : sections.findByCrateIdAndIdIn(crateId, sectionIds))
+      for (var section : sections.findByCrateIdAndIdIn(crateId, sectionIds)) {
         for (var chunk : chunks.findByDocumentIdAndCrateIdAndOrdinalBetweenOrderByOrdinal(
             section.getDocumentId(), crateId, section.getFirstOrdinal(), section.getLastOrdinal()))
           chunkIds.add(chunk.getId());
+        // Image descriptions are stored after the text; they belong to the section whose text holds the image.
+        for (var picture : chunks.findByDocumentIdAndCrateIdAndAnchorOrdinalBetweenOrderByOrdinal(
+            section.getDocumentId(), crateId, section.getFirstOrdinal(), section.getLastOrdinal()))
+          chunkIds.add(picture.getId());
+      }
       if (chunkIds.isEmpty()) { metrics.count("answer.hierarchical", crateId, "outcome", "no-chunks"); return null; }
       metrics.count("answer.hierarchical", crateId, "outcome", "applied");
       metrics.summary("answer.hierarchical.sections", crateId, sectionIds.size());

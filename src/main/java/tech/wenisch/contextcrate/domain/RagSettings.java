@@ -53,6 +53,9 @@ public class RagSettings {
   @Column(name="dartboard_sigma",nullable=false) private double dartboardSigma=0.1;
   public boolean isDartboardEnabled(){return dartboardEnabled;} public int getDartboardOversampling(){return dartboardOversampling;} public double getDartboardRelevanceWeight(){return dartboardRelevanceWeight;} public double getDartboardDiversityWeight(){return dartboardDiversityWeight;} public double getDartboardSigma(){return dartboardSigma;}
   public void updateDartboard(boolean enabled,int oversampling,double relevanceWeight,double diversityWeight,double sigma){this.dartboardEnabled=enabled;this.dartboardOversampling=oversampling;this.dartboardRelevanceWeight=relevanceWeight;this.dartboardDiversityWeight=diversityWeight;this.dartboardSigma=sigma;}
+  /** Captions: the answer model describes tables and diagram code; the caption is indexed next to the chunk. */
+  @Column(name="captions_enabled",nullable=false) private boolean captionsEnabled;
+  public boolean isCaptionsEnabled(){return captionsEnabled;} public void updateCaptions(boolean enabled){this.captionsEnabled=enabled;}
   /** Retrieval mode "fusion": weight of the vector leg (0 to 1); the keyword leg gets the rest. */
   @Column(name="fusion_vector_weight",nullable=false) private double fusionVectorWeight=0.5;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;

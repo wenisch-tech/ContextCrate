@@ -42,7 +42,7 @@ All text is normalised to Unicode NFC. Line endings are converted to `\n`.
 |---|---|
 | `h1` to `h6` | Section boundary; the heading path for everything below |
 | `pre` (with or without `code`) | A **code block**. Line breaks and indentation are kept exactly. |
-| `table` | One block of `cell | cell` rows, kept together |
+| `table` | One block of `cell | cell` rows, kept together; can get a [caption](multimodal-captions.md) |
 | `ul`, `ol` | One block of `- item` lines, nested lists indented |
 | `p`, `blockquote`, other text | Prose blocks with whitespace collapsed |
 | `img`, `picture`, `figure`/`figcaption`, inline `svg` | An **image reference** (alt text, caption and address) when image indexing is on; see [Images](images.md) |

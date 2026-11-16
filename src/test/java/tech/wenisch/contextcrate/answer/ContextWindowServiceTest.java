@@ -1,6 +1,7 @@
 package tech.wenisch.contextcrate.answer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -36,6 +37,86 @@ class ContextWindowServiceTest {
   private ContextWindowService.Anchor anchor(List<DocumentChunk> chunks, int index) {
     var c = chunks.get(index);
     return new ContextWindowService.Anchor(c.getId(), c.getDocumentId(), c.getOrdinal());
+  }
+
+  /** The caption of an image that sits in chunk 4 is stored after the text, as chunk 10. */
+  private DocumentChunk pictureAt(List<DocumentChunk> doc, int anchorOrdinal) {
+    var picture = new DocumentChunk(UUID.nameUUIDFromBytes("picture".getBytes()), doc.get(0).getDocumentId(), doc.size(), null, "Image: Architecture\nA diagram of the pipeline.", Hashing.sha256("img"));
+    picture.assignCrate(crateId);
+    picture.describe("image", null, null, null, null).anchoredAt(anchorOrdinal);
+    doc.add(picture);
+    when(repository.findAllById(any())).thenAnswer(i -> doc.stream().filter(c -> ((Iterable<UUID>) i.getArgument(0)).iterator().hasNext() && contains(i.getArgument(0), c.getId())).toList());
+    return picture;
+  }
+
+  private static boolean contains(Iterable<UUID> ids, UUID id) {
+    for (UUID candidate : ids) if (candidate.equals(id)) return true;
+    return false;
+  }
+
+  @Test
+  void aMatchedImageDescriptionGetsTheTextAroundItsImageAsNeighbours() {
+    var doc = document(UUID.randomUUID(), 10);
+    var picture = pictureAt(doc, 4);
+
+    var windows = service.expand(crateId, List.of(new ContextWindowService.Anchor(picture.getId(), picture.getDocumentId(), picture.getOrdinal())), 1);
+
+    assertThat(windows).singleElement().satisfies(w -> {
+      assertThat(w.from()).isEqualTo(3);
+      assertThat(w.to()).isEqualTo(5);
+      assertThat(w.chunks()).isEqualTo(4);
+      assertThat(w.added()).isEqualTo(3);
+      assertThat(w.text()).isEqualTo("chunk-3\n\nchunk-4\n\nchunk-5\n\nImage: Architecture\nA diagram of the pipeline.");
+      assertThat(w.chunkIds()).contains(picture.getId());
+    });
+  }
+
+  @Test
+  void anImageDescriptionAndATextChunkInTheSamePlaceShareOneWindow() {
+    var doc = document(UUID.randomUUID(), 10);
+    var picture = pictureAt(doc, 4);
+
+    var windows = service.expand(crateId, List.of(anchor(doc, 5), new ContextWindowService.Anchor(picture.getId(), picture.getDocumentId(), picture.getOrdinal())), 1);
+
+    assertThat(windows).singleElement().satisfies(w -> {
+      assertThat(w.from()).isEqualTo(3);
+      assertThat(w.to()).isEqualTo(6);
+      assertThat(w.text()).startsWith("chunk-3\n\nchunk-4\n\nchunk-5\n\nchunk-6").endsWith("A diagram of the pipeline.");
+    });
+  }
+
+  @Test
+  void anUnmatchedImageDescriptionIsNotPartOfAnotherWindow() {
+    var doc = document(UUID.randomUUID(), 10);
+    pictureAt(doc, 4);
+
+    assertThat(service.expand(crateId, List.of(anchor(doc, 4)), 1).getFirst().text()).isEqualTo("chunk-3\n\nchunk-4\n\nchunk-5");
+    // the end of the document no longer drags the description in
+    assertThat(service.expand(crateId, List.of(anchor(doc, 9)), 2).getFirst().text()).isEqualTo("chunk-7\n\nchunk-8\n\nchunk-9");
+  }
+
+  @Test
+  void fetchingAnImageDescriptionReturnsTheTextAroundItsImage() {
+    var doc = document(UUID.randomUUID(), 10);
+    var picture = pictureAt(doc, 4);
+
+    var fetched = service.fetch(crateId, picture.getDocumentId(), picture.getOrdinal(), 1, 1);
+
+    assertThat(fetched.from()).isEqualTo(3);
+    assertThat(fetched.to()).isEqualTo(5);
+    assertThat(fetched.text()).isEqualTo("chunk-3\n\nchunk-4\n\nchunk-5\n\nImage: Architecture\nA diagram of the pipeline.");
+  }
+
+  @Test
+  void anImageDescriptionWithoutAnAnchorKeepsItsOwnPlace() {
+    var doc = document(UUID.randomUUID(), 10);
+    var picture = pictureAt(doc, 4);
+    picture.anchoredAt(null);
+
+    var w = service.expand(crateId, List.of(new ContextWindowService.Anchor(picture.getId(), picture.getDocumentId(), picture.getOrdinal())), 1).getFirst();
+
+    assertThat(w.from()).isEqualTo(9);
+    assertThat(w.text()).contains("chunk-9").endsWith("A diagram of the pipeline.");
   }
 
   @Test

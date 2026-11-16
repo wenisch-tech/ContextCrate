@@ -381,7 +381,7 @@ public class PgVectorSearchIndex implements SearchIndex {
     boolean first = true;
     for (Found f : found) {
       boolean chunk = !f.kind().equals("document");
-      boolean question = chunk && "question".equals(f.recordType());
+      boolean question = chunk && ChunkRetrievalRecord.isAlias(f.recordType());
       UUID id = chunk ? f.chunkId() : f.documentId();
       String retrieval = f.text() == null ? "" : f.text();
       String source = chunk && f.sourceText() != null ? f.sourceText() : retrieval;

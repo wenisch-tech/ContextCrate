@@ -313,7 +313,7 @@ public class QdrantSearchIndex implements SearchIndex {
     String retrieval = s.path("text").asText("");
     String source = chunk ? s.path("source_text").asText(retrieval) : retrieval;
     // A generated question is only a way to find its chunk: snippet, reranking and answer use the chunk text.
-    if (chunk && "question".equals(s.path("record_type").asText(""))) retrieval = source;
+    if (chunk && ChunkRetrievalRecord.isAlias(s.path("record_type").asText(""))) retrieval = source;
     float score = (float) point.path("score").asDouble();
     return new SearchHit(id, document, UUID.fromString(s.path("run_id").asText()), kind, s.path("title").asText(null), s.path("url").asText(null),
         chunk ? s.path("ordinal").asInt() : null, SearchSnippets.snippet(retrieval, query), score, lexical ? score : null, lexical ? null : score, null, source, retrieval);

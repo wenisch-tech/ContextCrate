@@ -193,6 +193,25 @@ public class ImageDescriptionWorker {
     return content.asText();
   }
 
+  /**
+   * The ordinal of the text chunk that contains the image: the chunk with the image's reference line, else the last text chunk
+   * under the heading where the image appeared. {@code null} when neither is found (the caption then has no known position).
+   */
+  static Integer anchorOf(List<DocumentChunk> chunks, DocumentImage image) {
+    for (String url : new String[] {image.getUrl(), image.getViewUrl()}) {
+      if (url == null || url.isBlank()) continue;
+      for (DocumentChunk c : chunks)
+        if (!"image".equals(c.getKind()) && c.getContent() != null && c.getContent().contains("(" + url + ")")) return c.getOrdinal();
+    }
+    String heading = image.getHeading();
+    if (heading != null && !heading.isBlank()) {
+      Integer found = null;
+      for (DocumentChunk c : chunks) if (!"image".equals(c.getKind()) && heading.strip().equals(c.getHeading() == null ? null : c.getHeading().strip())) found = c.getOrdinal();
+      return found;
+    }
+    return null;
+  }
+
   private void addChunk(DocumentImage image, String description) {
     NormalizedDocument document = documents.findById(image.getDocumentId()).orElse(null);
     if (document == null) return;
@@ -205,6 +224,7 @@ public class ImageDescriptionWorker {
         UUID.nameUUIDFromBytes(("chunk:" + document.getId() + ":" + ordinal).getBytes(StandardCharsets.UTF_8)),
         document.getId(), ordinal, image.getHeading(), content, Hashing.sha256(content));
     chunk.assignCrate(document.getCrateId());
+    chunk.anchoredAt(anchorOf(existing, image));
     chunk.describe("image", null, null, null, null).media(image.getViewUrl() != null ? image.getViewUrl() : image.getUrl());
     chunks.save(chunk);
     queue.publish(PipelineMessage.create(document.getCrateId(), WorkStage.INDEX,

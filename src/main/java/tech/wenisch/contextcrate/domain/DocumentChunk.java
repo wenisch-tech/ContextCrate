@@ -60,6 +60,28 @@ public class DocumentChunk {
   @Column(name = "overlap_chars")
   private Integer overlapChars;
 
+  /**
+   * For the caption chunk of an image: the ordinal of the text chunk that contains the image. The caption chunk itself is
+   * stored after the text of the document; this is where it belongs. {@code null} for every other chunk.
+   */
+  @Column(name = "anchor_ordinal")
+  private Integer anchorOrdinal;
+
+  public Integer getAnchorOrdinal() {
+    return anchorOrdinal;
+  }
+
+  public DocumentChunk anchoredAt(Integer ordinal) {
+    this.anchorOrdinal = ordinal;
+    return this;
+  }
+
+  /** The place of the chunk in the running text of its document: the anchor of an image caption, else its own ordinal. */
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public int position() {
+    return anchorOrdinal != null ? anchorOrdinal : ordinal;
+  }
+
   public Integer getOverlapChars() {
     return overlapChars;
   }

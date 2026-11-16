@@ -45,8 +45,9 @@ public class SectionSummaryService {
 
   /** Consecutive chunks of one document that share a section heading. */
   public record Section(UUID id, String heading, List<DocumentChunk> chunks) {
-    public int firstOrdinal() { return chunks.getFirst().getOrdinal(); }
-    public int lastOrdinal() { return chunks.getLast().getOrdinal(); }
+    /** First and last place in the running text; the caption chunk of an image counts where its image sits. */
+    public int firstOrdinal() { return chunks.stream().mapToInt(DocumentChunk::position).min().orElse(0); }
+    public int lastOrdinal() { return chunks.stream().mapToInt(DocumentChunk::position).max().orElse(0); }
     Integer startLine() { return chunks.stream().map(DocumentChunk::getStartLine).filter(Objects::nonNull).min(Integer::compare).orElse(null); }
     Integer endLine() { return chunks.stream().map(DocumentChunk::getEndLine).filter(Objects::nonNull).max(Integer::compare).orElse(null); }
     String text() {
@@ -81,8 +82,14 @@ public class SectionSummaryService {
     List<Section> out = new ArrayList<>();
     Map<String, Integer> seen = new HashMap<>();
     String currentKey = null; List<DocumentChunk> current = null; String currentHeading = null; UUID currentId = null;
-    for (DocumentChunk chunk : chunks.stream().sorted(Comparator.comparingInt(DocumentChunk::getOrdinal)).toList()) {
-      String key = sectionKey(chunk.getHeading());
+    // An image caption belongs to the section of the text chunk that holds the image, not to the end of the document.
+    Map<Integer, String> keyOfOrdinal = new HashMap<>();
+    for (DocumentChunk c : chunks) if (c.getAnchorOrdinal() == null) keyOfOrdinal.put(c.getOrdinal(), sectionKey(c.getHeading()));
+    var ordered = chunks.stream().sorted(Comparator.comparingInt(DocumentChunk::position)
+        .thenComparingInt((DocumentChunk c) -> c.getAnchorOrdinal() == null ? 0 : 1).thenComparingInt(DocumentChunk::getOrdinal)).toList();
+    for (DocumentChunk chunk : ordered) {
+      String key = chunk.getAnchorOrdinal() != null && keyOfOrdinal.containsKey(chunk.getAnchorOrdinal())
+          ? keyOfOrdinal.get(chunk.getAnchorOrdinal()) : sectionKey(chunk.getHeading());
       if (current == null || !key.equals(currentKey)) {
         if (current != null) out.add(new Section(currentId, currentHeading, current));
         int occurrence = seen.merge(key, 1, Integer::sum);

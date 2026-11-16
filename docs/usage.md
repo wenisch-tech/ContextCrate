@@ -37,6 +37,7 @@ The features are listed in the order content flows through the system.
 | **Chunking** | Cuts documents into passages along their structure, with chunk size and overlap. | [Chunking](features/chunking.md) |
 | **Contextual headers** | Puts the document title, summary and section path in front of every chunk before it is embedded. | [Contextual headers](features/contextual-headers.md) |
 | **Images** | Makes meaningful images searchable and optionally describes them with a vision model. | [Images](features/images.md) |
+| **Captions** | A vision model describes each image and the answer model each table and diagram code before indexing; the caption is embedded and leads back to the real chunk and its source. | [Captions and multi-modal RAG](features/multimodal-captions.md) |
 | **Embeddings** | Local or remote models that create the vectors for semantic search. | [Embeddings](embeddings.md) |
 | **Retrieval** | Standard and proposition retrieval, lexical, semantic, hybrid or fusion. | [Retrieval](features/retrieval.md) |
 | **Semantic chunking** | Optional per ingestion job: cuts text where the topic changes, based on sentence embeddings, instead of by size. | [Semantic chunking](features/semantic-chunking.md) |

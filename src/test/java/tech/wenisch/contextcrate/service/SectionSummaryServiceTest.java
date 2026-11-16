@@ -56,6 +56,23 @@ class SectionSummaryServiceTest {
   }
 
   @Test
+  void anImageCaptionStoredAfterTheTextBelongsToTheSectionOfItsImage() {
+    var picture = chunk(3, "Billing", "Image: chart\nA chart.");
+    picture.describe("image", null, null, null, null).anchoredAt(1);
+    var chunks = List.of(chunk(0, "Ops > Pager", "a"), chunk(1, "Ops > Pager", "b"), chunk(2, "Billing > Invoices", "c"), picture);
+
+    var sections = SectionSummaryService.sections(document.getId(), chunks);
+
+    assertThat(sections).extracting(s -> s.heading()).containsExactly("Ops > Pager", "Billing > Invoices");
+    assertThat(sections.get(0).chunks()).extracting(DocumentChunk::getOrdinal).containsExactly(0, 1, 3);
+    // the stored position is where the image sits, not the end of the document
+    assertThat(sections.get(0).firstOrdinal()).isZero();
+    assertThat(sections.get(0).lastOrdinal()).isEqualTo(1);
+    assertThat(sections.get(1).firstOrdinal()).isEqualTo(2);
+    assertThat(sections.get(1).lastOrdinal()).isEqualTo(2);
+  }
+
+  @Test
   void summarizesEverySectionAndStoresItsPosition() throws Exception {
     answerModel();
     when(llm.complete(any())).thenReturn("{\"summary\":\"Explains the pager rotation.\"}");

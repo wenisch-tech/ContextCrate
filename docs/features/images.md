@@ -4,6 +4,8 @@ Images in documentation carry information that text search cannot see: architect
 screenshots, charts. ContextCrate can make the **meaningful** ones searchable and citable, without
 indexing every icon, logo and badge a page contains.
 
+The text a vision model writes for an image is called a **caption** (not to be confused with the `<figcaption>` of a page). Captions of images, tables and diagrams are described together in [Captions and multi-modal RAG](multimodal-captions.md).
+
 Image handling is configured per crate under **Settings → Images**, and can be switched off
 completely.
 

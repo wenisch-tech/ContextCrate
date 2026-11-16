@@ -76,6 +76,23 @@ class AnswerServiceHierarchicalTest {
   }
 
   @Test
+  void theScopeAlsoContainsTheImageDescriptionsOfTheChosenSections() throws Exception {
+    var picture = new DocumentChunk(UUID.randomUUID(), documentId, 12, "Ops > Pager", "Image: x", "h");
+    when(index.search(any())).thenAnswer(i -> {
+      SearchIndex.SearchRequest r = i.getArgument(0);
+      return new SearchIndex.SearchResults("q", "hybrid", List.of("summary".equals(r.kind()) ? hit(sectionId, "summary") : hit(inSection.getId(), "chunk")));
+    });
+    var service = service(true);
+    when(chunks.findByDocumentIdAndCrateIdAndAnchorOrdinalBetweenOrderByOrdinal(documentId, crateId, 2, 4)).thenReturn(List.of(picture));
+
+    service.prepare(request());
+
+    var searches = ArgumentCaptor.forClass(SearchIndex.SearchRequest.class);
+    verify(index, times(2)).search(searches.capture());
+    assertThat(searches.getAllValues().get(1).chunkIds()).containsExactlyInAnyOrder(inSection.getId(), picture.getId());
+  }
+
+  @Test
   void searchesAllChunksWhenNoSectionIsFound() throws Exception {
     when(index.search(any())).thenAnswer(i -> {
       SearchIndex.SearchRequest r = i.getArgument(0);

@@ -16,6 +16,8 @@ public class RetrievalPreparationService {
   /**
    * @param document the chunks' document; used for the contextual header, may be {@code null} (no header)
    */
+  private CaptionService captionService;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) public void setCaptionService(CaptionService captionService){this.captionService=captionService;}
   private SectionSummaryService sectionSummaries;
   @org.springframework.beans.factory.annotation.Autowired(required=false) public void setSectionSummaries(SectionSummaryService sectionSummaries){this.sectionSummaries=sectionSummaries;}
   private QuestionGenerationService questions;
@@ -28,6 +30,11 @@ public class RetrievalPreparationService {
     RagSettings rag=settings.current(crateId);List<ChunkRetrievalRecord> records=base(crateId,rag,document,chunks);
     // Hierarchical retrieval: one summary record per section, on top of every chunk record.
     if(rag.isHierarchicalEnabled()&&sectionSummaries!=null&&document!=null&&!chunks.isEmpty()){records=new ArrayList<>(records);records.addAll(sectionSummaries.summariesFor(document,chunks));}
+    // Captions: the model describes tables and diagram code; each caption is an extra record that points back at its chunk.
+    if(rag.isCaptionsEnabled()&&captionService!=null&&!chunks.isEmpty()){
+      var made=captionService.captionsFor(crateId,chunks);records=new ArrayList<>(records);
+      for(DocumentChunk chunk:chunks){var caption=made.get(chunk.getId());if(caption!=null)records.add(ChunkRetrievalRecord.caption(chunk,caption.kind(),caption.text()));}
+    }
     if(!rag.isEnrichmentEnabled()||questions==null||chunks.isEmpty())return records;
     var generated=questions.questionsFor(crateId,chunks,rag.getEnrichmentQuestions());List<ChunkRetrievalRecord> all=new ArrayList<>(records);
     for(DocumentChunk chunk:chunks){List<String> list=generated.getOrDefault(chunk.getId(),List.of());for(int i=0;i<list.size();i++)all.add(ChunkRetrievalRecord.question(chunk,i,list.get(i)));}

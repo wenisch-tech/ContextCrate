@@ -52,6 +52,7 @@ and [Deployment](deployment.md).
    See [Embeddings](embeddings.md).
 6. **Describe images** (optional, `IMAGE_DESCRIBE`): have a vision model describe meaningful
    images. See [Images](features/images.md).
+7. **Caption** (optional, part of indexing): the answer model describes tables and diagram code before they are embedded; image descriptions are the captions of pictures. See [Captions](features/multimodal-captions.md).
 
 **Querying.** A question is optionally transformed ([Query transformation](features/query-transformation.md)),
 optionally turned into a hypothetical answer whose embedding drives the vector search ([HyDE](features/hyde.md)),

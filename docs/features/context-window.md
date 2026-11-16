@@ -64,7 +64,11 @@ The matched chunk stays the reference of the source: its id, score and snippet a
 shows; only the text that the model reads is larger.
 
 Chunks of kind *image* (descriptions of pictures) are not part of the running text and are skipped
-as neighbours. A matched image description is kept.
+as neighbours. A matched image description is kept, and its window is built around **the place of its
+image**: the description remembers the text chunk that contains the image (its *anchor*), so the neighbours
+are the chunks before and after the image, and the description follows that text. The same applies when you
+fetch an image description by its index. A description without an anchor (described before anchors were
+recorded, or an image whose place could not be found) is treated like any other chunk and uses its own index.
 
 ## Removing the overlap
 

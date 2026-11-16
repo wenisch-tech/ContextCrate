@@ -55,6 +55,8 @@ For every section ContextCrate stores its **exact position**:
 | First and last chunk | The ordinals of the first and last chunk of the section; this is what links a summary to its chunks |
 | Lines | For source code, the first and last line of the section |
 
+The description of an image belongs to the section whose text contains the image, and its position is the position of that text, so the image is found together with the text around it.
+
 Pages are not part of the position yet, because ContextCrate parses web pages, Markdown, text and source
 code, which have headings and lines but no pages.
 

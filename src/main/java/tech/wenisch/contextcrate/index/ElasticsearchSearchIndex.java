@@ -321,7 +321,7 @@ public class ElasticsearchSearchIndex implements SearchIndex {
     JsonNode s = h.path("_source");
     String kind = s.path("kind").asText();
     boolean chunk = !kind.equals("document");
-    boolean question = chunk && "question".equals(s.path("record_type").asText(""));
+    boolean question = chunk && ChunkRetrievalRecord.isAlias(s.path("record_type").asText(""));
     UUID document = UUID.fromString(s.path("parent_id").asText());
     UUID id = UUID.fromString(chunk ? s.path("chunk_id").asText(h.path("_id").asText()) : s.path("parent_id").asText());
     String retrieval = s.path("text").asText("");

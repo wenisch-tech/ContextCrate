@@ -57,13 +57,22 @@ public class ContextWindowService {
       byDocument.computeIfAbsent(a.documentId(), d -> new ArrayList<>()).add(i);
     }
     List<Window> windows = new ArrayList<>();
+    // The caption chunk of an image is stored after the text; its window is built around the text chunk that holds the image.
+    Map<UUID, DocumentChunk> matchedChunks = new HashMap<>();
+    if (!byDocument.isEmpty())
+      for (DocumentChunk c : chunks.findAllById(anchors.stream().map(Anchor::chunkId).filter(Objects::nonNull).toList()))
+        if (crateId.equals(c.getCrateId())) matchedChunks.put(c.getId(), c);
+    java.util.function.IntUnaryOperator effective = p -> {
+      DocumentChunk c = matchedChunks.get(anchors.get(p).chunkId());
+      return c != null && c.getAnchorOrdinal() != null ? c.getAnchorOrdinal() : anchors.get(p).index();
+    };
     for (var entry : byDocument.entrySet()) {
       UUID documentId = entry.getKey();
       List<Integer> positions = entry.getValue();
       // Ranges around every matched chunk, merged when they overlap or touch.
       List<int[]> ranges = new ArrayList<>(); // {from, to, primary position}
-      positions.stream().sorted(Comparator.comparingInt(p -> anchors.get(p).index())).forEach(p -> {
-        int index = anchors.get(p).index();
+      positions.stream().sorted(Comparator.comparingInt(p -> effective.applyAsInt(p))).forEach(p -> {
+        int index = effective.applyAsInt(p);
         int from = Math.max(0, index - n), to = index + n;
         int[] last = ranges.isEmpty() ? null : ranges.get(ranges.size() - 1);
         if (last != null && from <= last[1] + 1) {
@@ -77,14 +86,24 @@ public class ContextWindowService {
       List<DocumentChunk> loaded = chunks.findByDocumentIdAndCrateIdAndOrdinalBetweenOrderByOrdinal(documentId, crateId, min, max);
       Set<UUID> matched = new HashSet<>();
       for (int p : positions) matched.add(anchors.get(p).chunkId());
+      for (DocumentChunk c : loaded) if (matched.contains(c.getId())) matchedChunks.putIfAbsent(c.getId(), c);
       for (int[] range : ranges) {
         List<DocumentChunk> part = new ArrayList<>();
         for (DocumentChunk chunk : loaded) {
           if (chunk.getOrdinal() < range[0] || chunk.getOrdinal() > range[1]) continue;
-          // Image descriptions are separate chunks and not part of the running text, unless they were matched.
-          if ("image".equals(chunk.getKind()) && !matched.contains(chunk.getId())) continue;
+          // Image descriptions are separate chunks and not part of the running text; a matched one is added below.
+          if ("image".equals(chunk.getKind())) continue;
           part.add(chunk);
         }
+        // A matched image description belongs to this window when its image sits in the window's text; it follows that text.
+        List<DocumentChunk> pictures = new ArrayList<>();
+        for (int p : positions) {
+          DocumentChunk picture = matchedChunks.get(anchors.get(p).chunkId());
+          int at = effective.applyAsInt(p);
+          if (picture != null && "image".equals(picture.getKind()) && at >= range[0] && at <= range[1] && pictures.stream().noneMatch(x -> x.getId().equals(picture.getId()))) pictures.add(picture);
+        }
+        pictures.sort(Comparator.comparingInt(DocumentChunk::getOrdinal));
+        part.addAll(pictures);
         if (part.isEmpty()) continue;
         long hits = part.stream().filter(c -> matched.contains(c.getId())).count();
         windows.add(new Window(range[2], documentId, range[0], range[1], part.size(), (int) (part.size() - hits),
@@ -100,7 +119,19 @@ public class ContextWindowService {
   public Fetched fetch(UUID crateId, UUID documentId, int index, int before, int after) {
     int b = Math.max(0, Math.min(before, MAX_RADIUS)), a = Math.max(0, Math.min(after, MAX_RADIUS));
     List<DocumentChunk> found = chunks.findByDocumentIdAndCrateIdAndOrdinalBetweenOrderByOrdinal(documentId, crateId, Math.max(0, index - b), index + a);
-    if (found.stream().noneMatch(c -> c.getOrdinal() == index)) return null;
+    DocumentChunk requested = found.stream().filter(c -> c.getOrdinal() == index).findFirst().orElse(null);
+    if (requested == null) return null;
+    if ("image".equals(requested.getKind()) && requested.getAnchorOrdinal() != null) {
+      // An image description: its neighbours are the text around the image, followed by the description itself.
+      int at = requested.getAnchorOrdinal();
+      List<DocumentChunk> around = new ArrayList<>(chunks.findByDocumentIdAndCrateIdAndOrdinalBetweenOrderByOrdinal(documentId, crateId, Math.max(0, at - b), at + a)
+          .stream().filter(c -> !"image".equals(c.getKind())).toList());
+      if (!around.isEmpty()) {
+        int from = around.get(0).getOrdinal(), to = around.get(around.size() - 1).getOrdinal();
+        around.add(requested);
+        return new Fetched(documentId, index, from, to, around.size(), ChunkJoiner.render(around));
+      }
+    }
     return new Fetched(documentId, index, found.get(0).getOrdinal(), found.get(found.size() - 1).getOrdinal(), found.size(), ChunkJoiner.render(found));
   }
 
