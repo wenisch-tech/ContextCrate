@@ -25,6 +25,7 @@ public class AnswerService {
   private int rrfConstant = 60;
   private QueryTransformationService transformation;
   private HydeService hyde;
+  private HierarchicalRetrievalService hierarchical;
   private ContextWindowService contextWindow;
   private ContextCompressionService compression;
   private tech.wenisch.contextcrate.service.SystemSettingsService systemSettings;
@@ -36,6 +37,8 @@ public class AnswerService {
   public void setMetrics(CrateMetrics metrics, HotContentTracker hot) { this.metrics=metrics; this.hot=hot; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setQueryTransformation(QueryTransformationService transformation) { this.transformation=transformation; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setHierarchical(HierarchicalRetrievalService hierarchical) { this.hierarchical=hierarchical; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setHyde(HydeService hyde) { this.hyde=hyde; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -118,6 +121,11 @@ public class AnswerService {
       var search=new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode);
       if("fusion".equals(mode)) search=search.withVectorWeight(policy.getFusionVectorWeight());
       if(useHyde) { long hydeStarted=System.nanoTime();String hypothetical=hyde.generate(request.crateId(),query);hydeNanos+=System.nanoTime()-hydeStarted;if(hypothetical!=null){search=search.withVectorQuery(hypothetical);hydeQueries++;} }
+      // Hierarchical retrieval: only chunks of the sections that the summary level found are searched; no hit there = search all.
+      if(policy.isHierarchicalEnabled()&&hierarchical!=null){
+        var scope=hierarchical.scope(search,policy.getHierarchicalTopK());
+        if(scope!=null){var narrowed=index.search(search.withChunkIds(scope));if(!narrowed.hits().isEmpty()){lists.add(narrowed);continue;}hierarchical.fellBack(request.crateId());}
+      }
       lists.add(index.search(search));
     }
     var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,limit);

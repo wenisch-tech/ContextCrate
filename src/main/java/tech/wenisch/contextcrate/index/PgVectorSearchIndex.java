@@ -188,7 +188,7 @@ public class PgVectorSearchIndex implements SearchIndex {
       ensureTable(name);
       List<Row> rows = new ArrayList<>();
       rows.add(new Row(d.getId(), "document", null, d.getBody() == null ? "" : d.getBody(), false));
-      for (ChunkRetrievalRecord c : chunks) rows.add(new Row(c.recordId(), "chunk", c, c.retrievalText(), c.isQuestion()));
+      for (ChunkRetrievalRecord c : chunks) rows.add(new Row(c.recordId(), c.isSummary() ? SUMMARY : "chunk", c, c.retrievalText(), c.isQuestion()));
       List<float[]> vectors = embed(rows);
       boolean withVector = embeddings.descriptor().dimensions() > 0;
       String t = PgVectorSql.quote(name);
@@ -353,6 +353,14 @@ public class PgVectorSearchIndex implements SearchIndex {
   private static String filters(SearchRequest r, List<Object> args) {
     StringBuilder sql = new StringBuilder();
     if (r.kind() != null) { sql.append(" and kind = ?"); args.add(r.kind()); }
+    else sql.append(" and kind <> 'summary'");
+    if (r.chunkIds() != null) {
+      if (r.chunkIds().isEmpty()) sql.append(" and false");
+      else {
+        sql.append(" and chunk_id in (").append(String.join(",", java.util.Collections.nCopies(r.chunkIds().size(), "?::uuid"))).append(")");
+        args.addAll(r.chunkIdStrings());
+      }
+    }
     if (r.runId() != null) { sql.append(" and run_id = ?::uuid"); args.add(r.runId().toString()); }
     return sql.toString();
   }
@@ -372,7 +380,7 @@ public class PgVectorSearchIndex implements SearchIndex {
     Map<UUID, SearchHit> out = new LinkedHashMap<>();
     boolean first = true;
     for (Found f : found) {
-      boolean chunk = f.kind().equals("chunk");
+      boolean chunk = !f.kind().equals("document");
       boolean question = chunk && "question".equals(f.recordType());
       UUID id = chunk ? f.chunkId() : f.documentId();
       String retrieval = f.text() == null ? "" : f.text();

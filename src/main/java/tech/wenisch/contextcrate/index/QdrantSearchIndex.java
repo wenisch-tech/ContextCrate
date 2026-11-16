@@ -134,7 +134,7 @@ public class QdrantSearchIndex implements SearchIndex {
       String body = document.getBody() == null ? "" : document.getBody();
       points.add(new Point(document.getId().toString(), "document", document, null, cap(body), body, false));
       for (ChunkRetrievalRecord c : chunks)
-        points.add(new Point(c.recordId().toString(), "chunk", document, c, c.retrievalText(), c.sourceContent(), c.isQuestion()));
+        points.add(new Point(c.recordId().toString(), c.isSummary() ? SUMMARY : "chunk", document, c, c.retrievalText(), c.sourceContent(), c.isQuestion()));
       List<float[]> vectors = embed(points);
       deletePoints(name, document.getId());
       for (int from = 0; from < points.size(); from += UPSERT_BATCH) {
@@ -282,7 +282,11 @@ public class QdrantSearchIndex implements SearchIndex {
     List<Map<String, Object>> must = new ArrayList<>();
     if (r.kind() != null) must.add(match("kind", r.kind()));
     if (r.runId() != null) must.add(match("run_id", r.runId().toString()));
-    if (!must.isEmpty()) body.put("filter", Map.of("must", must));
+    if (r.chunkIds() != null) must.add(Map.of("key", "chunk_id", "match", Map.of("any", r.chunkIdStrings())));
+    Map<String, Object> filter = new LinkedHashMap<>();
+    if (!must.isEmpty()) filter.put("must", must);
+    if (r.kind() == null) filter.put("must_not", List.of(match("kind", SUMMARY)));
+    if (!filter.isEmpty()) body.put("filter", filter);
     JsonNode points = mapper.readTree(request("POST", "/collections/" + name + "/points/query", mapper.writeValueAsString(body), Set.of(200)).body())
         .path("result").path("points");
     Map<UUID, SearchHit> out = new LinkedHashMap<>();
@@ -303,7 +307,7 @@ public class QdrantSearchIndex implements SearchIndex {
   private static SearchHit hit(JsonNode point, String query, boolean lexical) {
     JsonNode s = point.path("payload");
     String kind = s.path("kind").asText();
-    boolean chunk = kind.equals("chunk");
+    boolean chunk = !kind.equals("document");
     UUID document = UUID.fromString(s.path("parent_id").asText());
     UUID id = UUID.fromString(chunk ? s.path("chunk_id").asText(point.path("id").asText()) : s.path("parent_id").asText());
     String retrieval = s.path("text").asText("");

@@ -19,6 +19,9 @@ Configure the strategy on the crate **Settings** page or with `PUT /api/v1/crate
 
 Proposition retrieval requires enabled, configured embedding and answer providers. It reuses the crate's OpenAI-compatible answer endpoint, model, credentials, headers, timeout, and output-token limit. Generation and grading are deterministic non-streaming requests with temperature zero.
 
+> **Large crates:** [hierarchical retrieval](hierarchical-retrieval.md) adds a summary level: sections are
+> found first, then chunks are searched only inside them.
+>
 > **Neighbouring chunks:** the [context window](context-window.md) expands each matched chunk with the chunks before and after it when the answer is prepared.
 >
 > **Index time or query time?** Proposition retrieval and [contextual chunk

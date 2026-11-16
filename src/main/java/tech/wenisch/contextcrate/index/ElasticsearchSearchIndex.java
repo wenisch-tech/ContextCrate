@@ -143,7 +143,7 @@ public class ElasticsearchSearchIndex implements SearchIndex {
       ensureIndex(name);
       List<Entry> entries = new ArrayList<>();
       entries.add(new Entry(document.getId().toString(), "document", null, document.getBody(), false));
-      for (ChunkRetrievalRecord c : chunks) entries.add(new Entry(c.recordId().toString(), "chunk", c, c.retrievalText(), c.isQuestion()));
+      for (ChunkRetrievalRecord c : chunks) entries.add(new Entry(c.recordId().toString(), c.isSummary() ? SUMMARY : "chunk", c, c.retrievalText(), c.isQuestion()));
       List<float[]> vectors = embed(entries);
       deleteDocument(name, document.getId());
       for (int from = 0; from < entries.size(); from += BULK_BATCH) {
@@ -279,7 +279,9 @@ public class ElasticsearchSearchIndex implements SearchIndex {
     int limit = retrieval.candidateLimit();
     List<Map<String, Object>> filters = new ArrayList<>();
     if (r.kind() != null) filters.add(Map.of("term", Map.of("kind", r.kind())));
+    else filters.add(Map.of("bool", Map.of("must_not", List.of(Map.of("term", Map.of("kind", SUMMARY))))));
     if (r.runId() != null) filters.add(Map.of("term", Map.of("run_id", r.runId().toString())));
+    if (r.chunkIds() != null) filters.add(Map.of("terms", Map.of("chunk_id", r.chunkIdStrings())));
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("size", limit);
     if (semantic) {
@@ -318,7 +320,7 @@ public class ElasticsearchSearchIndex implements SearchIndex {
   private static SearchHit hit(JsonNode h, String query, boolean lexical) {
     JsonNode s = h.path("_source");
     String kind = s.path("kind").asText();
-    boolean chunk = kind.equals("chunk");
+    boolean chunk = !kind.equals("document");
     boolean question = chunk && "question".equals(s.path("record_type").asText(""));
     UUID document = UUID.fromString(s.path("parent_id").asText());
     UUID id = UUID.fromString(chunk ? s.path("chunk_id").asText(h.path("_id").asText()) : s.path("parent_id").asText());

@@ -41,7 +41,7 @@ const sidebars = {
             {
               type: 'category', label: 'Retrieval', collapsed: true,
               link: { type: 'doc', id: 'features/retrieval' },
-              items: ['features/query-transformation', 'features/hyde', 'reranking'],
+              items: ['features/hierarchical-retrieval', 'features/query-transformation', 'features/hyde', 'reranking'],
             },
             {
               type: 'category', label: 'Answer generation', collapsed: true,

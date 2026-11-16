@@ -40,6 +40,11 @@ public class RagSettings {
   @Column(name="llm_rerank_top_n",nullable=false) private int llmRerankTopN=4;
   public boolean isLlmRerankEnabled(){return llmRerankEnabled;} public int getLlmRerankTopN(){return llmRerankTopN;}
   public void updateLlmRerank(boolean enabled,int topN){this.llmRerankEnabled=enabled;this.llmRerankTopN=Math.max(1,Math.min(topN,20));}
+  /** Hierarchical retrieval: section summaries are searched first; only chunks of the best sections are searched next. */
+  @Column(name="hierarchical_enabled",nullable=false) private boolean hierarchicalEnabled;
+  @Column(name="hierarchical_top_k",nullable=false) private int hierarchicalTopK=4;
+  public boolean isHierarchicalEnabled(){return hierarchicalEnabled;} public int getHierarchicalTopK(){return hierarchicalTopK;}
+  public void updateHierarchical(boolean enabled,int topK){this.hierarchicalEnabled=enabled;this.hierarchicalTopK=Math.max(1,Math.min(topK,10));}
   /** Retrieval mode "fusion": weight of the vector leg (0 to 1); the keyword leg gets the rest. */
   @Column(name="fusion_vector_weight",nullable=false) private double fusionVectorWeight=0.5;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;

@@ -54,6 +54,12 @@ public class RagSettingsService {
   @Transactional public RagSettings updateIncludeImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateIncludeImages(enabled);return settings.save(value);}
   @Transactional public RagSettings updateSendImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateSendImages(enabled);return settings.save(value);}
   @Transactional public RagSettings updateLlmRerank(java.util.UUID crateId,boolean enabled,int topN){var value=current(crateId);value.updateLlmRerank(enabled,topN);return settings.save(value);}
+  public static final int MIN_HIERARCHICAL_TOP_K=1,MAX_HIERARCHICAL_TOP_K=10,DEFAULT_HIERARCHICAL_TOP_K=4;
+  /** Hierarchical retrieval: switch and number of sections taken from the summary level. Changing the switch needs an index rebuild. */
+  @Transactional public RagSettings updateHierarchical(java.util.UUID crateId,boolean enabled,int topK){
+    if(topK<MIN_HIERARCHICAL_TOP_K||topK>MAX_HIERARCHICAL_TOP_K)throw new IllegalArgumentException("hierarchical sections must be between "+MIN_HIERARCHICAL_TOP_K+" and "+MAX_HIERARCHICAL_TOP_K);
+    var value=current(crateId);value.updateHierarchical(enabled,topK);return settings.save(value);
+  }
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);

@@ -16,6 +16,8 @@ public class RetrievalPreparationService {
   /**
    * @param document the chunks' document; used for the contextual header, may be {@code null} (no header)
    */
+  private SectionSummaryService sectionSummaries;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) public void setSectionSummaries(SectionSummaryService sectionSummaries){this.sectionSummaries=sectionSummaries;}
   private QuestionGenerationService questions;
   @org.springframework.beans.factory.annotation.Autowired(required=false) public void setQuestions(QuestionGenerationService questions){this.questions=questions;}
   /**
@@ -24,6 +26,8 @@ public class RetrievalPreparationService {
    */
   public List<ChunkRetrievalRecord> prepare(UUID crateId,NormalizedDocument document,List<DocumentChunk> chunks){
     RagSettings rag=settings.current(crateId);List<ChunkRetrievalRecord> records=base(crateId,rag,document,chunks);
+    // Hierarchical retrieval: one summary record per section, on top of every chunk record.
+    if(rag.isHierarchicalEnabled()&&sectionSummaries!=null&&document!=null&&!chunks.isEmpty()){records=new ArrayList<>(records);records.addAll(sectionSummaries.summariesFor(document,chunks));}
     if(!rag.isEnrichmentEnabled()||questions==null||chunks.isEmpty())return records;
     var generated=questions.questionsFor(crateId,chunks,rag.getEnrichmentQuestions());List<ChunkRetrievalRecord> all=new ArrayList<>(records);
     for(DocumentChunk chunk:chunks){List<String> list=generated.getOrDefault(chunk.getId(),List.of());for(int i=0;i<list.size();i++)all.add(ChunkRetrievalRecord.question(chunk,i,list.get(i)));}

@@ -35,9 +35,15 @@ public interface SearchIndex extends AutoCloseable {
    * @param vectorQuery optional text embedded <em>instead of</em> {@code query} for the vector leg
    *     (HyDE: a hypothetical answer). Blank or null means the query itself is embedded.
    * @param vectorWeight weight of the vector leg (0 to 1) in {@code fusion} mode; null means the default of 0.5
+   * @param chunkIds optional restriction to these chunks (hierarchical retrieval: the chunks of the sections
+   *     found in the summary level). Null means no restriction; an empty set matches nothing.
    */
   record SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode,
-      String vectorQuery, Double vectorWeight) {
+      String vectorQuery, Double vectorWeight, java.util.Set<UUID> chunkIds) {
+    public SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode,
+        String vectorQuery, Double vectorWeight) {
+      this(crateId, query, limit, runId, kind, mode, vectorQuery, vectorWeight, null);
+    }
     public SearchRequest(UUID crateId, String query, int limit, UUID runId, String kind, String mode, String vectorQuery) {
       this(crateId, query, limit, runId, kind, mode, vectorQuery, null);
     }
@@ -58,21 +64,35 @@ public interface SearchIndex extends AutoCloseable {
       if (vectorWeight != null && (vectorWeight.isNaN() || vectorWeight < 0 || vectorWeight > 1))
         throw new IllegalArgumentException("vector weight must be between 0 and 1");
       vectorQuery = vectorQuery == null || vectorQuery.isBlank() ? null : vectorQuery.trim();
+      chunkIds = chunkIds == null ? null : java.util.Set.copyOf(chunkIds);
     }
 
     /** Same request, but the vector leg embeds the given text (a hypothetical document). */
     public SearchRequest withVectorQuery(String text) {
-      return new SearchRequest(crateId, query, limit, runId, kind, mode, text, vectorWeight);
+      return new SearchRequest(crateId, query, limit, runId, kind, mode, text, vectorWeight, chunkIds);
     }
 
     /** Same request, with the weight of the vector leg for {@code fusion} mode. */
     public SearchRequest withVectorWeight(double weight) {
-      return new SearchRequest(crateId, query, limit, runId, kind, mode, vectorQuery, weight);
+      return new SearchRequest(crateId, query, limit, runId, kind, mode, vectorQuery, weight, chunkIds);
+    }
+
+    /** Same request, restricted to the given chunks (the leaf level of hierarchical retrieval). */
+    public SearchRequest withChunkIds(java.util.Collection<UUID> ids) {
+      return new SearchRequest(crateId, query, limit, runId, kind, mode, vectorQuery, vectorWeight, ids == null ? null : java.util.Set.copyOf(ids));
+    }
+
+    /** Chunk ids as strings for filters, or null when the request is not restricted. */
+    public java.util.List<String> chunkIdStrings() {
+      return chunkIds == null ? null : chunkIds.stream().map(UUID::toString).sorted().toList();
     }
 
     /** The text to embed as a vector query, and whether it is document-like (HyDE). */
     public boolean hasVectorQuery() { return vectorQuery != null; }
   }
+
+  /** Kind of the section summary rows of hierarchical retrieval; they are only returned when asked for explicitly. */
+  String SUMMARY = "summary";
 
   record SearchHit(
       UUID id,
