@@ -19,6 +19,9 @@ Configure the strategy on the crate **Settings** page or with `PUT /api/v1/crate
 
 Proposition retrieval requires enabled, configured embedding and answer providers. It reuses the crate's OpenAI-compatible answer endpoint, model, credentials, headers, timeout, and output-token limit. Generation and grading are deterministic non-streaming requests with temperature zero.
 
+> **Repeated content:** [dartboard retrieval](dartboard-retrieval.md) retrieves more candidates and picks the K
+> that are relevant and different from each other.
+>
 > **Large crates:** [hierarchical retrieval](hierarchical-retrieval.md) adds a summary level: sections are
 > found first, then chunks are searched only inside them.
 >

@@ -343,6 +343,8 @@ public class CratePortableService {
     rag.updateFusion(crateId,r.path("fusionVectorWeight").asDouble(0.5));
     rag.updateHyde(crateId,r.path("hydeEnabled").asBoolean(false));
     rag.updateHierarchical(crateId,r.path("hierarchicalEnabled").asBoolean(false),r.path("hierarchicalTopK").asInt(RagSettingsService.DEFAULT_HIERARCHICAL_TOP_K));
+    rag.updateDartboard(crateId,r.path("dartboardEnabled").asBoolean(false),r.path("dartboardOversampling").asInt(RagSettingsService.DEFAULT_DARTBOARD_OVERSAMPLING),
+        r.path("dartboardRelevanceWeight").asDouble(RagSettingsService.DEFAULT_DARTBOARD_WEIGHT),r.path("dartboardDiversityWeight").asDouble(RagSettingsService.DEFAULT_DARTBOARD_WEIGHT),r.path("dartboardSigma").asDouble(RagSettingsService.DEFAULT_DARTBOARD_SIGMA));
     rag.updateLlmRerank(crateId,r.path("llmRerankEnabled").asBoolean(false),r.path("llmRerankTopN").asInt(4));
     rag.updateContextWindow(crateId,r.path("contextWindow").asInt(0));
     rag.updateEnrichment(crateId,r.path("enrichmentEnabled").asBoolean(false),r.path("enrichmentQuestions").asInt(RagSettingsService.DEFAULT_ENRICHMENT_QUESTIONS));

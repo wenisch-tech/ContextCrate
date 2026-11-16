@@ -38,6 +38,13 @@ public class CrateSettingsApiController {
     }
     if(r.fusionVectorWeight()!=null)updated=rag.updateFusion(crateId,r.fusionVectorWeight());
     if(r.hydeEnabled()!=null)updated=rag.updateHyde(crateId,r.hydeEnabled());
+    if(r.dartboardEnabled()!=null||r.dartboardOversampling()!=null||r.dartboardRelevanceWeight()!=null||r.dartboardDiversityWeight()!=null||r.dartboardSigma()!=null){
+      updated=rag.updateDartboard(crateId,r.dartboardEnabled()==null?current.isDartboardEnabled():r.dartboardEnabled(),
+          r.dartboardOversampling()==null?current.getDartboardOversampling():r.dartboardOversampling(),
+          r.dartboardRelevanceWeight()==null?current.getDartboardRelevanceWeight():r.dartboardRelevanceWeight(),
+          r.dartboardDiversityWeight()==null?current.getDartboardDiversityWeight():r.dartboardDiversityWeight(),
+          r.dartboardSigma()==null?current.getDartboardSigma():r.dartboardSigma());
+    }
     boolean hierarchicalChanged=false;
     if(r.hierarchicalEnabled()!=null||r.hierarchicalTopK()!=null){
       boolean on=r.hierarchicalEnabled()==null?current.isHierarchicalEnabled():r.hierarchicalEnabled();
@@ -89,7 +96,7 @@ public class CrateSettingsApiController {
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
       boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Boolean enrichmentEnabled,Integer enrichmentQuestions,Integer contextWindow,Boolean contextCompression,String contextHeaderVariant,Integer contextHeaderWords,
-      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK){}
+      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK,Boolean dartboardEnabled,Integer dartboardOversampling,Double dartboardRelevanceWeight,Double dartboardDiversityWeight,Double dartboardSigma){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

@@ -45,6 +45,14 @@ public class RagSettings {
   @Column(name="hierarchical_top_k",nullable=false) private int hierarchicalTopK=4;
   public boolean isHierarchicalEnabled(){return hierarchicalEnabled;} public int getHierarchicalTopK(){return hierarchicalTopK;}
   public void updateHierarchical(boolean enabled,int topK){this.hierarchicalEnabled=enabled;this.hierarchicalTopK=Math.max(1,Math.min(topK,10));}
+  /** Dartboard retrieval: K x oversampling candidates are retrieved and K relevant, mutually different chunks are chosen. */
+  @Column(name="dartboard_enabled",nullable=false) private boolean dartboardEnabled;
+  @Column(name="dartboard_oversampling",nullable=false) private int dartboardOversampling=3;
+  @Column(name="dartboard_relevance_weight",nullable=false) private double dartboardRelevanceWeight=1.0;
+  @Column(name="dartboard_diversity_weight",nullable=false) private double dartboardDiversityWeight=1.0;
+  @Column(name="dartboard_sigma",nullable=false) private double dartboardSigma=0.1;
+  public boolean isDartboardEnabled(){return dartboardEnabled;} public int getDartboardOversampling(){return dartboardOversampling;} public double getDartboardRelevanceWeight(){return dartboardRelevanceWeight;} public double getDartboardDiversityWeight(){return dartboardDiversityWeight;} public double getDartboardSigma(){return dartboardSigma;}
+  public void updateDartboard(boolean enabled,int oversampling,double relevanceWeight,double diversityWeight,double sigma){this.dartboardEnabled=enabled;this.dartboardOversampling=oversampling;this.dartboardRelevanceWeight=relevanceWeight;this.dartboardDiversityWeight=diversityWeight;this.dartboardSigma=sigma;}
   /** Retrieval mode "fusion": weight of the vector leg (0 to 1); the keyword leg gets the rest. */
   @Column(name="fusion_vector_weight",nullable=false) private double fusionVectorWeight=0.5;
   @Column(name="image_indexing_enabled",nullable=false) private boolean imageIndexingEnabled=true;

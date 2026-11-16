@@ -54,6 +54,16 @@ public class RagSettingsService {
   @Transactional public RagSettings updateIncludeImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateIncludeImages(enabled);return settings.save(value);}
   @Transactional public RagSettings updateSendImages(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateSendImages(enabled);return settings.save(value);}
   @Transactional public RagSettings updateLlmRerank(java.util.UUID crateId,boolean enabled,int topN){var value=current(crateId);value.updateLlmRerank(enabled,topN);return settings.save(value);}
+  public static final int MIN_DARTBOARD_OVERSAMPLING=2,MAX_DARTBOARD_OVERSAMPLING=10,DEFAULT_DARTBOARD_OVERSAMPLING=3;
+  public static final double MIN_DARTBOARD_SIGMA=0.01,MAX_DARTBOARD_SIGMA=1.0,DEFAULT_DARTBOARD_SIGMA=0.1,MAX_DARTBOARD_WEIGHT=10.0,DEFAULT_DARTBOARD_WEIGHT=1.0;
+  /** Dartboard retrieval; takes effect on the next question, no rebuild. */
+  @Transactional public RagSettings updateDartboard(java.util.UUID crateId,boolean enabled,int oversampling,double relevanceWeight,double diversityWeight,double sigma){
+    if(oversampling<MIN_DARTBOARD_OVERSAMPLING||oversampling>MAX_DARTBOARD_OVERSAMPLING)throw new IllegalArgumentException("dartboard oversampling must be between "+MIN_DARTBOARD_OVERSAMPLING+" and "+MAX_DARTBOARD_OVERSAMPLING);
+    if(Double.isNaN(relevanceWeight)||Double.isNaN(diversityWeight)||relevanceWeight<0||diversityWeight<0||relevanceWeight>MAX_DARTBOARD_WEIGHT||diversityWeight>MAX_DARTBOARD_WEIGHT)throw new IllegalArgumentException("dartboard weights must be between 0 and "+(int)MAX_DARTBOARD_WEIGHT);
+    if(relevanceWeight==0&&diversityWeight==0)throw new IllegalArgumentException("dartboard relevance and diversity weight must not both be 0");
+    if(Double.isNaN(sigma)||sigma<MIN_DARTBOARD_SIGMA||sigma>MAX_DARTBOARD_SIGMA)throw new IllegalArgumentException("dartboard sigma must be between "+MIN_DARTBOARD_SIGMA+" and "+MAX_DARTBOARD_SIGMA);
+    var value=current(crateId);value.updateDartboard(enabled,oversampling,relevanceWeight,diversityWeight,sigma);return settings.save(value);
+  }
   public static final int MIN_HIERARCHICAL_TOP_K=1,MAX_HIERARCHICAL_TOP_K=10,DEFAULT_HIERARCHICAL_TOP_K=4;
   /** Hierarchical retrieval: switch and number of sections taken from the summary level. Changing the switch needs an index rebuild. */
   @Transactional public RagSettings updateHierarchical(java.util.UUID crateId,boolean enabled,int topK){

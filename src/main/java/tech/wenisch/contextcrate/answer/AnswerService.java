@@ -26,6 +26,7 @@ public class AnswerService {
   private QueryTransformationService transformation;
   private HydeService hyde;
   private HierarchicalRetrievalService hierarchical;
+  private DartboardService dartboard;
   private ContextWindowService contextWindow;
   private ContextCompressionService compression;
   private tech.wenisch.contextcrate.service.SystemSettingsService systemSettings;
@@ -37,6 +38,8 @@ public class AnswerService {
   public void setMetrics(CrateMetrics metrics, HotContentTracker hot) { this.metrics=metrics; this.hot=hot; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setQueryTransformation(QueryTransformationService transformation) { this.transformation=transformation; }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setDartboard(DartboardService dartboard) { this.dartboard=dartboard; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setHierarchical(HierarchicalRetrievalService hierarchical) { this.hierarchical=hierarchical; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -117,8 +120,11 @@ public class AnswerService {
     if(useHyde&&"lexical".equals(mode)){hyde.skipped(request.crateId(),"lexical-mode");useHyde=false;}
     else if(useHyde&&!embeddingsAvailable(request.crateId())){hyde.skipped(request.crateId(),"embeddings-unavailable");useHyde=false;}
     else if(useHyde&&!available(request.crateId())){hyde.skipped(request.crateId(),"answer-model-unavailable");useHyde=false;}
+    // Dartboard: retrieve K x oversampling candidates; K relevant and mutually different chunks are chosen afterwards. Needs vectors, so not in lexical mode.
+    boolean useDartboard=policy.isDartboardEnabled()&&dartboard!=null&&!"lexical".equals(mode)&&embeddingsAvailable(request.crateId());
+    int searchLimit=useDartboard?DartboardService.candidateLimit(limit,policy.getDartboardOversampling()):limit;
     for(String query:queries) {
-      var search=new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode);
+      var search=new SearchIndex.SearchRequest(request.crateId(),query,searchLimit,request.runId(),"chunk",mode);
       if("fusion".equals(mode)) search=search.withVectorWeight(policy.getFusionVectorWeight());
       if(useHyde) { long hydeStarted=System.nanoTime();String hypothetical=hyde.generate(request.crateId(),query);hydeNanos+=System.nanoTime()-hydeStarted;if(hypothetical!=null){search=search.withVectorQuery(hypothetical);hydeQueries++;} }
       // Hierarchical retrieval: only chunks of the sections that the summary level found are searched; no hit there = search all.
@@ -128,7 +134,8 @@ public class AnswerService {
       }
       lists.add(index.search(search));
     }
-    var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,limit);
+    var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,searchLimit);
+    if(useDartboard)results=dartboard.apply(request.crateId(),request.question(),results,limit,policy);
     // HyDE generation has its own timer; keep it out of the retrieval time so the latency budget does not count it twice.
     metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted-hydeNanos,"transformed",applied.isEmpty()?"false":"true");
     return new Retrieved(results,queries,applied,hydeQueries);

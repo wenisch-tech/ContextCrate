@@ -45,6 +45,7 @@ The features are listed in the order content flows through the system.
 | **Contextual compression** | A model keeps only the sentences of each retrieved chunk that matter for the question and drops the rest, to save tokens. | [Contextual compression](features/contextual-compression.md) |
 | **Context window** | Adds the chunks before and after each matched chunk to the answer context, without the chunk overlap. | [Context window](features/context-window.md) |
 | **Hierarchical retrieval** | Summarizes document sections at indexing time; a question first finds the best sections, then searches chunks only inside them. | [Hierarchical retrieval](features/hierarchical-retrieval.md) |
+| **Dartboard retrieval** | Retrieves more candidates than needed and picks the top K that are relevant and different from each other, so sources do not repeat. | [Dartboard retrieval](features/dartboard-retrieval.md) |
 | **Reranking** | Optional batched cross-encoder, or LLM based rating from 1 to 10, that reorders the best candidates. | [Reranking](reranking.md) |
 | **Query transformation** | Rewrites vague, specific or multi-part questions before searching. | [Query transformation](features/query-transformation.md) |
 | **HyDE** | Searches with an embedded hypothetical answer instead of the question. | [HyDE](features/hyde.md) |
