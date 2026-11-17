@@ -96,6 +96,14 @@ public class CrateSettingsApiController {
     if(!previous.toString().equals(current.toString())||(("proposition".equals(rag.current(crateId).getRetrievalStrategy())||rag.current(crateId).isEnrichmentEnabled()||rag.current(crateId).isHierarchicalEnabled()||rag.current(crateId).isCaptionsEnabled()||tech.wenisch.contextcrate.service.ContextHeaderService.enabled(rag.current(crateId).getContextHeaderVariant()))&&!previousAnswer.toString().equals(providers.effectiveAnswer(crateId).toString())))rebuild.rebuildAsync(crateId);
     return providers(crateId);
   }
+  public record FeedbackSettingsRequest(boolean enabled,Integer linkTtlHours,boolean retrievalEnabled,Integer maxPerDocument,boolean enrichmentEnabled,Integer intervalHours,Integer minQuality,Integer minRelevance,Boolean requiresApproval){}
+  /** Answer feedback: ratings, feedback-weighted retrieval and periodic enrichment. Takes effect immediately. */
+  @PutMapping("/rag/feedback")
+  public RagSettings updateFeedback(@PathVariable UUID crateId,@RequestBody FeedbackSettingsRequest r){
+    access.requireMutable(crateId,CrateMember.Role.OWNER);
+    var c=rag.current(crateId);
+    return rag.updateFeedback(crateId,r.enabled(),r.linkTtlHours()==null?c.getFeedbackLinkTtlHours():r.linkTtlHours(),r.retrievalEnabled(),r.maxPerDocument()==null?c.getFeedbackRetrievalMaxPerDocument():r.maxPerDocument(),r.enrichmentEnabled(),r.intervalHours()==null?c.getFeedbackEnrichmentIntervalHours():r.intervalHours(),r.minQuality()==null?c.getFeedbackEnrichmentMinQuality():r.minQuality(),r.minRelevance()==null?c.getFeedbackEnrichmentMinRelevance():r.minRelevance(),r.requiresApproval()==null?c.isFeedbackEnrichmentRequiresApproval():r.requiresApproval());
+  }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
       boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Boolean enrichmentEnabled,Integer enrichmentQuestions,Integer contextWindow,Boolean contextCompression,String contextHeaderVariant,Integer contextHeaderWords,
       Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK,Boolean dartboardEnabled,Integer dartboardOversampling,Double dartboardRelevanceWeight,Double dartboardDiversityWeight,Double dartboardSigma,Boolean captionsEnabled){}

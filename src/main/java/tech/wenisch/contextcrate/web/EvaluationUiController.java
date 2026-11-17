@@ -28,6 +28,10 @@ public class EvaluationUiController {
   private final EvaluationAdminService admin;
   private final SharedModelService sharedModels;
   private final AuditLogRepository audits;
+  private tech.wenisch.contextcrate.feedback.FeedbackAdminService feedback;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setFeedback(tech.wenisch.contextcrate.feedback.FeedbackAdminService feedback) { this.feedback = feedback; }
 
   public EvaluationUiController(CrateAccessService access, CrateService crateService, EvaluationSettingsService settings,
       EvaluationAdminService admin, SharedModelService sharedModels, AuditLogRepository audits) {
@@ -61,6 +65,7 @@ public class EvaluationUiController {
     model.addAttribute("golden", admin.golden(crateId));
     model.addAttribute("judgeModels", sharedModels.options(SharedModel.Kind.JUDGE, view.judgeSharedModelId()));
     model.addAttribute("days", days);
+    model.addAttribute("feedbackEntries", feedback == null ? java.util.List.of() : feedback.recent(crateId, 50));
     return "evaluation";
   }
 

@@ -150,6 +150,31 @@
     </form>
   </section>
 
+  <section id="feedback" class="mb-5">
+    <h2 class="h4">User feedback</h2>
+    <p class="text-secondary">Ratings of answers (1 to 5). Approved entries with a high quality are added to the index as question and answer documents. Enable it in the <a th:href="@{/crates/{id}/settings(id=${crate.id})}">RAG settings</a>.</p>
+    <p th:if="${#lists.isEmpty(feedbackEntries)}" class="text-secondary">No rated answers yet.</p>
+    <div th:unless="${#lists.isEmpty(feedbackEntries)}" class="table-responsive"><table class="table table-sm align-middle">
+      <thead><tr><th>Question</th><th>Relevance</th><th>Quality</th><th>Comment</th><th>Index</th><th></th></tr></thead>
+      <tbody><tr th:each="f:${feedbackEntries}" th:id="'fb-'+${f.id}">
+        <td style="max-width:22rem" th:text="${#strings.abbreviate(f.question,140)}" th:title="${f.answer}"></td>
+        <td th:text="${f.relevance == null ? '–' : f.relevance}"></td><td th:text="${f.quality == null ? '–' : f.quality}"></td>
+        <td style="max-width:18rem" th:text="${f.comment}"></td><td th:text="${f.enrichmentStatus}"></td>
+        <td class="text-nowrap">
+          <button type="button" class="btn btn-sm btn-outline-success" th:data-action="approve" th:data-id="${f.id}" th:if="${f.enrichmentStatus.name() == 'CANDIDATE' || f.enrichmentStatus.name() == 'REJECTED' || f.enrichmentStatus.name() == 'NONE'}">Approve</button>
+          <button type="button" class="btn btn-sm btn-outline-warning" th:data-action="reject" th:data-id="${f.id}" th:if="${f.enrichmentStatus.name() != 'REJECTED'}">Reject</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" th:data-action="delete" th:data-id="${f.id}">Delete</button>
+        </td></tr></tbody></table></div>
+    <script th:inline="none">
+      document.querySelectorAll('#feedback button[data-action]').forEach(b => b.addEventListener('click', async () => {
+        const id = b.dataset.id, action = b.dataset.action, base = location.pathname.replace(/\/crates\/([^/]+)\/evaluation.*/, '/api/v1/crates/$1/feedback');
+        b.disabled = true;
+        const r = await fetch(action === 'delete' ? base + '/' + id : base + '/' + id + '/' + action, { method: action === 'delete' ? 'DELETE' : 'POST' });
+        if (r.ok) location.reload(); else { b.disabled = false; b.textContent = 'Failed'; }
+      }));
+    </script>
+  </section>
+
   <section id="questions" class="mb-5">
     <div class="d-flex justify-content-between align-items-center mb-2" style="flex-wrap:wrap;gap:.5rem">
       <h2 class="h5 mb-0">Latest evaluated answers</h2>

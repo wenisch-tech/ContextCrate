@@ -56,7 +56,7 @@ and [Deployment](deployment.md).
 
 **Querying.** A question is optionally transformed ([Query transformation](features/query-transformation.md)),
 optionally turned into a hypothetical answer whose embedding drives the vector search ([HyDE](features/hyde.md)),
-retrieved with keyword, semantic or hybrid search ([Retrieval](features/retrieval.md)), optionally in two steps, sections first and then only their chunks ([Hierarchical retrieval](features/hierarchical-retrieval.md)), optionally narrowed to K relevant and mutually different chunks ([Dartboard retrieval](features/dartboard-retrieval.md)), optionally
+retrieved with keyword, semantic or hybrid search ([Retrieval](features/retrieval.md)), optionally in two steps, sections first and then only their chunks ([Hierarchical retrieval](features/hierarchical-retrieval.md)), optionally narrowed to K relevant and mutually different chunks ([Dartboard retrieval](features/dartboard-retrieval.md)), optionally re-weighted by the ratings of earlier answers ([Answer feedback](features/feedback.md)), optionally
 reranked ([Reranking](reranking.md)) and graded ([Grading](features/grading.md)); each kept chunk can be
 expanded with its neighbours ([Context window](features/context-window.md)); the answer model
 then writes a cited answer ([Answers](answers.md)) that can be verified

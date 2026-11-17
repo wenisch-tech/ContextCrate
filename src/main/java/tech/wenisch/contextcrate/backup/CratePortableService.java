@@ -346,6 +346,7 @@ public class CratePortableService {
     rag.updateCaptions(crateId,r.path("captionsEnabled").asBoolean(false));
     rag.updateDartboard(crateId,r.path("dartboardEnabled").asBoolean(false),r.path("dartboardOversampling").asInt(RagSettingsService.DEFAULT_DARTBOARD_OVERSAMPLING),
         r.path("dartboardRelevanceWeight").asDouble(RagSettingsService.DEFAULT_DARTBOARD_WEIGHT),r.path("dartboardDiversityWeight").asDouble(RagSettingsService.DEFAULT_DARTBOARD_WEIGHT),r.path("dartboardSigma").asDouble(RagSettingsService.DEFAULT_DARTBOARD_SIGMA));
+    rag.updateFeedback(crateId,r.path("feedbackEnabled").asBoolean(false),r.path("feedbackLinkTtlHours").asInt(168),r.path("feedbackRetrievalEnabled").asBoolean(false),r.path("feedbackRetrievalMaxPerDocument").asInt(10),r.path("feedbackEnrichmentEnabled").asBoolean(false),r.path("feedbackEnrichmentIntervalHours").asInt(24),r.path("feedbackEnrichmentMinQuality").asInt(4),r.path("feedbackEnrichmentMinRelevance").asInt(3),!r.has("feedbackEnrichmentRequiresApproval")||r.path("feedbackEnrichmentRequiresApproval").asBoolean());
     rag.updateLlmRerank(crateId,r.path("llmRerankEnabled").asBoolean(false),r.path("llmRerankTopN").asInt(4));
     rag.updateContextWindow(crateId,r.path("contextWindow").asInt(0));
     rag.updateEnrichment(crateId,r.path("enrichmentEnabled").asBoolean(false),r.path("enrichmentQuestions").asInt(RagSettingsService.DEFAULT_ENRICHMENT_QUESTIONS));

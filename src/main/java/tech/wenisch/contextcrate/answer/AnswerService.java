@@ -28,6 +28,9 @@ public class AnswerService {
   private HierarchicalRetrievalService hierarchical;
   private DartboardService dartboard;
   private ContextWindowService contextWindow;
+  private FeedbackReweighter feedbackReweighter;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setFeedbackReweighter(FeedbackReweighter feedbackReweighter) { this.feedbackReweighter=feedbackReweighter; }
   private ContextCompressionService compression;
   private tech.wenisch.contextcrate.service.SystemSettingsService systemSettings;
   private tech.wenisch.contextcrate.evaluation.EvaluationCollector evaluation;
@@ -122,7 +125,9 @@ public class AnswerService {
     else if(useHyde&&!available(request.crateId())){hyde.skipped(request.crateId(),"answer-model-unavailable");useHyde=false;}
     // Dartboard: retrieve K x oversampling candidates; K relevant and mutually different chunks are chosen afterwards. Needs vectors, so not in lexical mode.
     boolean useDartboard=policy.isDartboardEnabled()&&dartboard!=null&&!"lexical".equals(mode)&&embeddingsAvailable(request.crateId());
-    int searchLimit=useDartboard?DartboardService.candidateLimit(limit,policy.getDartboardOversampling()):limit;
+    // Feedback weighting: fetch more candidates than needed, so a document that earlier ratings favour can move into the top K.
+    boolean useFeedback=policy.isFeedbackRetrievalEnabled()&&feedbackReweighter!=null&&available(request.crateId());
+    int searchLimit=useDartboard?DartboardService.candidateLimit(limit,policy.getDartboardOversampling()):useFeedback?Math.min(limit*2,100):limit;
     for(String query:queries) {
       var search=new SearchIndex.SearchRequest(request.crateId(),query,searchLimit,request.runId(),"chunk",mode);
       if("fusion".equals(mode)) search=search.withVectorWeight(policy.getFusionVectorWeight());
@@ -135,6 +140,10 @@ public class AnswerService {
       lists.add(index.search(search));
     }
     var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,searchLimit);
+    if(useFeedback){
+      results=feedbackReweighter.apply(request.crateId(),request.question(),results,policy);
+      if(!useDartboard&&results.hits().size()>limit)results=new SearchIndex.SearchResults(results.query(),results.mode(),results.hits().subList(0,limit));
+    }
     if(useDartboard)results=dartboard.apply(request.crateId(),request.question(),results,limit,policy);
     // HyDE generation has its own timer; keep it out of the retrieval time so the latency budget does not count it twice.
     metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted-hydeNanos,"transformed",applied.isEmpty()?"false":"true");

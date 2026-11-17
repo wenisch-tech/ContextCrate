@@ -135,7 +135,7 @@ public class UiController {
 
   @GetMapping("/sources/new")
   String newSource(Model model) {
-    model.addAttribute("connectorTypes", ConnectorType.values());
+    model.addAttribute("connectorTypes", java.util.Arrays.stream(ConnectorType.values()).filter(t -> t != ConnectorType.FEEDBACK).toList());
     return "source-form";
   }
 
@@ -170,7 +170,7 @@ public class UiController {
     model.addAttribute("source", source);
     model.addAttribute("config", sourceCodec.read(source.getConfigurationJson(),
         source.getConnectorType()).withoutSecrets());
-    model.addAttribute("connectorTypes", ConnectorType.values());
+    model.addAttribute("connectorTypes", java.util.Arrays.stream(ConnectorType.values()).filter(t -> t != ConnectorType.FEEDBACK).toList());
     return "source-form";
   }
 
@@ -725,6 +725,15 @@ public class UiController {
       @RequestParam(defaultValue = "1.0") double dartboardRelevanceWeight,
       @RequestParam(defaultValue = "1.0") double dartboardDiversityWeight,
       @RequestParam(defaultValue = "0.1") double dartboardSigma,
+      @RequestParam(defaultValue = "false") boolean feedbackEnabled,
+      @RequestParam(defaultValue = "168") int feedbackLinkTtlHours,
+      @RequestParam(defaultValue = "false") boolean feedbackRetrievalEnabled,
+      @RequestParam(defaultValue = "10") int feedbackRetrievalMaxPerDocument,
+      @RequestParam(defaultValue = "false") boolean feedbackEnrichmentEnabled,
+      @RequestParam(defaultValue = "24") int feedbackEnrichmentIntervalHours,
+      @RequestParam(defaultValue = "4") int feedbackEnrichmentMinQuality,
+      @RequestParam(defaultValue = "3") int feedbackEnrichmentMinRelevance,
+      @RequestParam(defaultValue = "false") boolean feedbackEnrichmentRequiresApproval,
       @RequestParam(defaultValue = "0.5") double fusionVectorWeight,
       @RequestParam(defaultValue = "0") int contextWindow,
       @RequestParam(defaultValue = "false") boolean contextCompression,
@@ -743,6 +752,7 @@ public class UiController {
       @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy())||enrichmentEnabled!=previous.isEnrichmentEnabled()||(enrichmentEnabled&&enrichmentQuestions!=previous.getEnrichmentQuestions())||(hierarchicalEnabled&&!previous.isHierarchicalEnabled())||captionsEnabled!=previous.isCaptionsEnabled();ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateFusion(crateId,fusionVectorWeight);ragSettings.updateSendImages(crateId,sendImages);ragSettings.updateIncludeImages(crateId,includeImages);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateHierarchical(crateId,hierarchicalEnabled,hierarchicalTopK);ragSettings.updateCaptions(crateId,captionsEnabled);ragSettings.updateDartboard(crateId,dartboardEnabled,dartboardOversampling,dartboardRelevanceWeight,dartboardDiversityWeight,dartboardSigma);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextCompression(crateId,contextCompression);ragSettings.updateEnrichment(crateId,enrichmentEnabled,enrichmentQuestions);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
+    ragSettings.updateFeedback(crateId,feedbackEnabled,feedbackLinkTtlHours,feedbackRetrievalEnabled,feedbackRetrievalMaxPerDocument,feedbackEnrichmentEnabled,feedbackEnrichmentIntervalHours,feedbackEnrichmentMinQuality,feedbackEnrichmentMinRelevance,feedbackEnrichmentRequiresApproval);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }
 

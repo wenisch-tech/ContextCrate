@@ -91,6 +91,12 @@ Reranking is disabled by default and can rescore the retrieval candidate pool be
 shown or used for RAG. Configure a local ONNX cross-encoder or Cohere-compatible endpoint with
 `CONTEXTCRATE_RERANKING_*`, or override every setting per crate in the UI. See [Reranking](reranking.md).
 
+## Public URL
+
+`contextcrate.public-url` (`CONTEXTCRATE_PUBLIC_URL`) is the address users reach ContextCrate under, for example `https://contextcrate.example.com`.
+It is used for the rating links of [answer feedback](features/feedback.md). When empty, the address of the request is used.
+`contextcrate.feedback.enrichment-poll-ms` (default 60000) is how often the feedback job checks which crates are due.
+
 ## Metrics
 
 Prometheus metrics are described under [Operations](operations.md#metrics).

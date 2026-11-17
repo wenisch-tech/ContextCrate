@@ -57,7 +57,7 @@ public class SecurityConfig {
       throws Exception {
     HttpSecurity security = http.authorizeHttpRequests(
             a ->
-                a.requestMatchers("/css/**", "/js/**", "/img/**", "/actuator/health/**")
+                a.requestMatchers("/css/**", "/js/**", "/img/**", "/actuator/health/**", "/feedback/**")
                     .permitAll()
                     // Metrics carry crate names, document titles and URIs across all crates.
                     .requestMatchers("/actuator/prometheus", "/actuator/metrics/**")

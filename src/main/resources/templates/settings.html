@@ -22,6 +22,7 @@
       <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
       <a href="#hierarchical" :class="{'active':active==='hierarchical'}">Hierarchical retrieval</a>
       <a href="#dartboard" :class="{'active':active==='dartboard'}">Dartboard retrieval</a>
+      <a href="#feedback" :class="{'active':active==='feedback'}">Answer feedback</a>
       <a href="#context-window" :class="{'active':active==='context-window'}">Context window</a>
       <a href="#context-compression" :class="{'active':active==='context-compression'}">Context compression</a>
       <a href="#enrichment" :class="{'active':active==='enrichment'}">Document enrichment</a>
@@ -181,6 +182,25 @@
             <div class="field"><label class="field-label" for="dartboard-diversity">Diversity weight</label><input class="input" id="dartboard-diversity" type="number" name="dartboardDiversityWeight" min="0" max="10" step="0.1" th:value="${rag.dartboardDiversityWeight}"></div>
           </div><p class="field-help">Weights 0 to 10, default 1 each, not both 0. A higher diversity weight gives more varied sources; with diversity 0 the result is the plain top K. Takes effect immediately, no rebuild. Needs embeddings: costs one embedding call per question for the candidate texts, and is skipped in lexical mode and when embeddings are unavailable.</p></div>
         </section>
+
+        <section id="feedback" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Answer feedback</h2><p class="settings-hint">After an answer people can rate how relevant the retrieved information was and how good the answer was (1 to 5), and add a comment. In the chat this is a small row under the answer; for OpenAI-compatible clients a "Rate it" link is added at the end of the answer. Ratings are stored with the question, the answer and the sources used.</p></div><label class="switch-labelled" for="feedback-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="feedback-enabled" name="feedbackEnabled" th:checked="${rag.feedbackEnabled}"><span></span></span></label></div>
+          <div class="panel-body"><div class="grid gap-4 md:grid-cols-2">
+            <div class="field"><label class="field-label" for="feedback-ttl">Rating link valid for (hours)</label><input class="input" id="feedback-ttl" type="number" name="feedbackLinkTtlHours" min="1" max="720" step="1" th:value="${rag.feedbackLinkTtlHours}"><p class="field-help">1 to 720, default 168 (7 days). The link works without signing in; unrated links are deleted after they expire.</p></div>
+            <div class="field"><label class="field-label" for="feedback-max-doc">Ratings per document</label><input class="input" id="feedback-max-doc" type="number" name="feedbackRetrievalMaxPerDocument" min="1" max="50" step="1" th:value="${rag.feedbackRetrievalMaxPerDocument}"><p class="field-help">1 to 50, default 10. The newest ratings of a document that are considered when weighting.</p></div>
+          </div>
+          <label class="switch-labelled mt-4" for="feedback-retrieval"><span>Weight retrieval by feedback</span><span class="switch"><input type="checkbox" id="feedback-retrieval" name="feedbackRetrievalEnabled" th:checked="${rag.feedbackRetrievalEnabled}"><span></span></span></label>
+          <p class="field-help">The score of a candidate document is multiplied by (average relevance rating ÷ 3) of earlier ratings that the model judges relevant for the new question; then the candidates are sorted again. Costs one short model call per earlier rating (at most 40 per question). Takes effect immediately.</p>
+          <label class="switch-labelled mt-4" for="feedback-enrichment"><span>Add well rated answers to the index</span><span class="switch"><input type="checkbox" id="feedback-enrichment" name="feedbackEnrichmentEnabled" th:checked="${rag.feedbackEnrichmentEnabled}"><span></span></span></label>
+          <div class="grid gap-4 md:grid-cols-2 mt-2">
+            <div class="field"><label class="field-label" for="feedback-interval">Interval (hours)</label><input class="input" id="feedback-interval" type="number" name="feedbackEnrichmentIntervalHours" min="1" max="720" step="1" th:value="${rag.feedbackEnrichmentIntervalHours}"></div>
+            <div class="field"><label class="field-label" for="feedback-min-quality">Minimum quality</label><input class="input" id="feedback-min-quality" type="number" name="feedbackEnrichmentMinQuality" min="1" max="5" step="1" th:value="${rag.feedbackEnrichmentMinQuality}"></div>
+            <div class="field"><label class="field-label" for="feedback-min-relevance">Minimum relevance</label><input class="input" id="feedback-min-relevance" type="number" name="feedbackEnrichmentMinRelevance" min="1" max="5" step="1" th:value="${rag.feedbackEnrichmentMinRelevance}"></div>
+            <label class="switch-labelled" for="feedback-approval"><span>Owner approval required</span><span class="switch"><input type="checkbox" id="feedback-approval" name="feedbackEnrichmentRequiresApproval" th:checked="${rag.feedbackEnrichmentRequiresApproval}"><span></span></span></label>
+          </div>
+          <p class="field-help">At every interval, answers rated at least this well become a document with the question and the verified answer, which is embedded and indexed. With approval required they wait in the feedback list on the evaluation page until an owner approves them. Last run: <span th:text="${rag.feedbackEnrichmentLastRun == null ? 'never' : rag.feedbackEnrichmentLastRun}"></span>.</p></div>
+        </section>
+
 
         <section id="images" class="panel scroll-mt-24" x-data="{img:false,desc:false}" x-init="img=$el.querySelector('#image-indexing-enabled').checked;desc=$el.querySelector('#image-description-enabled').checked">
           <div class="panel-header"><div><h2 class="settings-title">Images</h2><p class="settings-hint">Makes meaningful images in web pages, Markdown and Git repositories searchable and citable. Icons, logos, badges, avatars and tracking pixels are skipped. Applies to the next ingestion run.</p></div><label class="switch-labelled" for="image-indexing-enabled"><span>Index images</span><span class="switch"><input type="checkbox" id="image-indexing-enabled" name="imageIndexingEnabled" x-model="img" th:checked="${rag.imageIndexingEnabled}"><span></span></span></label></div>

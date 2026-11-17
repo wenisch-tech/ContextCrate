@@ -53,6 +53,21 @@ public class RagSettings {
   @Column(name="dartboard_sigma",nullable=false) private double dartboardSigma=0.1;
   public boolean isDartboardEnabled(){return dartboardEnabled;} public int getDartboardOversampling(){return dartboardOversampling;} public double getDartboardRelevanceWeight(){return dartboardRelevanceWeight;} public double getDartboardDiversityWeight(){return dartboardDiversityWeight;} public double getDartboardSigma(){return dartboardSigma;}
   public void updateDartboard(boolean enabled,int oversampling,double relevanceWeight,double diversityWeight,double sigma){this.dartboardEnabled=enabled;this.dartboardOversampling=oversampling;this.dartboardRelevanceWeight=relevanceWeight;this.dartboardDiversityWeight=diversityWeight;this.dartboardSigma=sigma;}
+  /** Answer feedback: ratings, feedback-weighted retrieval and periodic enrichment of the index with rated answers. */
+  @Column(name="feedback_enabled",nullable=false) private boolean feedbackEnabled;
+  @Column(name="feedback_link_ttl_hours",nullable=false) private int feedbackLinkTtlHours=168;
+  @Column(name="feedback_retrieval_enabled",nullable=false) private boolean feedbackRetrievalEnabled;
+  @Column(name="feedback_retrieval_max_per_document",nullable=false) private int feedbackRetrievalMaxPerDocument=10;
+  @Column(name="feedback_enrichment_enabled",nullable=false) private boolean feedbackEnrichmentEnabled;
+  @Column(name="feedback_enrichment_interval_hours",nullable=false) private int feedbackEnrichmentIntervalHours=24;
+  @Column(name="feedback_enrichment_min_quality",nullable=false) private int feedbackEnrichmentMinQuality=4;
+  @Column(name="feedback_enrichment_min_relevance",nullable=false) private int feedbackEnrichmentMinRelevance=3;
+  @Column(name="feedback_enrichment_requires_approval",nullable=false) private boolean feedbackEnrichmentRequiresApproval=true;
+  @Column(name="feedback_enrichment_last_run") private java.time.Instant feedbackEnrichmentLastRun;
+  public boolean isFeedbackEnabled(){return feedbackEnabled;} public int getFeedbackLinkTtlHours(){return feedbackLinkTtlHours;} public boolean isFeedbackRetrievalEnabled(){return feedbackRetrievalEnabled;} public int getFeedbackRetrievalMaxPerDocument(){return feedbackRetrievalMaxPerDocument;}
+  public boolean isFeedbackEnrichmentEnabled(){return feedbackEnrichmentEnabled;} public int getFeedbackEnrichmentIntervalHours(){return feedbackEnrichmentIntervalHours;} public int getFeedbackEnrichmentMinQuality(){return feedbackEnrichmentMinQuality;} public int getFeedbackEnrichmentMinRelevance(){return feedbackEnrichmentMinRelevance;} public boolean isFeedbackEnrichmentRequiresApproval(){return feedbackEnrichmentRequiresApproval;} public java.time.Instant getFeedbackEnrichmentLastRun(){return feedbackEnrichmentLastRun;}
+  public void updateFeedback(boolean enabled,int linkTtlHours,boolean retrieval,int maxPerDocument,boolean enrichment,int intervalHours,int minQuality,int minRelevance,boolean requiresApproval){this.feedbackEnabled=enabled;this.feedbackLinkTtlHours=linkTtlHours;this.feedbackRetrievalEnabled=retrieval;this.feedbackRetrievalMaxPerDocument=maxPerDocument;this.feedbackEnrichmentEnabled=enrichment;this.feedbackEnrichmentIntervalHours=intervalHours;this.feedbackEnrichmentMinQuality=minQuality;this.feedbackEnrichmentMinRelevance=minRelevance;this.feedbackEnrichmentRequiresApproval=requiresApproval;}
+  public void feedbackEnrichmentRan(java.time.Instant at){this.feedbackEnrichmentLastRun=at;}
   /** Captions: the answer model describes tables and diagram code; the caption is indexed next to the chunk. */
   @Column(name="captions_enabled",nullable=false) private boolean captionsEnabled;
   public boolean isCaptionsEnabled(){return captionsEnabled;} public void updateCaptions(boolean enabled){this.captionsEnabled=enabled;}

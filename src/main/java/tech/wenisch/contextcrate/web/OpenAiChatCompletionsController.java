@@ -79,6 +79,11 @@ public class OpenAiChatCompletionsController {
   private final CrateAccessService access;
   private final RuntimeProviderSettings settings;
 
+  private tech.wenisch.contextcrate.feedback.FeedbackService feedback;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setFeedback(tech.wenisch.contextcrate.feedback.FeedbackService feedback) { this.feedback = feedback; }
+
   public OpenAiChatCompletionsController(
       AnswerService answers, CrateAccessService access, RuntimeProviderSettings settings) {
     this.answers = answers;
@@ -98,9 +103,11 @@ public class OpenAiChatCompletionsController {
     var prepared = answers.prepare(toAnswerRequest(crateId, request));
     String id = "chatcmpl-" + UUID.randomUUID();
     String model = configuredModel(crateId);
+    // Built here: the streamed answer is produced on another thread, where the request is no longer available.
+    String feedbackBase = feedback == null ? null : feedback.baseUrl();
 
     if (!Boolean.TRUE.equals(request.stream())) {
-      String text = answerText(prepared);
+      String text = answerText(prepared, feedbackBase);
       return ResponseEntity.ok(completion(id, model, text, prepared));
     }
 
@@ -110,7 +117,7 @@ public class OpenAiChatCompletionsController {
           try {
             // The role arrives first so a client can render the assistant turn before content.
             send(emitter, chunk(id, model, new Delta("assistant", null), null));
-            String text = answerText(prepared);
+            String text = answerText(prepared, feedbackBase);
             send(emitter, chunk(id, model, new Delta(null, text), null));
             send(emitter, chunk(id, model, new Delta(null, null), "stop"));
             send(emitter, "[DONE]");
@@ -144,10 +151,15 @@ public class OpenAiChatCompletionsController {
    * base64 data URLs (the form OpenAI-compatible chat clients render). Citations are annotated first, so the picture
    * data never passes through the citation rewriting.
    */
-  private String answerText(AnswerService.Prepared prepared) throws Exception {
+  private String answerText(AnswerService.Prepared prepared, String feedbackBase) throws Exception {
     if (prepared.strictGrounding() && prepared.sources().isEmpty()) { answers.declined(prepared); return annotateCitations(NO_ANSWER, prepared.sources()); }
     var result = answers.generate(prepared);
-    return result.embedImages(annotateCitations(result.textWithMarkers(), prepared.sources()));
+    String text = result.embedImages(annotateCitations(result.textWithMarkers(), prepared.sources()));
+    if (feedback == null) return text;
+    var ticket = feedback.open(prepared, result.text(), tech.wenisch.contextcrate.domain.AnswerFeedback.Channel.OPENAI, feedbackBase);
+    // No link without a base URL: a relative link would not work in the client.
+    if (ticket.isEmpty() || ticket.get().url() == null) return text;
+    return text + "\n\n<hr>\n\n<sub>Was this answer helpful? [Rate it](" + ticket.get().url() + ")</sub>";
   }
 
   private String configuredModel(UUID crateId) {

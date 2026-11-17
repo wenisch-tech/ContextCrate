@@ -107,6 +107,19 @@ wrote, so a citation cannot point somewhere the model made up. A marker that doe
 retrieved source, or whose source has no plain `http(s)` URL to link to, is left as plain `[n]` text
 and does not appear in the reference list — there is nothing accurate to point it at.
 
+## Rating link
+
+When **Answer feedback** is enabled for the crate, the answer ends with a horizontal rule and a rating link:
+
+```markdown
+<hr>
+
+<sub>Was this answer helpful? [Rate it](https://contextcrate.example.com/feedback/fb_...)</sub>
+```
+
+The link opens a page where the person rates relevance and quality (1 to 5) and can leave a comment. It needs no
+sign-in and expires (default after 7 days). See [Answer feedback](../features/feedback.md).
+
 ## Images in answers
 
 If the answer model was given a picture of a retrieved source and decides it helps (for example when the user asks to see a

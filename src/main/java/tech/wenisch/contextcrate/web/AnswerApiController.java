@@ -14,14 +14,16 @@ import java.util.UUID;
 public class AnswerApiController {
   private final AnswerService answers;
   private final CrateAccessService access;
+  private tech.wenisch.contextcrate.feedback.FeedbackService feedback;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) public void setFeedback(tech.wenisch.contextcrate.feedback.FeedbackService feedback){this.feedback=feedback;}
   public AnswerApiController(AnswerService answers, CrateAccessService access){this.answers=answers;this.access=access;}
   @PostMapping(consumes=MediaType.APPLICATION_JSON_VALUE,produces=MediaType.TEXT_EVENT_STREAM_VALUE)
   public ResponseEntity<SseEmitter> answer(@PathVariable UUID crateId, @RequestBody AnswerService.Request request) throws Exception {
     access.require(crateId, CrateMember.Role.VIEWER);
     if(!answers.available(crateId))return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-    var prepared=answers.prepare(request.withCrate(crateId));var emitter=new SseEmitter(180_000L);
+    var prepared=answers.prepare(request.withCrate(crateId));var emitter=new SseEmitter(180_000L);final String feedbackBase=feedback==null?null:feedback.baseUrl();
     emitter.send(SseEmitter.event().name("sources").data(prepared.structuredSources()?prepared.sources():java.util.List.of()));
-    CompletableFuture.runAsync(()->{try{if(prepared.strictGrounding()&&prepared.sources().isEmpty()){answers.declined(prepared);send(emitter,"delta",java.util.Map.of("text",AnswerService.NO_ANSWER));}else { var result=answers.generate(prepared);if(result.verificationStatus()!=null)send(emitter,"verification",java.util.Map.of("status",result.verificationStatus()));send(emitter,"delta",java.util.Map.of("text",result.rendered())); }send(emitter,"complete",java.util.Map.of("sourcesAvailable",!prepared.sources().isEmpty()));emitter.complete();}catch(Exception e){send(emitter,"error",java.util.Map.of("error","Answer generation failed"));emitter.completeWithError(e);}});
+    CompletableFuture.runAsync(()->{try{tech.wenisch.contextcrate.feedback.FeedbackService.Ticket ticket=null;if(prepared.strictGrounding()&&prepared.sources().isEmpty()){answers.declined(prepared);send(emitter,"delta",java.util.Map.of("text",AnswerService.NO_ANSWER));}else { var result=answers.generate(prepared);if(result.verificationStatus()!=null)send(emitter,"verification",java.util.Map.of("status",result.verificationStatus()));send(emitter,"delta",java.util.Map.of("text",result.rendered()));if(feedback!=null)ticket=feedback.open(prepared,result.text(),tech.wenisch.contextcrate.domain.AnswerFeedback.Channel.UI,feedbackBase).orElse(null); }var complete=new java.util.LinkedHashMap<String,Object>();complete.put("sourcesAvailable",!prepared.sources().isEmpty());if(ticket!=null){complete.put("feedbackToken",ticket.token());if(ticket.url()!=null)complete.put("feedbackUrl",ticket.url());complete.put("feedbackExpiresAt",ticket.expiresAt().toString());}send(emitter,"complete",complete);emitter.complete();}catch(Exception e){send(emitter,"error",java.util.Map.of("error","Answer generation failed"));emitter.completeWithError(e);}});
     return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(emitter);
   }
   private static void send(SseEmitter emitter,String name,Object data){try{emitter.send(SseEmitter.event().name(name).data(data));}catch(Exception ignored){}}

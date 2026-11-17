@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rate an answer · ContextCrate</title>
+  <link rel="stylesheet" href="/css/contextcrate.css">
+  <style>
+    .fb-card{max-width:640px;margin:2rem auto}
+    .fb-scale{display:flex;gap:.5rem;flex-wrap:wrap}
+    .fb-scale label{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .7rem;border:1px solid var(--bs-border-color,#555);border-radius:.5rem;cursor:pointer}
+    .fb-answer{white-space:pre-wrap;max-height:14rem;overflow:auto}
+  </style>
+</head>
+<body>
+<main class="card fb-card shadow-lg"><div class="card-body p-4">
+  <h1 class="h4">Rate an answer</h1>
+  <div th:if="${done}">
+    <p class="mb-0">Thanks! Your feedback helps improve future answers. You can close this page.</p>
+  </div>
+  <form th:unless="${done}" method="post" th:action="@{/feedback/{t}(t=${token})}">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+    <p class="text-secondary small mb-1">Your question</p>
+    <p th:text="${question}" class="fb-answer"></p>
+    <p class="text-secondary small mb-1">Answer (excerpt)</p>
+    <p th:text="${answer}" class="fb-answer"></p>
+    <fieldset class="mb-3"><legend class="h6">Relevance <span class="text-secondary fw-normal">– did the retrieved information match your question? (5 = very well)</span></legend>
+      <div class="fb-scale"><label th:each="n:${#numbers.sequence(1,5)}"><input type="radio" name="relevance" th:value="${n}" th:checked="${relevance != null && relevance == n}"> <span th:text="${n}"></span></label></div></fieldset>
+    <fieldset class="mb-3"><legend class="h6">Quality <span class="text-secondary fw-normal">– was the answer correct, complete and useful? (5 = very good)</span></legend>
+      <div class="fb-scale"><label th:each="n:${#numbers.sequence(1,5)}"><input type="radio" name="quality" th:value="${n}" th:checked="${quality != null && quality == n}"> <span th:text="${n}"></span></label></div></fieldset>
+    <div class="mb-3"><label class="form-label" for="comment">What went wrong? <span class="text-secondary">(optional)</span></label>
+      <textarea id="comment" class="form-control" name="comment" rows="3" maxlength="2000" th:text="${comment}"></textarea></div>
+    <button class="btn btn-primary">Submit rating</button>
+  </form>
+</div></main>
+</body>
+</html>

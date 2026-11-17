@@ -214,6 +214,37 @@
     verified: ['good', 'Checked against sources'],
     revised: ['warn', 'Revised after checking']
   };
+  /* Small, unobtrusive rating row: relevance of the retrieved information and quality of the answer, 1 to 5. */
+  const feedbackRow = turn => {
+    const row = el('span', 'fb-row'); row.style.cssText = 'display:inline-flex;gap:.9rem;align-items:center;font-size:.8rem;opacity:.8;flex-wrap:wrap';
+    const note = el('span', '', ''); note.setAttribute('aria-live', 'polite');
+    const group = (label, hint, key) => {
+      const g = el('span', '', ''); g.style.cssText = 'display:inline-flex;gap:.1rem;align-items:center'; g.setAttribute('role', 'group'); g.setAttribute('aria-label', hint);
+      g.append(document.createTextNode(label + ' '));
+      const stars = [];
+      const paint = n => stars.forEach((b, i) => { b.textContent = i < n ? '\u2605' : '\u2606'; });
+      for (let i = 1; i <= 5; i++) {
+        const b = el('button', '', '\u2606'); b.type = 'button'; b.title = i + ' of 5'; b.setAttribute('aria-label', hint + ': ' + i + ' of 5');
+        b.style.cssText = 'background:none;border:0;padding:0 .05rem;cursor:pointer;color:inherit;font-size:1rem;line-height:1';
+        b.addEventListener('mouseenter', () => paint(i)); b.addEventListener('mouseleave', () => paint(turn[key] || 0));
+        b.addEventListener('click', async () => {
+          const previous = turn[key]; turn[key] = i; paint(i);
+          try {
+            const r = await fetch(`/api/v1/crates/${crateId}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: turn.fbToken, [key === 'rel' ? 'relevance' : 'quality']: i }) });
+            if (!r.ok) throw new Error();
+            note.textContent = '\u2713 Thanks'; persist();
+          } catch { turn[key] = previous; paint(previous || 0); note.textContent = 'Could not save'; }
+        });
+        stars.push(b); g.append(b);
+      }
+      paint(turn[key] || 0);
+      return g;
+    };
+    row.append(group('Relevance', 'Relevance of the retrieved information', 'rel'), group('Quality', 'Quality of the answer', 'qual'));
+    if (turn.fbUrl) { const a = el('a', '', 'Comment'); a.href = turn.fbUrl; a.target = '_blank'; a.rel = 'noopener'; a.style.cssText = 'color:inherit;text-decoration:underline'; row.append(a); }
+    row.append(note);
+    return row;
+  };
   const finishTurn = (turn, error) => {
     turn.done = true; turn.failed = Boolean(error);
     turn.aEl.removeAttribute('aria-busy');
@@ -236,6 +267,7 @@
         });
         turn.metaEl.append(copy);
       }
+      if (turn.fbToken) turn.metaEl.append(feedbackRow(turn));
     }
     turn.metaEl.hidden = !turn.metaEl.childElementCount;
     if (active === turn) renderRail();
@@ -244,7 +276,7 @@
   /* ---------- persistence (this browser tab only) ---------- */
   const persist = () => {
     try {
-      const done = turns.filter(t => t.saved).map(t => ({ q: t.q, md: t.md, sources: t.sources, verification: t.verification }));
+      const done = turns.filter(t => t.saved).map(t => ({ q: t.q, md: t.md, sources: t.sources, verification: t.verification, fbToken: t.fbToken, fbUrl: t.fbUrl, rel: t.rel, qual: t.qual }));
       if (done.length) sessionStorage.setItem(STORE, JSON.stringify(done)); else sessionStorage.removeItem(STORE);
     } catch { /* storage unavailable: the conversation simply is not kept across reloads */ }
   };
@@ -253,7 +285,7 @@
       const saved = JSON.parse(sessionStorage.getItem(STORE) || '[]');
       for (const item of saved) {
         const turn = createTurn(item.q);
-        Object.assign(turn, { saved: true, md: item.md, sources: item.sources || [], verification: item.verification });
+        Object.assign(turn, { saved: true, md: item.md, sources: item.sources || [], verification: item.verification, fbToken: item.fbToken, fbUrl: item.fbUrl, rel: item.rel, qual: item.qual });
         renderMarkdown(turn.bodyEl, turn.md, turn);
         finishTurn(turn);
         history.push({ role: 'user', content: turn.q }, { role: 'assistant', content: turn.md });
@@ -303,6 +335,7 @@
             renderMarkdown(turn.bodyEl, turn.md, turn);
             if (!revealed) { turn.bodyEl.classList.add('reveal'); revealed = true; }
           }
+          else if (name === 'complete') { if (payload.feedbackToken) { turn.fbToken = payload.feedbackToken; turn.fbUrl = payload.feedbackUrl || null; } }
           else if (name === 'error') throw new Error(payload.error || 'The answer could not be generated.');
         }
       }

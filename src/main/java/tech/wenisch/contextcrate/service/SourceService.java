@@ -48,7 +48,7 @@ public class SourceService {
   }
 
   public List<Source> list(UUID crateId) {
-    return sources.findByCrateIdOrderByCreatedAtDesc(crateId);
+    return sources.findByCrateIdOrderByCreatedAtDesc(crateId).stream().filter(s -> s.getConnectorType() != ConnectorType.FEEDBACK).toList();
   }
 
   public Source require(UUID crateId, UUID id) {

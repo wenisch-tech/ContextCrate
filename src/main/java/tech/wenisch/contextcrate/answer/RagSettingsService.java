@@ -56,6 +56,15 @@ public class RagSettingsService {
   @Transactional public RagSettings updateLlmRerank(java.util.UUID crateId,boolean enabled,int topN){var value=current(crateId);value.updateLlmRerank(enabled,topN);return settings.save(value);}
   /** Captions for tables and diagrams. Changing the switch needs an index rebuild (the caller schedules it). */
   @Transactional public RagSettings updateCaptions(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateCaptions(enabled);return settings.save(value);}
+  public static final int MIN_FEEDBACK_TTL_HOURS=1,MAX_FEEDBACK_TTL_HOURS=720,MAX_FEEDBACK_PER_DOCUMENT=50;
+  /** Answer feedback switches and thresholds; takes effect immediately, no rebuild. */
+  @Transactional public RagSettings updateFeedback(java.util.UUID crateId,boolean enabled,int linkTtlHours,boolean retrieval,int maxPerDocument,boolean enrichment,int intervalHours,int minQuality,int minRelevance,boolean requiresApproval){
+    if(linkTtlHours<MIN_FEEDBACK_TTL_HOURS||linkTtlHours>MAX_FEEDBACK_TTL_HOURS)throw new IllegalArgumentException("feedback link validity must be between "+MIN_FEEDBACK_TTL_HOURS+" and "+MAX_FEEDBACK_TTL_HOURS+" hours");
+    if(intervalHours<MIN_FEEDBACK_TTL_HOURS||intervalHours>MAX_FEEDBACK_TTL_HOURS)throw new IllegalArgumentException("feedback enrichment interval must be between "+MIN_FEEDBACK_TTL_HOURS+" and "+MAX_FEEDBACK_TTL_HOURS+" hours");
+    if(maxPerDocument<1||maxPerDocument>MAX_FEEDBACK_PER_DOCUMENT)throw new IllegalArgumentException("feedback per document must be between 1 and "+MAX_FEEDBACK_PER_DOCUMENT);
+    if(minQuality<1||minQuality>5||minRelevance<1||minRelevance>5)throw new IllegalArgumentException("feedback thresholds must be between 1 and 5");
+    var value=current(crateId);value.updateFeedback(enabled,linkTtlHours,retrieval,maxPerDocument,enrichment,intervalHours,minQuality,minRelevance,requiresApproval);return settings.save(value);
+  }
   public static final int MIN_DARTBOARD_OVERSAMPLING=2,MAX_DARTBOARD_OVERSAMPLING=10,DEFAULT_DARTBOARD_OVERSAMPLING=3;
   public static final double MIN_DARTBOARD_SIGMA=0.01,MAX_DARTBOARD_SIGMA=1.0,DEFAULT_DARTBOARD_SIGMA=0.1,MAX_DARTBOARD_WEIGHT=10.0,DEFAULT_DARTBOARD_WEIGHT=1.0;
   /** Dartboard retrieval; takes effect on the next question, no rebuild. */
