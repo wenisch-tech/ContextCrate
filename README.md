@@ -35,6 +35,7 @@ ContextCrate keeps that context on infrastructure you control, combines lexical 
 
 Every option is switchable per crate or ingestion job, off by default, and documented with a diagram and tuning advice. Combine them and measure the effect with the built-in evaluation.
 
+
 ### Chunking and indexing
 
 | Option | What it does |
