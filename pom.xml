@@ -15,7 +15,7 @@
     <description>Self-hosted crawling and indexing platform</description>
     <properties>
         <java.version>25</java.version>
-        <thymeleaf.version>3.1.6.RELEASE</thymeleaf.version>
+        <thymeleaf.version>3.1.7.RELEASE</thymeleaf.version>
         <commons-codec.version>1.23.0</commons-codec.version>
         <commonmark.version>0.32.0</commonmark.version>
         <treesitter.version>0.25.3</treesitter.version>
@@ -28,17 +28,17 @@
         <djl.version>0.40.0</djl.version>
         <jgit.version>7.8.1.202611041320-r</jgit.version>
         <mockito.version>5.24.0</mockito.version>
-        <postgresql.version>42.7.14</postgresql.version>
+        <postgresql.version>42.7.15</postgresql.version>
         <!-- Overrides spring-boot-dependencies' rabbit-amqp-client.version (5.30.0) to clear
              CVE-2026-63337/63335/63336/69219/69220 in the transitive com.rabbitmq:amqp-client. -->
         <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
         <!-- Overrides spring-boot-dependencies' tomcat.version (11.0.24). -->
-        <tomcat.version>11.0.27</tomcat.version>
+        <tomcat.version>11.0.29</tomcat.version>
         <mcp.version>2.0.1</mcp.version>
         <mcp.sdk.version>2.1.0</mcp.sdk.version>
         <jackson-bom.version>3.2.4</jackson-bom.version>
         <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
-        <netty.version>4.2.20.Final</netty.version>
+        <netty.version>4.2.21.Final</netty.version>
     </properties>
     <dependencyManagement>
         <dependencies>
