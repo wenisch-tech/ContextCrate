@@ -26,6 +26,9 @@ public class AnswerService {
   private QueryTransformationService transformation;
   private HydeService hyde;
   private AdaptiveRetrievalService adaptive;
+  private tech.wenisch.contextcrate.graph.GraphSearchService graphSearch;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setGraphSearch(tech.wenisch.contextcrate.graph.GraphSearchService graphSearch) { this.graphSearch=graphSearch; }
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   public void setAdaptive(AdaptiveRetrievalService adaptive) { this.adaptive=adaptive; }
   private HierarchicalRetrievalService hierarchical;
@@ -106,7 +109,7 @@ public class AnswerService {
     metrics.count("answer.requests",request.crateId(),"transformed",transformed);
     metrics.time("answer.prepare.duration",request.crateId(),System.nanoTime()-prepareStarted,"transformed",transformed);
     for(var source:sources)hot.record(request.crateId(),source.documentId(),source.chunkId());
-    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied(),retrieved.hydeQueries(),promptLayers(request.crateId(),policy),policy.isSendImagesToModel(),policy.isSendImagesToModel()&&policy.isIncludeImagesInAnswer());
+    return new Prepared(request.crateId(),request.question(),history,found.mode(),sources,actor(),policy.isStrictGrounding(),policy.isInlineCitations(),policy.isStructuredSources(),policy.isAnswerVerificationEnabled(),policy.getAnswerVerificationFailureAction(),retrieved.queries(),retrieved.applied(),retrieved.hydeQueries(),promptLayers(request.crateId(),policy),policy.isSendImagesToModel(),policy.isSendImagesToModel()&&policy.isIncludeImagesInAnswer(),retrieved.graph());
   }
   /**
    * Retrieves chunks for the question. With query transformation enabled the question is turned into
@@ -114,6 +117,11 @@ public class AnswerService {
    * the transformed queries; grading, generation and verification keep the original question.
    */
   private Retrieved retrieve(Request request,List<HistoryMessage> history,RagSettings policy,int limit,String mode) throws Exception {
+    // Graph RAG: local or global search over the knowledge graph replaces chunk retrieval; nothing usable = normal retrieval.
+    if(graphSearch!=null&&policy.isGraphRetrievalEnabled()&&policy.isGraphExtractionEnabled()&&available(request.crateId())) {
+      var graph=graphRetrieve(request,history,policy,limit,mode);
+      if(graph!=null)return graph;
+    }
     List<String> queries=List.of(request.question());List<String> applied=List.of();
     // Adaptive retrieval: the model classifies the question; the category decides queries, candidate count and final selection.
     // It replaces query transformation and Dartboard for this question. An unknown category runs the normal pipeline.
@@ -169,7 +177,25 @@ public class AnswerService {
     if(category!=null)results=adaptiveSelect(request.crateId(),category,request.question(),results,limit);
     // HyDE generation has its own timer; keep it out of the retrieval time so the latency budget does not count it twice.
     metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted-hydeNanos,"transformed",applied.isEmpty()?"false":"true");
-    return new Retrieved(results,queries,applied,hydeQueries);
+    return new Retrieved(results,queries,applied,hydeQueries,null);
+  }
+  private Retrieved graphRetrieve(Request request,List<HistoryMessage> history,RagSettings policy,int limit,String mode) throws Exception {
+    long started=System.nanoTime();
+    java.util.function.Function<String,List<UUID>> chunkSearch=query->{
+      try{return index.search(new SearchIndex.SearchRequest(request.crateId(),query,limit,request.runId(),"chunk",mode)).hits().stream().map(SearchIndex.SearchHit::id).toList();}
+      catch(Exception e){log.warn("Index search for graph entry points failed. crateId={}: {}",request.crateId(),e.toString());return List.of();}
+    };
+    var found=graphSearch.search(request.crateId(),request.question(),history,policy.getGraphSearchMode(),limit,chunkSearch);
+    if(found==null)return null;
+    SearchIndex.SearchResults results=new SearchIndex.SearchResults(request.question(),mode,List.of());
+    if(!found.chunkIds().isEmpty()) {
+      // The index supplies title, URI and snippet of the chunks the graph chose; the graph's order is kept.
+      var hits=index.search(new SearchIndex.SearchRequest(request.crateId(),request.question(),found.chunkIds().size(),request.runId(),"chunk",mode).withChunkIds(new HashSet<>(found.chunkIds())));
+      Map<UUID,Integer> order=new HashMap<>();for(int i=0;i<found.chunkIds().size();i++)order.put(found.chunkIds().get(i),i);
+      results=new SearchIndex.SearchResults(hits.query(),hits.mode(),hits.hits().stream().filter(h->order.containsKey(h.id())).sorted(Comparator.comparingInt(h->order.get(h.id()))).toList());
+    }
+    metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-started,"transformed","true");
+    return new Retrieved(results,List.of(request.question()),List.of("graph:"+found.mode()),0,found.context());
   }
   /** The model picks the final K from the pooled candidates; a failure keeps the ranking order. */
   private SearchIndex.SearchResults adaptiveSelect(UUID crateId,AdaptiveRetrievalService.Category category,String question,SearchIndex.SearchResults results,int limit) {
@@ -211,7 +237,12 @@ public class AnswerService {
         .map(h->new SearchIndex.SearchHit(h.id(),h.documentId(),h.runId(),h.kind(),h.title(),h.sourceUri(),h.chunkOrdinal(),h.snippet(),score.get(h.id()).floatValue(),h.lexicalScore(),h.semanticScore(),h.rerankScore(),h.content(),h.retrievalContent())).toList();
     return new SearchIndex.SearchResults(query,lists.getFirst().mode(),fused);
   }
-  private record Retrieved(SearchIndex.SearchResults results,List<String> queries,List<String> applied,int hydeQueries) {}
+  private record Retrieved(SearchIndex.SearchResults results,List<String> queries,List<String> applied,int hydeQueries,GraphContext graph) {}
+  /**
+   * Knowledge graph context for generation (Graph RAG): entities, relations and community reports (local search) or the
+   * highest rated partial answers of the map step (global search), rendered as text.
+   */
+  public record GraphContext(String mode,String text,int entities,int communities) {}
   private List<Source> grade(UUID crateId,String question,List<Source> candidates) {
     List<Source> accepted=new ArrayList<>();
     try(var ignored=tech.wenisch.contextcrate.config.CrateContext.use(crateId)) {
@@ -324,7 +355,12 @@ public class AnswerService {
     for(var h:p.history())messages.add(new AnswerGenerationProvider.Message(h.role(),h.content()));
     messages.add(new AnswerGenerationProvider.Message("user",p.question()));return messages;
   }
-  private static String sourceContext(Prepared p) { var context=new StringBuilder("UNTRUSTED RETRIEVED SOURCES:\n");for(var s:p.sources())context.append("[SOURCE ").append(s.citation()).append("] URI: ").append(s.sourceUri()).append("\nCONTENT:\n").append(s.content()).append("\n[END SOURCE ").append(s.citation()).append("]\n");return context.toString(); }
+  private static String sourceContext(Prepared p) {
+    var context=new StringBuilder("UNTRUSTED RETRIEVED SOURCES:\n");for(var s:p.sources())context.append("[SOURCE ").append(s.citation()).append("] URI: ").append(s.sourceUri()).append("\nCONTENT:\n").append(s.content()).append("\n[END SOURCE ").append(s.citation()).append("]\n");
+    if(p.graph()!=null)context.append("\nUNTRUSTED KNOWLEDGE GRAPH CONTEXT (").append(GLOBAL_GRAPH.equals(p.graph().mode())?"global search: combine the most relevant partial answers into one answer":"local search: entities, relations and community reports").append("; not citable as a numbered source):\n").append(p.graph().text()).append("[END KNOWLEDGE GRAPH CONTEXT]\n");
+    return context.toString();
+  }
+  private static final String GLOBAL_GRAPH="global";
   private static String unsupportedWarning(String answer) { return "Warning: this answer contains statements that are not supported by the retrieved sources.\n\n"+answer; }
   private static String unavailableWarning(String answer) { return "Warning: this answer could not be verified against the retrieved sources.\n\n"+answer; }
   private static String actor(){var a=SecurityContextHolder.getContext().getAuthentication();return a==null?"system":a.getName();}
@@ -338,7 +374,11 @@ public class AnswerService {
     public String viewUrl() { return tech.wenisch.contextcrate.util.GitWebLinks.viewUrl(sourceUri); }
   }
   /** @param searchQueries what retrieval searched for; @param transformations strategies that changed the query set */
-  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages,boolean includeImages) {
+  public record Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages,boolean includeImages,GraphContext graph) {
+    /** Without knowledge graph context. */
+    public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages,boolean includeImages) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,hydeQueries,prompts,sendImages,includeImages,null); }
+    /** Whether there is anything to answer from: retrieved sources or knowledge graph context (global search has no sources). */
+    public boolean hasContext() { return !sources.isEmpty()||graph!=null&&graph.text()!=null&&!graph.text().isBlank(); }
     /** Without the answer-image switch: pictures are only shown to the model, never returned. */
     public Prepared(UUID crateId,String question,List<HistoryMessage> history,String mode,List<Source> sources,String actor,boolean strictGrounding,boolean inlineCitations,boolean structuredSources,boolean answerVerificationEnabled,String answerVerificationFailureAction,List<String> searchQueries,List<String> transformations,int hydeQueries,SystemPrompts.Layers prompts,boolean sendImages) { this(crateId,question,history,mode,sources,actor,strictGrounding,inlineCitations,structuredSources,answerVerificationEnabled,answerVerificationFailureAction,searchQueries,transformations,hydeQueries,prompts,sendImages,false); }
     /** Without the image switch: no pictures are sent. */

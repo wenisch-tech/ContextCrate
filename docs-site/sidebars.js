@@ -41,7 +41,7 @@ const sidebars = {
             {
               type: 'category', label: 'Retrieval', collapsed: true,
               link: { type: 'doc', id: 'features/retrieval' },
-              items: ['features/hierarchical-retrieval', 'features/dartboard-retrieval', 'features/feedback', 'features/adaptive-retrieval', 'features/query-transformation', 'features/hyde', 'reranking'],
+              items: ['features/hierarchical-retrieval', 'features/dartboard-retrieval', 'features/feedback', 'features/graph-rag', 'features/adaptive-retrieval', 'features/query-transformation', 'features/hyde', 'reranking'],
             },
             {
               type: 'category', label: 'Answer generation', collapsed: true,

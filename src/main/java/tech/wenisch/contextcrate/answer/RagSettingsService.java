@@ -81,6 +81,14 @@ public class RagSettingsService {
     if(topK<MIN_HIERARCHICAL_TOP_K||topK>MAX_HIERARCHICAL_TOP_K)throw new IllegalArgumentException("hierarchical sections must be between "+MIN_HIERARCHICAL_TOP_K+" and "+MAX_HIERARCHICAL_TOP_K);
     var value=current(crateId);value.updateHierarchical(enabled,topK);return settings.save(value);
   }
+  public static final java.util.List<String> GRAPH_SEARCH_MODES=java.util.List.of("local","global","auto");
+  /** Graph RAG switches; a null mode keeps the stored one. Retrieval needs extraction (no graph without it). */
+  @Transactional public RagSettings updateGraphRag(java.util.UUID crateId,boolean extraction,boolean retrieval,String mode){
+    var value=current(crateId);
+    String normalized=mode==null||mode.isBlank()?value.getGraphSearchMode():mode.strip().toLowerCase(java.util.Locale.ROOT);
+    if(!GRAPH_SEARCH_MODES.contains(normalized))throw new IllegalArgumentException("graph search mode must be local, global or auto");
+    value.updateGraphRag(extraction,extraction&&retrieval,normalized);return settings.save(value);
+  }
   @Transactional public RagSettings updateAdaptiveRetrieval(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateAdaptiveRetrieval(enabled);return settings.save(value);}
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){

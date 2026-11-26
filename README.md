@@ -53,11 +53,16 @@ Every option is switchable per crate or ingestion job, off by default, and docum
 | Option | What it does |
 |---|---|
 | [Hybrid and fusion search](docs/features/retrieval.md) | BM25 keyword and semantic vector search, fused by rank (hybrid) or by weighted, normalized scores (fusion), plus optional [reranking](docs/reranking.md): batched cross-encoder reranking (local ONNX or remote) or LLM based reranking. |
+| [Graph RAG](docs/features/graph-rag.md) | Builds a knowledge graph (entities, weighted relations, hierarchical Leiden communities with reports) and answers with local or global graph search; interactive graph explorer. |
 | [Adaptive retrieval](docs/features/adaptive-retrieval.md) | Classifies each question as factual, analytical or opinion and retrieves accordingly: precise passages, broad redundancy-free coverage, or balanced viewpoints. |
 | [Query transformation](docs/features/query-transformation.md) | Rewrites the question, asks a step-back question or splits it into sub-queries, chosen manually or automatically. |
 | [Hierarchical retrieval](docs/features/hierarchical-retrieval.md) | Two-level index: LLM summaries of document sections are searched first, then chunks only inside the best sections. |
 | [Dartboard retrieval](docs/features/dartboard-retrieval.md) | Picks the top K chunks by relevance and diversity from K × oversampling candidates, with an optional smoothing parameter sigma. |
 | [HyDE](docs/features/hyde.md) | Embeds an LLM-written hypothetical answer instead of the question to find the real chunks. |
+
+With Graph RAG switched on, the **Knowledge Graph** page shows the extracted entities, coloured by community. Node size grows with the number of chunks mentioning an entity, and edge thickness with the number of separate documents naming two entities together. Click an entity or a community for its description, relations and sources.
+
+![Knowledge Graph page: entities of a crate coloured by community, with the community list and entity type filter](docs/img/knowledge-graph-dark-overview.png)
 
 ### Answer generation
 
@@ -156,7 +161,7 @@ The full documentation is available at **[contextcrate.eu/docs](https://contextc
 
 **RAG features**
 - Chunking and indexing: [Parsing](https://contextcrate.eu/docs/features/parsing/) · [Chunking](https://contextcrate.eu/docs/features/chunking/) · [Semantic chunking](https://contextcrate.eu/docs/features/semantic-chunking/) · [Contextual headers](https://contextcrate.eu/docs/features/contextual-headers/) · [Document enrichment](https://contextcrate.eu/docs/features/document-enrichment/) · [Images](https://contextcrate.eu/docs/features/images/) · [Captions](https://contextcrate.eu/docs/features/multimodal-captions/) · [Embeddings](https://contextcrate.eu/docs/embeddings/)
-- Retrieval: [Retrieval](https://contextcrate.eu/docs/features/retrieval/) · [Hierarchical retrieval](https://contextcrate.eu/docs/features/hierarchical-retrieval/) · [Dartboard retrieval](https://contextcrate.eu/docs/features/dartboard-retrieval/) · [Adaptive retrieval](https://contextcrate.eu/docs/features/adaptive-retrieval/) · [Query transformation](https://contextcrate.eu/docs/features/query-transformation/) · [HyDE](https://contextcrate.eu/docs/features/hyde/) · [Reranking](https://contextcrate.eu/docs/reranking/)
+- Retrieval: [Retrieval](https://contextcrate.eu/docs/features/retrieval/) · [Hierarchical retrieval](https://contextcrate.eu/docs/features/hierarchical-retrieval/) · [Dartboard retrieval](https://contextcrate.eu/docs/features/dartboard-retrieval/) · [Graph RAG](https://contextcrate.eu/docs/features/graph-rag/) · [Adaptive retrieval](https://contextcrate.eu/docs/features/adaptive-retrieval/) · [Query transformation](https://contextcrate.eu/docs/features/query-transformation/) · [HyDE](https://contextcrate.eu/docs/features/hyde/) · [Reranking](https://contextcrate.eu/docs/reranking/)
 - Answer generation: [Answers](https://contextcrate.eu/docs/answers/) · [Context window](https://contextcrate.eu/docs/features/context-window/) · [Contextual compression](https://contextcrate.eu/docs/features/contextual-compression/) · [Grading](https://contextcrate.eu/docs/features/grading/) · [Answer verification](https://contextcrate.eu/docs/features/answer-verification/)
 - Evaluation: [RAG evaluation](https://contextcrate.eu/docs/features/evaluation/)
 

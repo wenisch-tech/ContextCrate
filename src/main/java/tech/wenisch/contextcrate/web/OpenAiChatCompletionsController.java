@@ -152,7 +152,7 @@ public class OpenAiChatCompletionsController {
    * data never passes through the citation rewriting.
    */
   private String answerText(AnswerService.Prepared prepared, String feedbackBase) throws Exception {
-    if (prepared.strictGrounding() && prepared.sources().isEmpty()) { answers.declined(prepared); return annotateCitations(NO_ANSWER, prepared.sources()); }
+    if (prepared.strictGrounding() && !prepared.hasContext()) { answers.declined(prepared); return annotateCitations(NO_ANSWER, prepared.sources()); }
     var result = answers.generate(prepared);
     String text = result.embedImages(annotateCitations(result.textWithMarkers(), prepared.sources()));
     if (feedback == null) return text;

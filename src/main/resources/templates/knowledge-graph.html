@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head><th:block th:replace="~{fragments :: head('Knowledge Graph')}"></th:block></head>
+<body><aside th:replace="~{fragments :: sidebar}"></aside><div th:replace="~{fragments :: overlay}"></div><header th:replace="~{fragments :: topbar('Workspace')}"></header>
+<main class="page" x-data="knowledgeGraph($el.dataset.crateId)" th:attr="data-crate-id=${crate.id}">
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Graph RAG</p>
+      <h1 class="page-title">Knowledge Graph</h1>
+      <p class="page-copy">Entities and relations the answer model found in this crate's documents, grouped into communities. Larger nodes are mentioned in more chunks; thicker edges connect entities named together in more separate documents. Click an entity or a community to see its description and sources.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2" th:if="${crateRole != null and crateRole.includes(T(tech.wenisch.contextcrate.domain.CrateMember.Role).OWNER)}">
+      <a class="btn-secondary btn-sm" th:href="@{/crates/{id}/settings(id=${crate.id})} + '#graph-rag'">Graph RAG settings</a>
+      <button type="button" class="btn-secondary btn-sm" @click="rebuild()" :disabled="rebuildState==='sending'" th:disabled="${!graphEnabled}"><i data-lucide="refresh-cw" class="size-4"></i>Rebuild graph</button>
+    </div>
+  </div>
+
+  <div class="alert-info mb-4" th:if="${!graphEnabled}">Graph RAG is switched off for this crate. A crate owner can switch on <strong>Build knowledge graph</strong> in the crate settings; the graph is then built after indexing.</div>
+  <div class="alert-info mb-4" th:if="${param.rebuildScheduled != null}">The graph is rebuilt as soon as indexing is idle.</div>
+  <div class="alert-info mb-4" x-show="rebuildState==='scheduled'" x-cloak>The graph is rebuilt as soon as indexing is idle.</div>
+  <div class="alert-error mb-4" x-show="rebuildState==='failed'" x-cloak>The rebuild could not be scheduled.</div>
+  <div class="alert-error mb-4" x-show="error" x-cloak x-text="error"></div>
+
+  <div class="kg-status mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-300">
+    <span>Status: <strong class="text-ink-100" th:text="${graphStatus.status == 'READY' ? 'ready' : graphStatus.status == 'BUILDING' ? 'building' : graphStatus.status == 'FAILED' ? 'last build failed' : 'not built yet'}">not built yet</strong><span th:if="${graphStatus.dirty}"> · update pending</span></span>
+    <span th:if="${graphStatus.finishedAt != null}" th:text="${graphStatus.entities} + ' entities · ' + ${graphStatus.edges} + ' edges · ' + ${graphStatus.communities} + ' communities on ' + ${graphStatus.levels} + ' level(s)'"></span>
+    <span th:if="${graphStatus.finishedAt != null}" th:text="'Built ' + ${#strings.replace(#strings.substring(graphStatus.finishedAt.toString(), 0, 16), 'T', ' ')} + ' UTC'"></span>
+    <span x-show="truncated" x-cloak x-text="'Showing the ' + nodeCount + ' most mentioned of ' + totalNodes + ' entities'"></span>
+  </div>
+  <p class="alert-warn mb-4" th:if="${graphStatus.status == 'FAILED' and graphStatus.error != null}" th:text="'Last build failed: ' + ${graphStatus.error}"></p>
+
+  <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+    <section class="panel kg-stage relative overflow-hidden">
+      <div x-ref="canvas" class="kg-canvas h-[72vh] min-h-[480px] w-full" aria-label="Knowledge graph" role="img"></div>
+
+      <div class="empty-state absolute inset-0 grid place-items-center" x-show="!loading && nodeCount===0" x-cloak>
+        <div class="max-w-md p-6 text-center"><p class="text-lg font-semibold text-ink-100">No knowledge graph yet</p><p class="mt-2 text-sm text-ink-300">The graph appears here once Graph RAG is switched on and the documents have been indexed. Building runs in the background after indexing.</p></div>
+      </div>
+      <div class="absolute inset-0 grid place-items-center text-sm text-ink-300" x-show="loading">Loading the knowledge graph…</div>
+
+      <!-- Search -->
+      <div class="absolute left-3 top-3 w-72 max-w-[calc(100%-6rem)]" x-show="nodeCount>0" x-cloak @click.outside="matches=[]">
+        <label class="sr-only" for="kg-search">Find an entity</label>
+        <input id="kg-search" class="input kg-glass" type="search" placeholder="Find an entity…" autocomplete="off" x-model="query" @input.debounce.150ms="search()" @keydown.escape="matches=[];query=''" @keydown.enter.prevent="matches.length && pickMatch(matches[0].id)">
+        <ul class="kg-glass mt-1 overflow-hidden rounded-lg border border-ink-700/70" x-show="matches.length">
+          <template x-for="m in matches" :key="m.id">
+            <li><button type="button" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-brand-500/15" @click="pickMatch(m.id)"><span class="truncate text-ink-100" x-text="m.name"></span><span class="badge shrink-0" x-text="m.type"></span></button></li>
+          </template>
+        </ul>
+      </div>
+
+      <!-- Camera and layout controls -->
+      <div class="kg-glass absolute right-3 top-3 flex flex-col overflow-hidden rounded-lg border border-ink-700/70" x-show="nodeCount>0" x-cloak>
+        <button type="button" class="kg-tool" @click="zoomIn()" title="Zoom in" aria-label="Zoom in"><i data-lucide="zoom-in" class="size-4"></i></button>
+        <button type="button" class="kg-tool" @click="zoomOut()" title="Zoom out" aria-label="Zoom out"><i data-lucide="zoom-out" class="size-4"></i></button>
+        <button type="button" class="kg-tool" @click="resetView()" title="Fit the whole graph" aria-label="Fit the whole graph"><i data-lucide="maximize-2" class="size-4"></i></button>
+        <button type="button" class="kg-tool" @click="toggleLayout()" :title="layoutRunning ? 'Stop the layout' : 'Run the layout again'" :aria-label="layoutRunning ? 'Stop the layout' : 'Run the layout again'"><i data-lucide="pause" class="size-4" x-show="layoutRunning"></i><i data-lucide="play" class="size-4" x-show="!layoutRunning"></i></button>
+      </div>
+
+      <!-- Level and counts -->
+      <div class="kg-glass absolute bottom-3 left-3 flex flex-wrap items-center gap-3 rounded-lg border border-ink-700/70 px-3 py-2 text-xs text-ink-300" x-show="nodeCount>0" x-cloak>
+        <span x-text="nodeCount + ' entities · ' + edgeCount + ' edges'"></span>
+        <label class="flex items-center gap-2" x-show="levels>1">Community level
+          <input type="range" min="0" :max="Math.max(0, levels-1)" step="1" :value="level" @input="setLevel($event.target.value)" class="kg-range" aria-label="Community level">
+          <span class="text-ink-100" x-text="level"></span>
+        </label>
+      </div>
+    </section>
+
+    <aside class="space-y-4">
+      <!-- Entity details -->
+      <section class="panel" x-show="selected && selected.kind==='entity'" x-cloak>
+        <div class="panel-header"><div class="min-w-0"><p class="eyebrow">Entity</p><h2 class="settings-title truncate" x-text="selected?.data.name"></h2></div><button type="button" class="btn-ghost btn-sm" @click="clearSelection()" aria-label="Close details"><i data-lucide="x" class="size-4"></i></button></div>
+        <div class="panel-body space-y-4 text-sm">
+          <div class="flex flex-wrap gap-2"><span class="badge" x-text="selected?.data.type"></span><span class="badge" x-show="selected?.data.chunkCount" x-text="selected?.data.chunkCount + ' chunks'"></span><span class="badge" x-show="selected?.data.documentCount" x-text="selected?.data.documentCount + ' documents'"></span><span class="badge" x-show="selected?.data.degree" x-text="selected?.data.degree + ' connections'"></span></div>
+          <p class="leading-relaxed text-ink-100" x-show="selected?.data.description" x-text="selected?.data.description"></p>
+          <p class="text-ink-300" x-show="detailLoading">Loading…</p>
+          <div x-show="selected?.data.communities?.length">
+            <p class="field-label">Communities</p>
+            <div class="flex flex-col gap-1">
+              <template x-for="c in (selected?.data.communities || [])" :key="c.id">
+                <button type="button" class="flex items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-brand-500/10" @click="selectCommunity(c.id)"><span class="kg-dot" :style="'background:' + communityColour(c.id)"></span><span class="truncate text-ink-100" x-text="c.title"></span><span class="ml-auto shrink-0 text-xs text-ink-500" x-text="'level ' + c.level"></span></button>
+              </template>
+            </div>
+          </div>
+          <div x-show="selected?.data.neighbours?.length">
+            <p class="field-label">Connected entities</p>
+            <ul class="space-y-1">
+              <template x-for="n in (selected?.data.neighbours || [])" :key="n.id">
+                <li><button type="button" class="w-full rounded-md px-2 py-1 text-left hover:bg-brand-500/10" @click="selectEntity(n.id)"><span class="flex items-center gap-2"><span class="truncate text-ink-100" x-text="n.name"></span><span class="badge shrink-0" x-text="n.type"></span><span class="ml-auto shrink-0 text-xs text-ink-500" x-text="'weight ' + n.weight.toFixed(1)"></span></span><span class="block text-xs text-ink-300" x-show="n.description" x-text="n.description"></span></button></li>
+              </template>
+            </ul>
+          </div>
+          <div x-show="selected?.data.chunks?.length">
+            <p class="field-label">Mentioned in</p>
+            <ul class="space-y-2">
+              <template x-for="c in (selected?.data.chunks || [])" :key="c.chunkId">
+                <li class="rounded-lg border border-ink-700/70 p-2"><a class="font-medium text-brand-400 hover:underline" :href="c.url" x-text="c.title || c.sourceUri || 'Document'"></a><p class="text-xs text-ink-500" x-show="c.heading" x-text="c.heading"></p><p class="mt-1 text-xs leading-relaxed text-ink-300" x-text="c.snippet"></p></li>
+              </template>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Community details -->
+      <section class="panel" x-show="selected && selected.kind==='community'" x-cloak>
+        <div class="panel-header"><div class="min-w-0"><p class="eyebrow" x-text="'Community · level ' + (selected?.data.level ?? '')"></p><h2 class="settings-title" x-text="selected?.data.title"></h2></div><button type="button" class="btn-ghost btn-sm" @click="clearSelection()" aria-label="Close details"><i data-lucide="x" class="size-4"></i></button></div>
+        <div class="panel-body space-y-4 text-sm">
+          <div class="flex flex-wrap gap-2"><span class="badge" x-show="selected?.data.size" x-text="selected?.data.size + ' entities'"></span><span class="badge" x-show="selected?.data.rating !== undefined" x-text="'importance ' + Number(selected?.data.rating ?? 0).toFixed(1) + ' / 10'"></span></div>
+          <p class="whitespace-pre-line leading-relaxed text-ink-100" x-text="selected?.data.summary"></p>
+          <p class="text-ink-300" x-show="detailLoading">Loading…</p>
+          <button type="button" class="flex items-center gap-2 text-left text-brand-400 hover:underline" x-show="selected?.data.parent" @click="selectCommunity(selected.data.parent.id)" x-text="'Part of: ' + (selected?.data.parent?.title || '')"></button>
+          <div x-show="selected?.data.children?.length">
+            <p class="field-label">Sub-communities</p>
+            <div class="flex flex-col gap-1">
+              <template x-for="c in (selected?.data.children || [])" :key="c.id">
+                <button type="button" class="flex items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-brand-500/10" @click="selectCommunity(c.id)"><span class="kg-dot" :style="'background:' + communityColour(c.id)"></span><span class="truncate text-ink-100" x-text="c.title"></span><span class="ml-auto shrink-0 text-xs text-ink-500" x-text="c.size"></span></button>
+              </template>
+            </div>
+          </div>
+          <div x-show="selected?.data.members?.length">
+            <p class="field-label">Members</p>
+            <div class="flex flex-wrap gap-1">
+              <template x-for="m in (selected?.data.members || [])" :key="m.id">
+                <button type="button" class="badge hover:border-brand-500/60" @click="selectEntity(m.id)" x-text="m.name"></button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Overview: communities of the level and entity types -->
+      <section class="panel" x-show="!selected && nodeCount>0" x-cloak>
+        <div class="panel-header"><div><p class="eyebrow" x-text="'Level ' + level"></p><h2 class="settings-title">Communities</h2></div></div>
+        <div class="panel-body max-h-[34vh] space-y-1 overflow-y-auto">
+          <p class="text-sm text-ink-300" x-show="!levelCommunities.length">No communities on this level.</p>
+          <template x-for="c in levelCommunities" :key="c.id">
+            <button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-brand-500/10" @click="selectCommunity(c.id)"><span class="kg-dot" :style="'background:' + communityColour(c.id)"></span><span class="truncate text-ink-100" x-text="c.title"></span><span class="ml-auto shrink-0 text-xs text-ink-500" x-text="c.size"></span></button>
+          </template>
+        </div>
+      </section>
+      <section class="panel" x-show="!selected && types.length" x-cloak>
+        <div class="panel-header"><div><h2 class="settings-title">Entity types</h2></div><div class="flex gap-1"><button type="button" class="btn-ghost btn-sm" @click="allTypes(true)">All</button><button type="button" class="btn-ghost btn-sm" @click="allTypes(false)">None</button></div></div>
+        <div class="panel-body flex flex-wrap gap-2">
+          <template x-for="t in types" :key="t.type">
+            <button type="button" class="badge" :class="t.on ? 'border-brand-500/60 text-ink-100' : 'opacity-50 line-through'" @click="toggleType(t.type)" :aria-pressed="t.on"><span x-text="t.type"></span><span class="ml-1 text-ink-500" x-text="t.count"></span></button>
+          </template>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

@@ -407,3 +407,20 @@
   .report h2 { break-after: avoid; }
   .report-glossary { break-before: page; }
 }
+
+/* Knowledge graph explorer */
+.kg-canvas { background:
+  radial-gradient(circle at 20% 15%, rgba(99, 102, 241, .16), transparent 45%),
+  radial-gradient(circle at 85% 80%, rgba(34, 211, 238, .10), transparent 50%),
+  var(--color-ink-950); }
+html.light .kg-canvas, html[data-theme="light"] .kg-canvas { background:
+  radial-gradient(circle at 20% 15%, rgba(99, 102, 241, .10), transparent 45%),
+  radial-gradient(circle at 85% 80%, rgba(34, 211, 238, .08), transparent 50%),
+  #f8fafc; }
+.kg-glass { background: color-mix(in srgb, var(--color-ink-900) 82%, transparent); backdrop-filter: blur(8px); }
+.kg-tool { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; color: var(--color-ink-300); }
+.kg-tool + .kg-tool { border-top: 1px solid color-mix(in srgb, var(--color-ink-700) 70%, transparent); }
+.kg-tool:hover { background: color-mix(in srgb, var(--color-brand-500) 18%, transparent); color: var(--color-ink-100); }
+.kg-tool:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: -2px; }
+.kg-dot { display: inline-block; width: .625rem; height: .625rem; border-radius: 9999px; flex-shrink: 0; box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ink-950) 60%, transparent); }
+.kg-range { accent-color: var(--color-brand-500); width: 7rem; }

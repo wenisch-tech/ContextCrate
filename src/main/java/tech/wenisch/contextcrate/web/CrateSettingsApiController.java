@@ -39,6 +39,10 @@ public class CrateSettingsApiController {
     if(r.fusionVectorWeight()!=null)updated=rag.updateFusion(crateId,r.fusionVectorWeight());
     if(r.hydeEnabled()!=null)updated=rag.updateHyde(crateId,r.hydeEnabled());
     if(r.adaptiveRetrievalEnabled()!=null)updated=rag.updateAdaptiveRetrieval(crateId,r.adaptiveRetrievalEnabled());
+    boolean graphChanged=r.graphExtractionEnabled()!=null&&r.graphExtractionEnabled()&&!current.isGraphExtractionEnabled();
+    if(r.graphExtractionEnabled()!=null||r.graphRetrievalEnabled()!=null||r.graphSearchMode()!=null)
+      updated=rag.updateGraphRag(crateId,r.graphExtractionEnabled()==null?current.isGraphExtractionEnabled():r.graphExtractionEnabled(),
+          r.graphRetrievalEnabled()==null?current.isGraphRetrievalEnabled():r.graphRetrievalEnabled(),r.graphSearchMode());
     if(r.dartboardEnabled()!=null||r.dartboardOversampling()!=null||r.dartboardRelevanceWeight()!=null||r.dartboardDiversityWeight()!=null||r.dartboardSigma()!=null){
       updated=rag.updateDartboard(crateId,r.dartboardEnabled()==null?current.isDartboardEnabled():r.dartboardEnabled(),
           r.dartboardOversampling()==null?current.getDartboardOversampling():r.dartboardOversampling(),
@@ -77,7 +81,7 @@ public class CrateSettingsApiController {
     }
     if(r.sendImagesToModel()!=null)updated=rag.updateSendImages(crateId,r.sendImagesToModel());
     if(r.includeImagesInAnswer()!=null)updated=rag.updateIncludeImages(crateId,r.includeImagesInAnswer());
-    if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy)||headerChanged||enrichmentChanged||hierarchicalChanged||captionsChanged)rebuild.rebuildAsync(crateId);return updated;
+    if(!strategy.equals(oldStrategy)||!policy.equals(oldPolicy)||headerChanged||enrichmentChanged||hierarchicalChanged||captionsChanged||graphChanged)rebuild.rebuildAsync(crateId);return updated;
   }
   @GetMapping("/providers") public ProviderView providers(@PathVariable UUID crateId){
     access.requireMutable(crateId,CrateMember.Role.OWNER);
@@ -107,7 +111,7 @@ public class CrateSettingsApiController {
   }
   public record RagRequest(boolean strictGrounding,boolean allowClientHistory,boolean inlineCitations,
       boolean structuredSources,Boolean gradingEnabled,Boolean answerVerificationEnabled,String answerVerificationFailureAction,String retrievalMode,String retrievalStrategy,String propositionFailurePolicy,int sourceLimit,Boolean queryTransformationEnabled,java.util.List<String> queryTransformationStrategies,Boolean hydeEnabled,Boolean enrichmentEnabled,Integer enrichmentQuestions,Integer contextWindow,Boolean contextCompression,String contextHeaderVariant,Integer contextHeaderWords,
-      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK,Boolean dartboardEnabled,Integer dartboardOversampling,Double dartboardRelevanceWeight,Double dartboardDiversityWeight,Double dartboardSigma,Boolean captionsEnabled,Boolean adaptiveRetrievalEnabled){}
+      Boolean imageIndexingEnabled,Boolean imageDescriptionEnabled,UUID imageVisionModelId,Integer imageMaxPerRun,Integer imageMaxBytes,Integer imageMinSize,String imageSkipPatterns,Double fusionVectorWeight,Boolean sendImagesToModel,Boolean includeImagesInAnswer,Boolean hierarchicalEnabled,Integer hierarchicalTopK,Boolean dartboardEnabled,Integer dartboardOversampling,Double dartboardRelevanceWeight,Double dartboardDiversityWeight,Double dartboardSigma,Boolean captionsEnabled,Boolean adaptiveRetrievalEnabled,Boolean graphExtractionEnabled,Boolean graphRetrievalEnabled,String graphSearchMode){}
   public record ProviderView(boolean embeddingsEnabled,String embeddingProvider,String localModelId,
       String localRevision,String localDownloadUrl,String localCachePath,String localModelPath,
       String openaiBaseUrl,String openaiModel,int openaiDimensions,int openaiMaxInputCharacters,boolean embeddingAutomaticLimitRecovery,int embeddingEffectiveMaxInputCharacters,boolean rerankingEnabled,String rerankingProvider,int rerankingCandidateLimit,String rerankingLocalModelId,String rerankingLocalRevision,String rerankingLocalDownloadUrl,String rerankingLocalCachePath,String rerankingLocalModelPath,String rerankingCohereBaseUrl,String rerankingCohereModel,int rerankingCohereMaxInputCharacters,int rerankingCohereTimeoutSeconds,boolean answeringEnabled,

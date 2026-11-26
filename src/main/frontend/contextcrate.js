@@ -1,11 +1,13 @@
 import Alpine from 'alpinejs';
+import { knowledgeGraph } from './knowledge-graph.js';
 import { createIcons, X, Menu, LayoutDashboard, Network, Files, ScanSearch, Activity,
   Settings2, KeyRound, Boxes, Shield, ArrowLeftRight, UserRound, LockKeyhole, Braces,
-  LogOut, Plus, Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, BookOpen, UsersRound, MessageSquare } from 'lucide';
+  LogOut, Plus, Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, BookOpen, UsersRound, MessageSquare, Gauge, Waypoints, ZoomIn, ZoomOut, Maximize2, RefreshCw, Play, Pause } from 'lucide';
 
 const icons = { X, Menu, LayoutDashboard, Network, Files, ScanSearch, Activity, Settings2,
   KeyRound, Boxes, Shield, ArrowLeftRight, UserRound, LockKeyhole, Braces, LogOut, Plus,
-  Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, BookOpen, UsersRound, MessageSquare };
+  Search, ArrowLeft, ArrowRight, Sun, Moon, Github, Bug, BookOpen, UsersRound, MessageSquare, Gauge, Waypoints,
+  ZoomIn, ZoomOut, Maximize2, RefreshCw, Play, Pause };
 
 const storedTheme = (() => {
   try { return localStorage.getItem('contextcrate-theme'); } catch { return null; }
@@ -37,6 +39,8 @@ Alpine.store('theme', {
     try { localStorage.setItem('contextcrate-theme', this.mode); } catch { /* use the current page only */ }
   }
 });
+
+Alpine.data('knowledgeGraph', knowledgeGraph);
 
 Alpine.data('wizard', (steps = 5, initial = 1) => ({
   step: Math.min(Math.max(Number(initial) || 1, 1), steps),

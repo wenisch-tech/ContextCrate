@@ -627,10 +627,15 @@ public class UiController {
     return "operations";
   }
 
+  private tech.wenisch.contextcrate.graph.GraphStore graphStore;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setGraphStore(tech.wenisch.contextcrate.graph.GraphStore graphStore) { this.graphStore = graphStore; }
+
   @GetMapping("/settings")
   String settings(@PathVariable UUID crateId,Model model) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
     model.addAttribute("rag", ragSettings.current(crateId));
+    model.addAttribute("graphStatus", graphStore == null ? tech.wenisch.contextcrate.graph.GraphModel.BuildStatus.NONE : graphStore.status(crateId));
     if (backendService != null) model.addAttribute("backends", backendService.view(crateId));
     if (systemPromptService != null) model.addAttribute("systemPrompt", systemPromptService.view(crateId));
     model.addAttribute("answering", properties.answering());
@@ -718,6 +723,9 @@ public class UiController {
       @RequestParam(required = false) java.util.List<String> queryTransformationStrategies,
       @RequestParam(defaultValue = "false") boolean hydeEnabled,
       @RequestParam(defaultValue = "false") boolean adaptiveRetrievalEnabled,
+      @RequestParam(defaultValue = "false") boolean graphExtractionEnabled,
+      @RequestParam(defaultValue = "false") boolean graphRetrievalEnabled,
+      @RequestParam(required = false) String graphSearchMode,
       @RequestParam(defaultValue = "false") boolean hierarchicalEnabled,
       @RequestParam(defaultValue = "4") int hierarchicalTopK,
       @RequestParam(defaultValue = "false") boolean captionsEnabled,
@@ -752,7 +760,7 @@ public class UiController {
       @RequestParam(defaultValue = "64") int imageMinSize,
       @RequestParam(defaultValue = "") String imageSkipPatterns) {
     access.requireMutable(crateId,CrateMember.Role.OWNER);
-    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy())||enrichmentEnabled!=previous.isEnrichmentEnabled()||(enrichmentEnabled&&enrichmentQuestions!=previous.getEnrichmentQuestions())||(hierarchicalEnabled&&!previous.isHierarchicalEnabled())||captionsEnabled!=previous.isCaptionsEnabled();ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateFusion(crateId,fusionVectorWeight);ragSettings.updateSendImages(crateId,sendImages);ragSettings.updateIncludeImages(crateId,includeImages);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateAdaptiveRetrieval(crateId,adaptiveRetrievalEnabled);ragSettings.updateHierarchical(crateId,hierarchicalEnabled,hierarchicalTopK);ragSettings.updateCaptions(crateId,captionsEnabled);ragSettings.updateDartboard(crateId,dartboardEnabled,dartboardOversampling,dartboardRelevanceWeight,dartboardDiversityWeight,dartboardSigma);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextCompression(crateId,contextCompression);ragSettings.updateEnrichment(crateId,enrichmentEnabled,enrichmentQuestions);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
+    var previous=ragSettings.current(crateId);boolean changed=!contextHeaderVariant.equals(previous.getContextHeaderVariant())||(tech.wenisch.contextcrate.service.ContextHeaderService.enabled(contextHeaderVariant)&&contextHeaderWords!=previous.getContextHeaderWords())||!retrievalStrategy.equals(previous.getRetrievalStrategy())||!propositionFailurePolicy.equals(previous.getPropositionFailurePolicy())||enrichmentEnabled!=previous.isEnrichmentEnabled()||(enrichmentEnabled&&enrichmentQuestions!=previous.getEnrichmentQuestions())||(hierarchicalEnabled&&!previous.isHierarchicalEnabled())||captionsEnabled!=previous.isCaptionsEnabled()||(graphExtractionEnabled&&!previous.isGraphExtractionEnabled());ragSettings.update(crateId,strictGrounding,allowClientHistory,inlineCitations,structuredSources,gradingEnabled,answerVerificationEnabled,answerVerificationFailureAction,retrievalMode,retrievalStrategy,propositionFailurePolicy,sourceLimit);ragSettings.updateQueryTransformation(crateId,queryTransformationEnabled,queryTransformationStrategies);ragSettings.updateFusion(crateId,fusionVectorWeight);ragSettings.updateSendImages(crateId,sendImages);ragSettings.updateIncludeImages(crateId,includeImages);ragSettings.updateHyde(crateId,hydeEnabled);ragSettings.updateAdaptiveRetrieval(crateId,adaptiveRetrievalEnabled);ragSettings.updateGraphRag(crateId,graphExtractionEnabled,graphRetrievalEnabled,graphSearchMode);ragSettings.updateHierarchical(crateId,hierarchicalEnabled,hierarchicalTopK);ragSettings.updateCaptions(crateId,captionsEnabled);ragSettings.updateDartboard(crateId,dartboardEnabled,dartboardOversampling,dartboardRelevanceWeight,dartboardDiversityWeight,dartboardSigma);ragSettings.updateContextWindow(crateId,contextWindow);ragSettings.updateContextCompression(crateId,contextCompression);ragSettings.updateEnrichment(crateId,enrichmentEnabled,enrichmentQuestions);ragSettings.updateContextHeader(crateId,contextHeaderVariant,contextHeaderWords);ragSettings.updateImages(crateId,imageIndexingEnabled,imageDescriptionEnabled,imageVisionModelId.isBlank()?null:UUID.fromString(imageVisionModelId),imageMaxPerRun,imageMaxBytes,imageMinSize,imageSkipPatterns);if(changed)rebuild.rebuildAsync(crateId);
     ragSettings.updateFeedback(crateId,feedbackEnabled,feedbackLinkTtlHours,feedbackRetrievalEnabled,feedbackRetrievalMaxPerDocument,feedbackEnrichmentEnabled,feedbackEnrichmentIntervalHours,feedbackEnrichmentMinQuality,feedbackEnrichmentMinRelevance,feedbackEnrichmentRequiresApproval);
     return "redirect:/crates/"+crateId+"/settings?saved"+(changed?"&rebuildScheduled":"");
   }

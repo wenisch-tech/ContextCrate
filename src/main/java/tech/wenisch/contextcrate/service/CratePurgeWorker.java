@@ -19,7 +19,8 @@ import tech.wenisch.contextcrate.storage.RoutingArtifactStore;
 public class CratePurgeWorker {
   private static final Logger log = LoggerFactory.getLogger(CratePurgeWorker.class);
   /** Children before parents. Tables with a cascading foreign key still list their rows explicitly, so the order never matters. */
-  static final String[] TABLES = {"extraction_result","content_hit","document_image","document_context","chunk_question","chunk_proposition",
+  static final String[] TABLES = {"graph_community_member","graph_community","graph_entity_chunk","graph_edge","graph_entity","graph_build",
+      "graph_chunk_relation","graph_chunk_entity","graph_chunk_extraction","extraction_result","content_hit","document_image","document_context","chunk_question","chunk_proposition",
       "proposition_evaluation","document_chunk","normalized_document","acquisition_record","source_item","pipeline_work_item","ingestion_run",
       "ingestion_job","source","extraction_rule","evaluation_case","evaluation_golden_item","evaluation_ignore_rule","crate_evaluation_settings","audit_log","api_key",
       "admin_elevation","crate_index_generation","crate_backend_settings","crate_rag_settings","crate_provider_settings","crate_member"};

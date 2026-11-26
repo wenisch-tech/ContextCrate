@@ -37,6 +37,13 @@ public class RagSettings {
   @Column(name="hyde_enabled",nullable=false) private boolean hydeEnabled;
   /** Adaptive retrieval: a model classifies the question (factual, analytical, opinion) and the retrieval strategy follows the category. */
   @Column(name="adaptive_retrieval_enabled",nullable=false) private boolean adaptiveRetrievalEnabled;
+  /** Graph RAG: entities and relations are extracted per chunk and a knowledge graph with communities is built after indexing. */
+  @Column(name="graph_extraction_enabled",nullable=false) private boolean graphExtractionEnabled;
+  /** Graph RAG as retrieval strategy (needs a built graph); graphSearchMode is local, global or auto. */
+  @Column(name="graph_retrieval_enabled",nullable=false) private boolean graphRetrievalEnabled;
+  @Column(name="graph_search_mode",nullable=false,length=10) private String graphSearchMode="auto";
+  public boolean isGraphExtractionEnabled(){return graphExtractionEnabled;} public boolean isGraphRetrievalEnabled(){return graphRetrievalEnabled;} public String getGraphSearchMode(){return graphSearchMode;}
+  public void updateGraphRag(boolean extraction,boolean retrieval,String mode){this.graphExtractionEnabled=extraction;this.graphRetrievalEnabled=retrieval;this.graphSearchMode=mode;}
   public boolean isAdaptiveRetrievalEnabled(){return adaptiveRetrievalEnabled;} public void updateAdaptiveRetrieval(boolean enabled){this.adaptiveRetrievalEnabled=enabled;}
   /** LLM based reranking: the answer model rates every retrieved candidate from 1 to 10; the best llmRerankTopN are kept. */
   @Column(name="llm_rerank_enabled",nullable=false) private boolean llmRerankEnabled;

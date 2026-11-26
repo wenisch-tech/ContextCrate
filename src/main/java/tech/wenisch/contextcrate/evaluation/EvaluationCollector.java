@@ -97,7 +97,7 @@ public class EvaluationCollector implements AutoCloseable {
       }
       if (!settings.judgeAvailable(crateId)) return;
       // Questions that found nothing are always kept when unanswered questions are tracked: they cost no judge scoring and are the gaps to close.
-      boolean gap = config.isTrackUnanswered() && prepared.sources().isEmpty();
+      boolean gap = config.isTrackUnanswered() && !prepared.hasContext();
       if (!gap && config.getSamplingRate() < 1.0 && ThreadLocalRandom.current().nextDouble() >= config.getSamplingRate()) {
         metrics.count("evaluation.cases", crateId, "outcome", "skipped", "source", "live");
         return;
