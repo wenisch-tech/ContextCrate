@@ -25,6 +25,9 @@ public class AnswerService {
   private int rrfConstant = 60;
   private QueryTransformationService transformation;
   private HydeService hyde;
+  private AdaptiveRetrievalService adaptive;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setAdaptive(AdaptiveRetrievalService adaptive) { this.adaptive=adaptive; }
   private HierarchicalRetrievalService hierarchical;
   private DartboardService dartboard;
   private ContextWindowService contextWindow;
@@ -112,10 +115,26 @@ public class AnswerService {
    */
   private Retrieved retrieve(Request request,List<HistoryMessage> history,RagSettings policy,int limit,String mode) throws Exception {
     List<String> queries=List.of(request.question());List<String> applied=List.of();
-    if(transformation!=null&&policy.isQueryTransformationEnabled()&&available(request.crateId())) {
+    // Adaptive retrieval: the model classifies the question; the category decides queries, candidate count and final selection.
+    // It replaces query transformation and Dartboard for this question. An unknown category runs the normal pipeline.
+    AdaptiveRetrievalService.Category category=null;
+    if(adaptive!=null&&policy.isAdaptiveRetrievalEnabled()&&available(request.crateId())) {
+      category=adaptive.classify(request.crateId(),request.question(),history);
+      if(category!=null) {
+        switch(category) {
+          case FACTUAL -> {
+            applied=new ArrayList<>(List.of("adaptive:factual"));
+            if(transformation!=null){var plan=transformation.plan(request.crateId(),request.question(),history,QueryTransformationService.REWRITE);if(!plan.applied().isEmpty()){queries=plan.queries();applied.addAll(plan.applied());}}
+          }
+          case ANALYTICAL -> {applied=List.of("adaptive:analytical");queries=adaptive.decompose(request.crateId(),request.question(),history);}
+          case OPINION -> {applied=List.of("adaptive:opinion");queries=adaptive.perspectives(request.crateId(),request.question(),history);}
+        }
+      }
+    }
+    if(category==null&&transformation!=null&&policy.isQueryTransformationEnabled()&&available(request.crateId())) {
       var plan=transformation.plan(request.crateId(),request.question(),history,policy.getQueryTransformationStrategies());
       if(!plan.applied().isEmpty()){queries=plan.queries();applied=plan.applied();}
-    } else if(policy.isQueryTransformationEnabled()) metrics.count("answer.query_transformation",request.crateId(),"strategy","none","outcome","skipped");
+    } else if(category==null&&policy.isQueryTransformationEnabled()) metrics.count("answer.query_transformation",request.crateId(),"strategy","none","outcome","skipped");
     long searchStarted=System.nanoTime();
     List<SearchIndex.SearchResults> lists=new ArrayList<>();
     // HyDE: the vector leg embeds an LLM-written hypothetical answer; keywords, reranking and snippets keep the query.
@@ -124,10 +143,12 @@ public class AnswerService {
     else if(useHyde&&!embeddingsAvailable(request.crateId())){hyde.skipped(request.crateId(),"embeddings-unavailable");useHyde=false;}
     else if(useHyde&&!available(request.crateId())){hyde.skipped(request.crateId(),"answer-model-unavailable");useHyde=false;}
     // Dartboard: retrieve K x oversampling candidates; K relevant and mutually different chunks are chosen afterwards. Needs vectors, so not in lexical mode.
-    boolean useDartboard=policy.isDartboardEnabled()&&dartboard!=null&&!"lexical".equals(mode)&&embeddingsAvailable(request.crateId());
+    boolean useDartboard=category==null&&policy.isDartboardEnabled()&&dartboard!=null&&!"lexical".equals(mode)&&embeddingsAvailable(request.crateId());
     // Feedback weighting: fetch more candidates than needed, so a document that earlier ratings favour can move into the top K.
     boolean useFeedback=policy.isFeedbackRetrievalEnabled()&&feedbackReweighter!=null&&available(request.crateId());
-    int searchLimit=useDartboard?DartboardService.candidateLimit(limit,policy.getDartboardOversampling()):useFeedback?Math.min(limit*2,100):limit;
+    // Adaptive: factual fetches 2K candidates for the one right passage; analytical and opinion search K per query and pool the lists.
+    int searchLimit=category==AdaptiveRetrievalService.Category.FACTUAL?Math.min(limit*2,100):useDartboard?DartboardService.candidateLimit(limit,policy.getDartboardOversampling()):useFeedback?Math.min(limit*2,100):limit;
+    int poolLimit=category==null?searchLimit:Math.min(searchLimit*queries.size(),100);
     for(String query:queries) {
       var search=new SearchIndex.SearchRequest(request.crateId(),query,searchLimit,request.runId(),"chunk",mode);
       if("fusion".equals(mode)) search=search.withVectorWeight(policy.getFusionVectorWeight());
@@ -139,15 +160,23 @@ public class AnswerService {
       }
       lists.add(index.search(search));
     }
-    var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,searchLimit);
+    var results=lists.size()==1?lists.getFirst():fuse(request.question(),lists,poolLimit);
     if(useFeedback){
       results=feedbackReweighter.apply(request.crateId(),request.question(),results,policy);
-      if(!useDartboard&&results.hits().size()>limit)results=new SearchIndex.SearchResults(results.query(),results.mode(),results.hits().subList(0,limit));
+      if(category==null&&!useDartboard&&results.hits().size()>limit)results=new SearchIndex.SearchResults(results.query(),results.mode(),results.hits().subList(0,limit));
     }
     if(useDartboard)results=dartboard.apply(request.crateId(),request.question(),results,limit,policy);
+    if(category!=null)results=adaptiveSelect(request.crateId(),category,request.question(),results,limit);
     // HyDE generation has its own timer; keep it out of the retrieval time so the latency budget does not count it twice.
     metrics.time("answer.retrieval.duration",request.crateId(),System.nanoTime()-searchStarted-hydeNanos,"transformed",applied.isEmpty()?"false":"true");
     return new Retrieved(results,queries,applied,hydeQueries);
+  }
+  /** The model picks the final K from the pooled candidates; a failure keeps the ranking order. */
+  private SearchIndex.SearchResults adaptiveSelect(UUID crateId,AdaptiveRetrievalService.Category category,String question,SearchIndex.SearchResults results,int limit) {
+    var hits=results.hits();
+    var pool=hits.stream().map(h->new AdaptiveRetrievalService.Candidate(h.title(),h.content()==null||h.content().isBlank()?h.snippet():h.content())).toList();
+    var chosen=adaptive.select(crateId,category,question,pool,limit);
+    return new SearchIndex.SearchResults(results.query(),results.mode(),chosen.stream().map(hits::get).toList());
   }
   /**
    * Replaces matched chunks by windows of consecutive chunks of their document. Windows of neighbouring

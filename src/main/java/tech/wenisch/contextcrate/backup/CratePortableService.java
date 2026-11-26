@@ -342,6 +342,7 @@ public class CratePortableService {
     rag.update(crateId,r.path("strictGrounding").asBoolean(),r.path("allowClientHistory").asBoolean(),r.path("inlineCitations").asBoolean(),r.path("structuredSources").asBoolean(),!r.has("gradingEnabled")||r.path("gradingEnabled").asBoolean(),!r.has("answerVerificationEnabled")||r.path("answerVerificationEnabled").asBoolean(),textOr(r,"answerVerificationFailureAction","revise-once"),text(r,"retrievalMode"),textOr(r,"retrievalStrategy","standard"),textOr(r,"propositionFailurePolicy","fail-indexing"),r.path("sourceLimit").asInt());
     rag.updateFusion(crateId,r.path("fusionVectorWeight").asDouble(0.5));
     rag.updateHyde(crateId,r.path("hydeEnabled").asBoolean(false));
+    rag.updateAdaptiveRetrieval(crateId,r.path("adaptiveRetrievalEnabled").asBoolean(false));
     rag.updateHierarchical(crateId,r.path("hierarchicalEnabled").asBoolean(false),r.path("hierarchicalTopK").asInt(RagSettingsService.DEFAULT_HIERARCHICAL_TOP_K));
     rag.updateCaptions(crateId,r.path("captionsEnabled").asBoolean(false));
     rag.updateDartboard(crateId,r.path("dartboardEnabled").asBoolean(false),r.path("dartboardOversampling").asInt(RagSettingsService.DEFAULT_DARTBOARD_OVERSAMPLING),

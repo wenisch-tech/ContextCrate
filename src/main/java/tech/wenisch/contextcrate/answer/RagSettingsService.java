@@ -81,6 +81,7 @@ public class RagSettingsService {
     if(topK<MIN_HIERARCHICAL_TOP_K||topK>MAX_HIERARCHICAL_TOP_K)throw new IllegalArgumentException("hierarchical sections must be between "+MIN_HIERARCHICAL_TOP_K+" and "+MAX_HIERARCHICAL_TOP_K);
     var value=current(crateId);value.updateHierarchical(enabled,topK);return settings.save(value);
   }
+  @Transactional public RagSettings updateAdaptiveRetrieval(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateAdaptiveRetrieval(enabled);return settings.save(value);}
   @Transactional public RagSettings updateHyde(java.util.UUID crateId,boolean enabled){var value=current(crateId);value.updateHyde(enabled);return settings.save(value);}
   @Transactional public RagSettings updateImages(java.util.UUID crateId,boolean indexing,boolean description,java.util.UUID visionModelId,int maxPerRun,int maxBytes,int minSize,String skipPatterns){
     var value=current(crateId);

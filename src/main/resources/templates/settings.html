@@ -19,7 +19,8 @@
       <a href="#retrieval" :class="{'active':active==='retrieval'}">Retrieval</a>
       <a href="#context-header" :class="{'active':active==='context-header'}">Chunk headers</a>
       <a href="#query-transformation" :class="{'active':active==='query-transformation'}">Query transformation</a>
-      <a href="#hyde" :class="{'active':active==='hyde'}">HyDE</a>
+      <a href="#adaptive" :class="{'active':active==='adaptive'}">Adaptive retrieval</a>
+      <a href="#hyde":class="{'active':active==='hyde'}">HyDE</a>
       <a href="#hierarchical" :class="{'active':active==='hierarchical'}">Hierarchical retrieval</a>
       <a href="#dartboard" :class="{'active':active==='dartboard'}">Dartboard retrieval</a>
       <a href="#feedback" :class="{'active':active==='feedback'}">Answer feedback</a>
@@ -161,6 +162,11 @@
         <section id="captions" class="panel scroll-mt-24">
           <div class="panel-header"><div><h2 class="settings-title">Captions for tables and diagrams</h2><p class="settings-hint">Before indexing, the answer model writes a short caption for every table and every diagram given as code (Mermaid, PlantUML, Graphviz). The caption is embedded and indexed next to the chunk and points back at it, so a question in plain words finds a table of numbers or a diagram's source; the answer still uses the real table or diagram and its source. Pictures are captioned by the vision model under Images.</p></div><label class="switch-labelled" for="captions-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="captions-enabled" name="captionsEnabled" th:checked="${rag.captionsEnabled}"><span></span></span></label></div>
           <div class="panel-body"><p class="field-help">Costs one answer-model call per table or diagram (up to 6,000 characters of it are sent to the answer provider); captions of unchanged chunks are reused. Changing this setting rebuilds the index in the background. If the model cannot be reached, a chunk is indexed without caption and tried again on the next rebuild.</p></div>
+        </section>
+
+        <section id="adaptive" class="panel scroll-mt-24">
+          <div class="panel-header"><div><h2 class="settings-title">Adaptive retrieval</h2><p class="settings-hint">The answer model first classifies the question and retrieval follows the category. Factual: the question is rewritten, twice as many candidates are fetched, and the model keeps the K most relevant. Analytical: the question is split into sub-questions with different angles, each is searched, and the model picks a broad, redundancy-free set. Opinion: the model identifies the viewpoints in the question, each viewpoint is searched, and the model picks a balanced set. Generation is the same for all categories.</p></div><label class="switch-labelled" for="adaptive-enabled"><span>Enabled</span><span class="switch"><input type="checkbox" id="adaptive-enabled" name="adaptiveRetrievalEnabled" th:checked="${rag.adaptiveRetrievalEnabled}"><span></span></span></label></div>
+          <div class="panel-body"><p class="field-help">Costs two to three answer-model calls per question (classification, optional query planning, selection) and sends the question and candidate passages to the answer provider. While active it replaces query transformation and Dartboard for the question; if classification fails the normal pipeline runs. Takes effect immediately; no rebuild.</p></div>
         </section>
 
         <section id="hyde" class="panel scroll-mt-24">
